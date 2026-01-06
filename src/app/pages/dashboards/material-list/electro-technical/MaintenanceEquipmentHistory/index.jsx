@@ -11,9 +11,9 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { Fragment, useRef, useState, useEffect } from "react"; 
-import axios from "utils/axios"; 
-import { useLocation } from "react-router"; 
+import { Fragment, useRef, useState, useEffect } from "react";
+import axios from "utils/axios";
+import { useLocation } from "react-router";
 
 // Local Imports
 import { TableSortIcon } from "components/shared/table/TableSortIcon";
@@ -63,7 +63,7 @@ export default function MaintenanceEquipmentHistory() {
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState([]);
-  
+
   // ✅ Pagination state
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -103,14 +103,14 @@ export default function MaintenanceEquipmentHistory() {
 
       const response = await axios.get(
         `/material/maintenance-equipment-history`, {
-          params: {
-            fid: fid,
-            draw: 1,
-            start: pagination.pageIndex * pagination.pageSize,
-            length: pagination.pageSize,
-            'search[value]': globalFilter
-          }
+        params: {
+          fid: fid,
+          draw: 1,
+          start: pagination.pageIndex * pagination.pageSize,
+          length: pagination.pageSize,
+          'search[value]': globalFilter
         }
+      }
       );
 
       if (response.data) {
@@ -267,11 +267,21 @@ export default function MaintenanceEquipmentHistory() {
           <Button
             className="h-8 space-x-1.5 rounded-md px-3 text-xs"
             color="primary"
-            onClick={() =>
-              navigate(
-                "/dashboards/material-list/electro-technical/maintenance-equipment-history/add-new-equipment-history"
-              )
-            }
+            onClick={() => {
+              const params = new URLSearchParams(location.search);
+              const fid = params.get('fid');
+              const labId = params.get('labId');
+
+              if (fid && labId) {
+                navigate(
+                  `/dashboards/material-list/electro-technical/maintenance-equipment-history/add-new-equipment-history?fid=${fid}&labId=${labId}`
+                );
+              } else {
+                navigate(
+                  "/dashboards/material-list/electro-technical/maintenance-equipment-history/add-new-equipment-history"
+                );
+              }
+            }}
           >
             Add New Equipment History
           </Button>
@@ -282,7 +292,7 @@ export default function MaintenanceEquipmentHistory() {
         className={clsx(
           "flex flex-col pt-4",
           tableSettings.enableFullScreen &&
-            "fixed inset-0 z-61 h-full w-full bg-white pt-3 dark:bg-dark-900",
+          "fixed inset-0 z-61 h-full w-full bg-white pt-3 dark:bg-dark-900",
         )}
       >
         <Toolbar table={table} />
@@ -310,9 +320,9 @@ export default function MaintenanceEquipmentHistory() {
                           "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                           header.column.getCanPin() && [
                             header.column.getIsPinned() === "left" &&
-                              "sticky z-2 ltr:left-0 rtl:right-0",
+                            "sticky z-2 ltr:left-0 rtl:right-0",
                             header.column.getIsPinned() === "right" &&
-                              "sticky z-2 ltr:right-0 rtl:left-0",
+                            "sticky z-2 ltr:right-0 rtl:left-0",
                           ],
                         )}
                       >
@@ -325,9 +335,9 @@ export default function MaintenanceEquipmentHistory() {
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext(),
-                                  )}
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
                             </span>
                             <TableSortIcon
                               sorted={header.column.getIsSorted()}
@@ -356,7 +366,7 @@ export default function MaintenanceEquipmentHistory() {
                           "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
                           row.getIsExpanded() && "border-dashed",
                           row.getIsSelected() && !isSafari &&
-                            "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                          "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
                         )}
                       >
                         {row.getVisibleCells().map((cell) => {
@@ -371,9 +381,9 @@ export default function MaintenanceEquipmentHistory() {
 
                                 cell.column.getCanPin() && [
                                   cell.column.getIsPinned() === "left" &&
-                                    "sticky z-2 ltr:left-0 rtl:right-0",
+                                  "sticky z-2 ltr:left-0 rtl:right-0",
                                   cell.column.getIsPinned() === "right" &&
-                                    "sticky z-2 ltr:right-0 rtl:left-0",
+                                  "sticky z-2 ltr:right-0 rtl:left-0",
                                 ],
                               )}
                             >
@@ -443,7 +453,7 @@ export default function MaintenanceEquipmentHistory() {
                     </select>
                     <span>entries</span>
                   </div>
-                  
+
                   {/* Records count */}
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     Showing {pagination.pageIndex * pagination.pageSize + 1} to{" "}
@@ -455,7 +465,7 @@ export default function MaintenanceEquipmentHistory() {
                     {recordsFiltered !== recordsTotal && ` (filtered from ${recordsTotal} total entries)`}
                   </div>
                 </div>
-                
+
                 <PaginationSection table={table} />
               </div>
             </div>
