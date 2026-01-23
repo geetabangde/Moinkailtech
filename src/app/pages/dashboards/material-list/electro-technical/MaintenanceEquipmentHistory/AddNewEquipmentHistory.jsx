@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'utils/axios';
-import { toast } from 'react-hot-toast';
-
+import toast, { Toaster } from 'react-hot-toast';
 import { Button, Input } from 'components/ui';
 
-const CalibrationForm = () => {
+const AddNewEquipmentHistory = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
 
   const fid = searchParams.get('fid');
   const labId = searchParams.get('labId');
@@ -95,7 +93,6 @@ const CalibrationForm = () => {
     }));
   };
 
-
   const handleBackClick = () => {
     if (fid && labId) {
       navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${fid}&labId=${labId}`);
@@ -104,14 +101,12 @@ const CalibrationForm = () => {
     }
   };
 
-
   const formatDateForAPI = (dateString) => {
     if (!dateString) return '';
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   };
 
-  // Function to handle form save
   const handleSave = async () => {
     // Validation
     if (!formData.serviceProvider.trim()) {
@@ -137,20 +132,16 @@ const CalibrationForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Prepare FormData for file upload
       const apiFormData = new FormData();
 
-      // Add master ID if available
       if (fid) {
         apiFormData.append('id', fid);
         apiFormData.append('masterid', fid);
       }
 
-      // Add basic fields - EXACT field names from Postman
       apiFormData.append('serviceprovider', formData.serviceProvider);
       apiFormData.append('typeofservice', formData.typeOfService);
       apiFormData.append('certificateno', formData.certificateNo);
-      // Convert dates to dd/mm/yyyy format
       apiFormData.append('startdate', formatDateForAPI(formData.startDate));
       apiFormData.append('enddate', formatDateForAPI(formData.endDate));
       apiFormData.append('iduse', formData.idUse || '');
@@ -159,53 +150,26 @@ const CalibrationForm = () => {
       apiFormData.append('meetacceptance', formData.meetsAcceptance || '');
       apiFormData.append('remark', formData.remark || '');
 
-   
       if (formData.certificateFile) {
         apiFormData.append('file', formData.certificateFile);
       }
 
-
       const checklistMapping = {
-        1: 'tracebilitycheck',
-        2: 'comapnycheck',
-        3: 'idcheck',
-        4: 'makecheck',
-        5: 'modelcheck',
-        6: 'srnocheck',
-        7: 'lccheck',
-        8: 'calibdatecheck',
-        9: 'duedatecheck',
-        10: 'parametercheck',
-        11: 'rangecheck',
-        12: 'resultcheck',
-        13: 'uncertaintycheck',
-        14: 'mastercertnocheck',
-        15: 'masterduedatecheck',
-        16: 'kcheck',
-        17: 'acceptablecheck'
+        1: 'tracebilitycheck', 2: 'comapnycheck', 3: 'idcheck', 4: 'makecheck',
+        5: 'modelcheck', 6: 'srnocheck', 7: 'lccheck', 8: 'calibdatecheck',
+        9: 'duedatecheck', 10: 'parametercheck', 11: 'rangecheck', 12: 'resultcheck',
+        13: 'uncertaintycheck', 14: 'mastercertnocheck', 15: 'masterduedatecheck',
+        16: 'kcheck', 17: 'acceptablecheck'
       };
 
       const remarkMapping = {
-        1: 'tracecheckremark',
-        2: 'comapnycheckremark',
-        3: 'idcheckremark',
-        4: 'makecheckremark',
-        5: 'modelcheckremark',
-        6: 'srnocheckremark',
-        7: 'lccheckremark',
-        8: 'calibdatecheckremark',
-        9: 'duedatecheckremark',
-        10: 'parametercheckremark',
-        11: 'rangecheckremark',
-        12: 'resultcheckremark',
-        13: 'uncertaintycheckremark',
-        14: 'mastercertnocheckremark',
-        15: 'masterduedatecheckremark',
-        16: 'kcheckremark',
-        17: 'acceptablecheckremark'
+        1: 'tracecheckremark', 2: 'comapnycheckremark', 3: 'idcheckremark', 4: 'makecheckremark',
+        5: 'modelcheckremark', 6: 'srnocheckremark', 7: 'lccheckremark', 8: 'calibdatecheckremark',
+        9: 'duedatecheckremark', 10: 'parametercheckremark', 11: 'rangecheckremark', 12: 'resultcheckremark',
+        13: 'uncertaintycheckremark', 14: 'mastercertnocheckremark', 15: 'masterduedatecheckremark',
+        16: 'kcheckremark', 17: 'acceptablecheckremark'
       };
 
-      // Add checklist values
       Object.keys(formData.checklist).forEach(key => {
         const item = formData.checklist[key];
         const checkName = checklistMapping[parseInt(key)];
@@ -217,7 +181,6 @@ const CalibrationForm = () => {
         }
       });
 
-      // Make API call
       const response = await axios.post('/material/add-master-validity', apiFormData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -225,15 +188,18 @@ const CalibrationForm = () => {
       });
 
       if (response.data.status) {
+        // Extract validity ID from response
+        // const validityId = response.data.id || response.data.validityId || response.data.data?.id;
+        
         toast.success(response.data.message || 'New Validity has been Added');
 
-        // Navigate back after successful save
+        // ALWAYS navigate to Add IMC page after successful save
         setTimeout(() => {
           if (fid && labId) {
-            navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${fid}&labId=${labId}`);
-          } else {
-            navigate("/dashboards/material-list/electro-technical/maintenance-equipment-history");
-          }
+      navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${fid}&labId=${labId}`);
+    } else {
+      navigate("/dashboards/material-list/electro-technical/maintenance-equipment-history");
+    }
         }, 1500);
       } else {
         toast.error(response.data.message || 'Failed to add validity');
@@ -248,8 +214,19 @@ const CalibrationForm = () => {
 
   return (
     <div className="w-full min-h-screen bg-gray-50 p-6">
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
+
       <div className="max-w-7xl mx-auto bg-white rounded-lg shadow">
-        {/* Header with Back Button */}
         <div className="flex items-center justify-between mb-6 p-6 border-b">
           <div className="flex items-center gap-4">
             <span className="text-gray-700">Add New Instrument</span>
@@ -264,7 +241,6 @@ const CalibrationForm = () => {
           </Button>
         </div>
 
-        {/* Top Form Section */}
         <div className="p-6 border-b">
           <div className="grid grid-cols-[200px_1fr] gap-4 mb-4">
             <label className="text-sm font-medium text-gray-700 flex items-center">
@@ -292,7 +268,7 @@ const CalibrationForm = () => {
             >
               <option>Calibration</option>
               <option>Maintenance</option>
-              <option>Repair</option>
+              <option>Repair/Modification</option>
             </select>
           </div>
 
@@ -363,7 +339,7 @@ const CalibrationForm = () => {
 
           <div className="grid grid-cols-[200px_1fr] gap-4 mb-4">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              Adjustment If Any
+              ID Use
             </label>
             <select
               className="w-full border border-blue-400 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -438,7 +414,6 @@ const CalibrationForm = () => {
           </div>
         </div>
 
-        {/* Checklist Table Section */}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -508,7 +483,6 @@ const CalibrationForm = () => {
           </table>
         </div>
 
-        {/* Save Button */}
         <div className="p-6 border-t flex justify-end">
           <Button
             className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -533,4 +507,4 @@ const CalibrationForm = () => {
   );
 };
 
-export default CalibrationForm;
+export default AddNewEquipmentHistory;

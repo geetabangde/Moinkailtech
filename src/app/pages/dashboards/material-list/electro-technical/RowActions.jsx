@@ -14,7 +14,7 @@ import {
   ShieldCheckIcon,
   DocumentTextIcon,
   BookOpenIcon,
-  TrashIcon,
+
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { Fragment, useCallback, useState } from "react";
@@ -53,10 +53,10 @@ export function RowActions({ row, table }) {
     setDeleteModalOpen(false);
   };
 
-  const openModal = () => {
-    setDeleteModalOpen(true);
-    setDeleteSuccess(false);
-  };
+  // const openModal = () => {
+  //   setDeleteModalOpen(true);
+  //   setDeleteSuccess(false);
+  // };
 
   const handleDeleteRows = useCallback(() => {
     setConfirmDeleteLoading(true);
@@ -156,13 +156,13 @@ export function RowActions({ row, table }) {
         ),
     },
 
-    {
-      label: "Delete",
-      icon: TrashIcon,
-      permission: 408,
-      onClick: openModal,
-      isDelete: true,
-    },
+    // {
+    //   label: "Delete",
+    //   icon: TrashIcon,
+    //   permission: 408,
+    //   onClick: openModal,
+    //   isDelete: true,
+    // },
   ];
 
   const filteredActions = actions.filter(

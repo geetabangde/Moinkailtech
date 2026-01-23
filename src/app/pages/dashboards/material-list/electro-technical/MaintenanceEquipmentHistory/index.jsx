@@ -1,4 +1,466 @@
-// Import Dependencies
+// // Import Dependencies
+// import {
+//   flexRender,
+//   getCoreRowModel,
+//   getExpandedRowModel,
+//   getFacetedMinMaxValues,
+//   getFacetedUniqueValues,
+//   getFilteredRowModel,
+//   getPaginationRowModel,
+//   getSortedRowModel,
+//   useReactTable,
+// } from "@tanstack/react-table";
+// import clsx from "clsx";
+// import { Fragment, useRef, useState, useEffect, useCallback } from "react";
+// import axios from "utils/axios";
+// import { useLocation } from "react-router";
+
+// // Local Imports
+// import { TableSortIcon } from "components/shared/table/TableSortIcon";
+// import { ColumnFilter } from "components/shared/table/ColumnFilter";
+// import { PaginationSection } from "components/shared/table/PaginationSection";
+// import { Button, Card, Table, THead, TBody, Th, Tr, Td } from "components/ui";
+// import {
+//   useBoxSize,
+//   useLockScrollbar,
+//   useLocalStorage,
+//   useDidUpdate,
+// } from "hooks";
+// import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
+// import { useSkipper } from "utils/react-table/useSkipper";
+// import { SelectedRowsActions } from "./SelectedRowsActions";
+// import { SubRowComponent } from "./SubRowComponent";
+// import { columns } from "./columns";
+// import { Toolbar } from "./Toolbar";
+// import { useThemeContext } from "app/contexts/theme/context";
+// import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
+// import { useNavigate } from "react-router";
+
+// // ----------------------------------------------------------------------
+
+// const isSafari = getUserAgentBrowser() === "Safari";
+
+// export default function MaintenanceEquipmentHistory() {
+//   const { cardSkin } = useThemeContext();
+//   const navigate = useNavigate();
+//   const location = useLocation();
+
+//   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
+
+//   // ✅ State for API data
+//   const [historyData, setHistoryData] = useState([]);
+//   const [masterRecord, setMasterRecord] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [recordsFiltered, setRecordsFiltered] = useState(0);
+
+//   const [tableSettings, setTableSettings] = useState({
+//     enableSorting: true,
+//     enableColumnFilters: true,
+//     enableFullScreen: false,
+//     enableRowDense: false,
+//   });
+
+//   const [globalFilter, setGlobalFilter] = useState("");
+//   const [sorting, setSorting] = useState([]);
+
+//   // ✅ Pagination state
+//   const [pagination, setPagination] = useState({
+//     pageIndex: 0,
+//     pageSize: 10,
+//   });
+
+//   const [columnVisibility, setColumnVisibility] = useLocalStorage(
+//     "column-visibility-maintenance-history",
+//     {},
+//   );
+
+//   const [columnPinning, setColumnPinning] = useLocalStorage(
+//     "column-pinning-maintenance-history",
+//     {},
+//   );
+
+//   const cardRef = useRef();
+//   const { width: cardWidth } = useBoxSize({ ref: cardRef });
+
+//   // ✅ API call function with useCallback to fix the missing dependency warning
+//   const fetchMaintenanceHistory = useCallback(async (fid) => {
+//     try {
+//       setLoading(true);
+
+//       const response = await axios.get(
+//         `/material/maintenance-equipment-history`, {
+//         params: {
+//           fid: fid,
+//           draw: 1,
+//           start: pagination.pageIndex * pagination.pageSize,
+//           length: pagination.pageSize,
+//           'search[value]': globalFilter
+//         }
+//       }
+//       );
+
+//       if (response.data) {
+//         setHistoryData(Array.isArray(response.data.data) ? response.data.data : []);
+//         setMasterRecord(response.data.masterRecord || null);
+//         setRecordsFiltered(response.data.recordsFiltered || 0);
+//       } else {
+//         console.warn("Unexpected response structure:", response.data);
+//         setHistoryData([]);
+//       }
+//     } catch (err) {
+//       console.error("Error fetching maintenance history:", err);
+//       setHistoryData([]);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [pagination.pageIndex, pagination.pageSize, globalFilter]);
+
+//   // ✅ Fetch maintenance history when URL params change
+//   useEffect(() => {
+//     const params = new URLSearchParams(location.search);
+//     const fid = params.get("fid") || "";
+
+//     if (fid) {
+//       fetchMaintenanceHistory(fid);
+//     } else {
+//       setLoading(false);
+//       setHistoryData([]);
+//     }
+//   }, [location.search, fetchMaintenanceHistory]);
+
+//   const table = useReactTable({
+//     data: historyData,
+//     columns: columns,
+//     state: {
+//       globalFilter,
+//       sorting,
+//       columnVisibility,
+//       columnPinning,
+//       tableSettings,
+//       pagination,
+//     },
+//     meta: {
+//       setTableSettings,
+//       deleteRow: (row) => {
+//         skipAutoResetPageIndex();
+//         setHistoryData((old) =>
+//           old.filter((oldRow) => oldRow.id !== row.original.id),
+//         );
+//       },
+//       deleteRows: (rows) => {
+//         skipAutoResetPageIndex();
+//         const rowIds = rows.map((row) => row.original.id);
+//         setHistoryData((old) => old.filter((row) => !rowIds.includes(row.id)));
+//       },
+//     },
+
+//     filterFns: {
+//       fuzzy: fuzzyFilter,
+//     },
+//     enableSorting: tableSettings.enableSorting,
+//     enableColumnFilters: tableSettings.enableColumnFilters,
+//     getCoreRowModel: getCoreRowModel(),
+//     onGlobalFilterChange: setGlobalFilter,
+//     getFilteredRowModel: getFilteredRowModel(),
+//     getFacetedUniqueValues: getFacetedUniqueValues(),
+//     getFacetedMinMaxValues: getFacetedMinMaxValues(),
+//     globalFilterFn: fuzzyFilter,
+//     onSortingChange: setSorting,
+//     getSortedRowModel: getSortedRowModel(),
+
+//     getExpandedRowModel: getExpandedRowModel(),
+//     getRowCanExpand: () => true,
+
+//     getPaginationRowModel: getPaginationRowModel(),
+//     onPaginationChange: setPagination,
+//     onColumnVisibilityChange: setColumnVisibility,
+//     onColumnPinningChange: setColumnPinning,
+
+//     autoResetPageIndex,
+//     pageCount: Math.ceil(recordsFiltered / pagination.pageSize),
+//     manualPagination: true,
+//   });
+
+//   useDidUpdate(() => table.resetRowSelection(), [historyData]);
+
+//   useLockScrollbar(tableSettings.enableFullScreen);
+
+//   // ✅ Loading UI
+//   if (loading) {
+//     return (
+//       <div className="flex h-[60vh] items-center justify-center text-gray-600">
+//         <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
+//           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+//           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
+//         </svg>
+//         Loading Maintenance History...
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="transition-content grid grid-cols-1 grid-rows-[auto_auto_1fr] px-(--margin-x) py-4">
+//       {/* ✅ Master Record Information */}
+//       {masterRecord && (
+//         <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-dark-800">
+//           <h3 className="mb-3 text-lg font-semibold text-gray-800 dark:text-white">
+//             Equipment Details
+//           </h3>
+//           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+//             <div>
+//               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Name:</span>
+//               <p className="text-sm font-semibold text-gray-800 dark:text-white">{masterRecord.name}</p>
+//             </div>
+//             <div>
+//               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">ID No:</span>
+//               <p className="text-sm font-semibold text-gray-800 dark:text-white">{masterRecord.idno}</p>
+//             </div>
+//             <div>
+//               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Serial No:</span>
+//               <p className="text-sm font-semibold text-gray-800 dark:text-white">{masterRecord.serialno}</p>
+//             </div>
+//             <div>
+//               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Make:</span>
+//               <p className="text-sm font-semibold text-gray-800 dark:text-white">{masterRecord.make}</p>
+//             </div>
+//             <div>
+//               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Model:</span>
+//               <p className="text-sm font-semibold text-gray-800 dark:text-white">{masterRecord.model}</p>
+//             </div>
+//             <div>
+//               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Quantity:</span>
+//               <p className="text-sm font-semibold text-gray-800 dark:text-white">{masterRecord.quantity}</p>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+
+//       <div className="flex items-center justify-between space-x-4">
+//         <div className="min-w-0">
+//           <h2 className="truncate text-xl font-medium tracking-wide text-gray-800 dark:text-dark-50">
+//             Maintenance Equipment History
+//           </h2>
+//         </div>
+//         {/* Right Side Actions */}
+//         <div className="flex flex-wrap items-center gap-3">
+//           {/* ✅ Service Type Filter */}
+//           <select
+//             className="h-8 rounded-md border border-gray-300 bg-white px-3 text-sm shadow-sm dark:border-gray-700 dark:bg-dark-800 dark:text-white"
+//             onChange={(e) => {
+//               const value = e.target.value || undefined;
+//               table.getColumn("typeofservice")?.setFilterValue(value);
+//             }}
+//           >
+//             <option value="">All Service Types</option>
+//             {Array.from(table.getColumn("typeofservice")?.getFacetedUniqueValues()?.keys() || [])
+//               .filter(Boolean)
+//               .sort()
+//               .map((service) => (
+//                 <option key={service} value={service}>
+//                   {service}
+//                 </option>
+//               ))}
+//           </select>
+
+//           <Button
+//             className="h-8 space-x-1.5 rounded-md px-3 text-xs"
+//             color="primary"
+//             onClick={() => {
+//               const params = new URLSearchParams(location.search);
+//               const fid = params.get('fid');
+//               const labId = params.get('labId');
+
+//               if (fid && labId) {
+//                 navigate(
+//                   `/dashboards/material-list/electro-technical/maintenance-equipment-history/add-new-equipment-history?fid=${fid}&labId=${labId}`
+//                 );
+//               } else {
+//                 navigate(
+//                   "/dashboards/material-list/electro-technical/maintenance-equipment-history/add-new-equipment-history"
+//                 );
+//               }
+//             }}
+//           >
+//             Add New Equipment History
+//           </Button>
+//         </div>
+//       </div>
+
+//       <div
+//         className={clsx(
+//           "flex flex-col pt-4",
+//           tableSettings.enableFullScreen &&
+//           "fixed inset-0 z-61 h-full w-full bg-white pt-3 dark:bg-dark-900",
+//         )}
+//       >
+//         <Toolbar table={table} />
+//         <Card
+//           className={clsx(
+//             "relative mt-3 flex grow flex-col",
+//             tableSettings.enableFullScreen && "overflow-hidden",
+//           )}
+//           ref={cardRef}
+//         >
+//           <div className="table-wrapper min-w-full grow overflow-x-auto">
+//             <Table
+//               hoverable
+//               dense={tableSettings.enableRowDense}
+//               sticky={tableSettings.enableFullScreen}
+//               className="w-full text-left rtl:text-right"
+//             >
+//               <THead>
+//                 {table.getHeaderGroups().map((headerGroup) => (
+//                   <Tr key={headerGroup.id}>
+//                     {headerGroup.headers.map((header) => (
+//                       <Th
+//                         key={header.id}
+//                         className={clsx(
+//                           "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
+//                           header.column.getCanPin() && [
+//                             header.column.getIsPinned() === "left" &&
+//                             "sticky z-2 ltr:left-0 rtl:right-0",
+//                             header.column.getIsPinned() === "right" &&
+//                             "sticky z-2 ltr:right-0 rtl:left-0",
+//                           ],
+//                         )}
+//                       >
+//                         {header.column.getCanSort() ? (
+//                           <div
+//                             className="flex cursor-pointer select-none items-center space-x-3"
+//                             onClick={header.column.getToggleSortingHandler()}
+//                           >
+//                             <span className="flex-1">
+//                               {header.isPlaceholder
+//                                 ? null
+//                                 : flexRender(
+//                                   header.column.columnDef.header,
+//                                   header.getContext(),
+//                                 )}
+//                             </span>
+//                             <TableSortIcon
+//                               sorted={header.column.getIsSorted()}
+//                             />
+//                           </div>
+//                         ) : header.isPlaceholder ? null : (
+//                           flexRender(
+//                             header.column.columnDef.header,
+//                             header.getContext(),
+//                           )
+//                         )}
+//                         {header.column.getCanFilter() ? (
+//                           <ColumnFilter column={header.column} />
+//                         ) : null}
+//                       </Th>
+//                     ))}
+//                   </Tr>
+//                 ))}
+//               </THead>
+//               <TBody>
+//                 {table.getRowModel().rows.map((row) => {
+//                   return (
+//                     <Fragment key={row.id}>
+//                       <Tr
+//                         className={clsx(
+//                           "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
+//                           row.getIsExpanded() && "border-dashed",
+//                           row.getIsSelected() && !isSafari &&
+//                           "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+//                         )}
+//                       >
+//                         {row.getVisibleCells().map((cell) => {
+//                           return (
+//                             <Td
+//                               key={cell.id}
+//                               className={clsx(
+//                                 "relative",
+//                                 cardSkin === "shadow"
+//                                   ? "dark:bg-dark-700"
+//                                   : "dark:bg-dark-900",
+
+//                                 cell.column.getCanPin() && [
+//                                   cell.column.getIsPinned() === "left" &&
+//                                   "sticky z-2 ltr:left-0 rtl:right-0",
+//                                   cell.column.getIsPinned() === "right" &&
+//                                   "sticky z-2 ltr:right-0 rtl:left-0",
+//                                 ],
+//                               )}
+//                             >
+//                               {cell.column.getIsPinned() && (
+//                                 <div
+//                                   className={clsx(
+//                                     "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
+//                                     cell.column.getIsPinned() === "left"
+//                                       ? "ltr:border-r rtl:border-l"
+//                                       : "ltr:border-l rtl:border-r",
+//                                   )}
+//                                 ></div>
+//                               )}
+//                               {flexRender(
+//                                 cell.column.columnDef.cell,
+//                                 cell.getContext(),
+//                               )}
+//                             </Td>
+//                           );
+//                         })}
+//                       </Tr>
+//                       {row.getIsExpanded() && (
+//                         <tr>
+//                           <td
+//                             colSpan={row.getVisibleCells().length}
+//                             className="p-0"
+//                           >
+//                             <SubRowComponent row={row} cardWidth={cardWidth} />
+//                           </td>
+//                         </tr>
+//                       )}
+//                     </Fragment>
+//                   );
+//                 })}
+//               </TBody>
+//             </Table>
+//           </div>
+//           <SelectedRowsActions table={table} />
+//           {historyData.length > 0 && (
+//             <div
+//               className={clsx(
+//                 "px-4 pb-4 sm:px-5 sm:pt-4",
+//                 tableSettings.enableFullScreen && "bg-gray-50 dark:bg-dark-800",
+//                 !(
+//                   table.getIsSomeRowsSelected() || table.getIsAllRowsSelected()
+//                 ) && "pt-4",
+//               )}
+//             >
+//               <PaginationSection table={table} />
+//             </div>
+//           )}
+//         </Card>
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import {
   flexRender,
   getCoreRowModel,
@@ -11,11 +473,11 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { Fragment, useRef, useState, useEffect } from "react";
+import { Fragment, useRef, useState, useEffect, useCallback } from "react";
 import axios from "utils/axios";
 import { useLocation } from "react-router";
 
-// Local Imports
+
 import { TableSortIcon } from "components/shared/table/TableSortIcon";
 import { ColumnFilter } from "components/shared/table/ColumnFilter";
 import { PaginationSection } from "components/shared/table/PaginationSection";
@@ -51,7 +513,6 @@ export default function MaintenanceEquipmentHistory() {
   const [historyData, setHistoryData] = useState([]);
   const [masterRecord, setMasterRecord] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [recordsTotal, setRecordsTotal] = useState(0);
   const [recordsFiltered, setRecordsFiltered] = useState(0);
 
   const [tableSettings, setTableSettings] = useState({
@@ -83,21 +544,8 @@ export default function MaintenanceEquipmentHistory() {
   const cardRef = useRef();
   const { width: cardWidth } = useBoxSize({ ref: cardRef });
 
-  // ✅ Fetch maintenance history when URL params change
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const fid = params.get("fid") || ""; // ✅ Get fid from URL params
-
-    if (fid) {
-      fetchMaintenanceHistory(fid);
-    } else {
-      setLoading(false);
-      setHistoryData([]);
-    }
-  }, [location.search, pagination.pageIndex, pagination.pageSize, globalFilter]);
-
-  // ✅ API call function
-  const fetchMaintenanceHistory = async (fid) => {
+  // ✅ API call function with useCallback to fix the missing dependency warning
+  const fetchMaintenanceHistory = useCallback(async (fid) => {
     try {
       setLoading(true);
 
@@ -116,7 +564,6 @@ export default function MaintenanceEquipmentHistory() {
       if (response.data) {
         setHistoryData(Array.isArray(response.data.data) ? response.data.data : []);
         setMasterRecord(response.data.masterRecord || null);
-        setRecordsTotal(response.data.recordsTotal || 0);
         setRecordsFiltered(response.data.recordsFiltered || 0);
       } else {
         console.warn("Unexpected response structure:", response.data);
@@ -127,6 +574,33 @@ export default function MaintenanceEquipmentHistory() {
       setHistoryData([]);
     } finally {
       setLoading(false);
+    }
+  }, [pagination.pageIndex, pagination.pageSize, globalFilter]);
+
+  // ✅ Fetch maintenance history when URL params change
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fid = params.get("fid") || "";
+
+    if (fid) {
+      fetchMaintenanceHistory(fid);
+    } else {
+      setLoading(false);
+      setHistoryData([]);
+    }
+  }, [location.search, fetchMaintenanceHistory]);
+
+  // ✅ Handler for Back to MM List button
+  const handleBackToMMList = () => {
+    const params = new URLSearchParams(location.search);
+    const labId = params.get('labId');
+
+    if (labId) {
+      // Navigate back to MM Instrument List with labId
+      navigate(`/dashboards/material-list/electro-technical?labId=${labId}`);
+    } else {
+      // Fallback: Navigate without labId
+      navigate('/dashboards/material-list/electro-technical');
     }
   };
 
@@ -180,14 +654,14 @@ export default function MaintenanceEquipmentHistory() {
 
     autoResetPageIndex,
     pageCount: Math.ceil(recordsFiltered / pagination.pageSize),
-    manualPagination: true, // ✅ Server-side pagination
+    manualPagination: true,
   });
 
   useDidUpdate(() => table.resetRowSelection(), [historyData]);
 
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // ✅ Loading UI
+ 
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center text-gray-600">
@@ -238,13 +712,37 @@ export default function MaintenanceEquipmentHistory() {
       )}
 
       <div className="flex items-center justify-between space-x-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-3">
           <h2 className="truncate text-xl font-medium tracking-wide text-gray-800 dark:text-dark-50">
-            Maintenance Equipment History
-          </h2>
+            Maintenance Equipment History      
+          </h2> 
         </div>
+
         {/* Right Side Actions */}
         <div className="flex flex-wrap items-center gap-3">
+        
+            {/* ✅ Back to MM List Button */}
+          <Button
+            className="h-8 space-x-1.5 rounded-md px-3 text-xs"
+            color="primary"
+            onClick={handleBackToMMList}
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span>Back to MM List</span>
+          </Button>
+        
           {/* ✅ Service Type Filter */}
           <select
             className="h-8 rounded-md border border-gray-300 bg-white px-3 text-sm shadow-sm dark:border-gray-700 dark:bg-dark-800 dark:text-white"
@@ -263,6 +761,7 @@ export default function MaintenanceEquipmentHistory() {
                 </option>
               ))}
           </select>
+
 
           <Button
             className="h-8 space-x-1.5 rounded-md px-3 text-xs"
@@ -432,42 +931,7 @@ export default function MaintenanceEquipmentHistory() {
                 ) && "pt-4",
               )}
             >
-              {/* ✅ Enhanced pagination with records info */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  {/* Page size selector */}
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <span>Show</span>
-                    <select
-                      value={table.getState().pagination.pageSize}
-                      onChange={(e) => {
-                        table.setPageSize(Number(e.target.value));
-                      }}
-                      className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-dark-700 dark:text-white"
-                    >
-                      {[10, 25, 50, 100].map((pageSize) => (
-                        <option key={pageSize} value={pageSize}>
-                          {pageSize}
-                        </option>
-                      ))}
-                    </select>
-                    <span>entries</span>
-                  </div>
-
-                  {/* Records count */}
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Showing {pagination.pageIndex * pagination.pageSize + 1} to{" "}
-                    {Math.min(
-                      (pagination.pageIndex + 1) * pagination.pageSize,
-                      recordsFiltered
-                    )}{" "}
-                    of {recordsFiltered} entries
-                    {recordsFiltered !== recordsTotal && ` (filtered from ${recordsTotal} total entries)`}
-                  </div>
-                </div>
-
-                <PaginationSection table={table} />
-              </div>
+              <PaginationSection table={table} />
             </div>
           )}
         </Card>

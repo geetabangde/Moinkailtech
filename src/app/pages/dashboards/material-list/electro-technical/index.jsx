@@ -11,8 +11,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { Fragment, useRef, useState, useEffect } from "react"; 
-import axios from "utils/axios"; 
+import { Fragment, useRef, useState, useEffect } from "react";
+import axios from "utils/axios";
 import { useSearchParams, useParams } from "react-router"; // ✅ Added useParams
 
 // Local Imports
@@ -45,8 +45,8 @@ export default function OrdersDatatableV2() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { labSlug } = useParams(); // ✅ Get current lab slug from URL
-  const labId = searchParams.get('labId'); 
-  
+  const labId = searchParams.get('labId');
+
   console.log('Lab ID from query params:', labId);
   console.log('Lab Slug from URL params:', labSlug); // ✅ Debug log
 
@@ -65,7 +65,7 @@ export default function OrdersDatatableV2() {
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState([]);
-  
+
   // ✅ Added pagination state for dynamic page size
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -103,7 +103,7 @@ export default function OrdersDatatableV2() {
       console.log('Fetching instruments for labId:', labId); // Debug
 
       const response = await axios.get(
-        `/material/mm-instrument-list?labs_id=${labId}`  
+        `/material/mm-instrument-list?labs_id=${labId}`
       );
 
       if (Array.isArray(response.data.data)) {
@@ -120,14 +120,14 @@ export default function OrdersDatatableV2() {
     }
   };
 
-  // ✅ Handler for Add New Instrument button
+
   const handleAddNewInstrument = () => {
     if (!labSlug || !labId) {
       console.error('Missing labSlug or labId');
       alert('Unable to add instrument. Lab information is missing.');
       return;
     }
-    
+
     // Navigate to AddNewInstrument with labId query parameter
     navigate(`/dashboards/material-list/${labSlug}/AddNewInstrument?labId=${labId}`);
   };
@@ -247,7 +247,7 @@ export default function OrdersDatatableV2() {
                 </option>
               ))}
           </select>
-          
+
           {/* ✅ Add New Instrument Button with dynamic labId and slug */}
           <Button
             className="h-8 space-x-1.5 rounded-md px-3 text-xs "
@@ -263,7 +263,7 @@ export default function OrdersDatatableV2() {
         className={clsx(
           "flex flex-col pt-4",
           tableSettings.enableFullScreen &&
-            "fixed inset-0 z-61 h-full w-full bg-white pt-3 dark:bg-dark-900",
+          "fixed inset-0 z-61 h-full w-full bg-white pt-3 dark:bg-dark-900",
         )}
       >
         <Toolbar table={table} />
@@ -291,9 +291,9 @@ export default function OrdersDatatableV2() {
                           "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                           header.column.getCanPin() && [
                             header.column.getIsPinned() === "left" &&
-                              "sticky z-2 ltr:left-0 rtl:right-0",
+                            "sticky z-2 ltr:left-0 rtl:right-0",
                             header.column.getIsPinned() === "right" &&
-                              "sticky z-2 ltr:right-0 rtl:left-0",
+                            "sticky z-2 ltr:right-0 rtl:left-0",
                           ],
                         )}
                       >
@@ -306,9 +306,9 @@ export default function OrdersDatatableV2() {
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext(),
-                                  )}
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
                             </span>
                             <TableSortIcon
                               sorted={header.column.getIsSorted()}
@@ -337,7 +337,7 @@ export default function OrdersDatatableV2() {
                           "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
                           row.getIsExpanded() && "border-dashed",
                           row.getIsSelected() && !isSafari &&
-                            "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                          "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
                         )}
                       >
                         {row.getVisibleCells().map((cell) => {
@@ -352,9 +352,9 @@ export default function OrdersDatatableV2() {
 
                                 cell.column.getCanPin() && [
                                   cell.column.getIsPinned() === "left" &&
-                                    "sticky z-2 ltr:left-0 rtl:right-0",
+                                  "sticky z-2 ltr:left-0 rtl:right-0",
                                   cell.column.getIsPinned() === "right" &&
-                                    "sticky z-2 ltr:right-0 rtl:left-0",
+                                  "sticky z-2 ltr:right-0 rtl:left-0",
                                 ],
                               )}
                             >
@@ -393,52 +393,11 @@ export default function OrdersDatatableV2() {
             </Table>
           </div>
           <SelectedRowsActions table={table} />
+
           {table.getFilteredRowModel().rows.length > 0 && (
-            <div
-              className={clsx(
-                "px-4 pb-4 sm:px-5 sm:pt-4",
-                tableSettings.enableFullScreen && "bg-gray-50 dark:bg-dark-800",
-                !(
-                  table.getIsSomeRowsSelected() || table.getIsAllRowsSelected()
-                ) && "pt-4",
-              )}
-            >
-              {/* ✅ Enhanced pagination with records info */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  {/* Page size selector */}
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <span>Show</span>
-                    <select
-                      value={table.getState().pagination.pageSize}
-                      onChange={(e) => {
-                        table.setPageSize(Number(e.target.value));
-                      }}
-                      className="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-dark-700 dark:text-white"
-                    >
-                      {[10, 25, 50, 100].map((pageSize) => (
-                        <option key={pageSize} value={pageSize}>
-                          {pageSize}
-                        </option>
-                      ))}
-                    </select>
-                    <span>entries</span>
-                  </div>
-                  
-                  {/* Records count */}
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
-                    {Math.min(
-                      (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-                      table.getFilteredRowModel().rows.length
-                    )}{" "}
-                    of {table.getFilteredRowModel().rows.length} entries
-                  </div>
-                </div>
-                
+        
                 <PaginationSection table={table} />
-              </div>
-            </div>
+           
           )}
         </Card>
       </div>

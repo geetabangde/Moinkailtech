@@ -93,6 +93,27 @@ export const generateLabRoutes = (labs) => {
               ).default,
             }),
           },
+
+          {
+            path: "view-imc",
+            lazy: async () => ({
+              Component: (
+                await import(
+                  "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewIntermediateCheck"
+                )
+              ).default,
+            }),
+          },
+          {
+  path: "view-planner",
+  lazy: async () => ({
+    Component: (
+      await import(
+        "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewPlanner"
+      )
+    ).default,
+  }),
+},
           {
             path: "add-new-equipment-history",
             lazy: async () => ({
@@ -137,11 +158,31 @@ export const generateLabRoutes = (labs) => {
                 }),
               },
               {
+                path: "add-new-uncertainty-matrix",
+                lazy: async () => ({
+                  Component: (
+                    await import(
+                      "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ValidityDetail/UncertaintyMatrixForm"
+                    )
+                  ).default,
+                }),
+              },
+              {
                 path: "edit-new-master-matrix",
                 lazy: async () => ({
                   Component: (
                     await import(
                       "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ValidityDetail/EditNewMasterMatrix"
+                    )
+                  ).default,
+                }),
+              },
+              {
+                path: "edit-new-uncertinity-master-matrix",
+                lazy: async () => ({
+                  Component: (
+                    await import(
+                      "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ValidityDetail/EditNewUncertinityMatrix"
                     )
                   ).default,
                 }),

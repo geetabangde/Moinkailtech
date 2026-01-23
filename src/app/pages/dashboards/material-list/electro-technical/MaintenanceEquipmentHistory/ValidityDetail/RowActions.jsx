@@ -104,12 +104,13 @@
 
 
 
+
 // RowActions.js
 import { useCallback, useState } from "react";
 import PropTypes from "prop-types";
 import { ConfirmModal } from "components/shared/ConfirmModal";
 import { Button } from "components/ui";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 const confirmMessages = {
@@ -122,8 +123,9 @@ const confirmMessages = {
   },
 };
 
-export function RowActions({ row, table, isUncertinityTable = false }) {
+export function RowActions({ row, table }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
@@ -149,35 +151,35 @@ export function RowActions({ row, table, isUncertinityTable = false }) {
 
   const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
 
-  // Handle Edit based on table context
-// RowActions.js
-// const handleEdit = () => {
-//   if (isUncertinityTable) {
-//     // Navigate to a different path for uncertinity table edit
-//     navigate(
-//       `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/edit-new-uncertinity-master-matrix`
-//     );
-//   } else {
-//     // Default navigation for the main table
-//     navigate(
-//       `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/edit-new-master-matrix`
-//     );
-//   }
-// };
-const handleEdit = () => {
-  // Check if this is from uncertainty table
-  const fromUncertaintyTable = isUncertinityTable || table.options.meta?.isUncertinityTable;
-  
-  if (fromUncertaintyTable) {
-    navigate(
-      `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/edit-new-uncertinity-master-matrix`
-    );
-  } else {
-    navigate(
-      `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/edit-new-master-matrix`
-    );
-  }
-};
+  // Handle Edit with URL parameters
+  const handleEdit = () => {
+    // Extract URL parameters
+    const params = new URLSearchParams(location.search);
+    const fid = params.get("fid") || "";
+    const cid = params.get("cid") || "";
+    const labId = params.get("labId") || "";
+    const id = row.original.id;
+
+    // Build query string
+    const queryParams = new URLSearchParams();
+    if (fid) queryParams.append('fid', fid);
+    if (cid) queryParams.append('cid', cid);
+    if (labId) queryParams.append('labId', labId);
+    if (id) queryParams.append('id', id);
+
+    // Check if this is from uncertainty table
+    const fromUncertaintyTable = table.options.meta?.isUncertaintyTable;
+    
+    if (fromUncertaintyTable) {
+      navigate(
+        `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/edit-new-uncertinity-master-matrix?${queryParams.toString()}`
+      );
+    } else {
+      navigate(
+        `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/edit-new-master-matrix?${queryParams.toString()}`
+      );
+    }
+  };
 
   return (
     <>
@@ -219,5 +221,4 @@ const handleEdit = () => {
 RowActions.propTypes = {
   row: PropTypes.object,
   table: PropTypes.object,
-  isUncertinityTable: PropTypes.bool,
 };

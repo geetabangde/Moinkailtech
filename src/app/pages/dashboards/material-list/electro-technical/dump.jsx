@@ -14,13 +14,15 @@ const Dump = () => {
     idNumber: '',
     serialNo: '',
     quantity: '',
-    location: '',  // Display location name
+    location: '', 
     reasonForDumping: ''
   });
 
   const [apiData, setApiData] = useState({
-    mlid: '',  // ✅ Changed: Material Location ID (for API submission)
-    typeofuse: '',
+    instrumentId: null,
+    locationId: null,
+    typeofuse: null,
+    quantity: null,
     issueStatus: null
   });
 
@@ -29,7 +31,6 @@ const Dump = () => {
     submitting: false
   });
   const [errors, setErrors] = useState({});
-  const [isIssued, setIsIssued] = useState(false);
 
   // Function to fetch location name from labs table
   const fetchLocationName = async (locationId) => {
@@ -38,28 +39,23 @@ const Dump = () => {
     try {
       console.log('🔍 Fetching location name for ID:', locationId);
       
-      // ✅ Correct endpoint without /api prefix
       const response = await axios.get(`/master/get-lab-byid/${locationId}`);
       
       console.log('✅ Location API Response:', response.data);
       
-      // ✅ Based on your API response structure:
-      // { "status": "true", "data": { "name": "SITE CALIBRATION" } }
       const locationName = response.data?.data?.name;
       
       console.log('📍 Extracted location name:', locationName);
       
-      // Filter out "Not Applicable" or empty values
       if (locationName && locationName !== 'Not Applicable' && locationName !== '') {
         return locationName;
       }
       
       console.warn('⚠️ No valid location name found, using ID');
-      return locationId; // Fallback to ID
+      return locationId;
     } catch (err) {
       console.error('❌ Error fetching location name:', err.message);
-      console.error('❌ Full error:', err);
-      return locationId; // Fallback to ID if fetch fails
+      return locationId;
     }
   };
 
@@ -79,7 +75,8 @@ const Dump = () => {
         const response = await axios.get(`/material/get-mm-instrument-byid?id=${instrumentId}`);
         const instrumentData = response.data?.data?.instrument || {};
         
-        console.log('✅ API Response:', instrumentData);
+        console.log('✅ Full API Response:', response.data);
+        console.log('✅ Instrument Data:', instrumentData);
         
         if (!instrumentData || Object.keys(instrumentData).length === 0) {
           toast.error('Instrument not found');
@@ -87,61 +84,50 @@ const Dump = () => {
           return;
         }
         
-        const typeofuse = parseInt(instrumentData.typeofuse) || 2;
+        // ✅ Extract exact values from API response
+        const extractedData = {
+          id: instrumentData.id,                              // 96
+          typeofuse: parseInt(instrumentData.typeofuse),      // 2
+          quantity: instrumentData.quantity || '1',           // "1"
+          instrumentlocation: instrumentData.instrumentlocation, // "1"
+          issuestatus: parseInt(instrumentData.issuestatus)   // 0
+        };
         
-        // ✅ Get location ID for API submission
-        // NOTE: Backend API should ideally return mlid (materiallocation.id)
-        // For now, using instrumentlocation as fallback
-        let mlid = instrumentData.mlid || '';
-        const instrumentLocationId = instrumentData.instrumentlocation || '';
+        console.log('📊 Extracted Data:', extractedData);
         
-        // ✅ If mlid not available, use instrumentlocation
-        if (!mlid && instrumentLocationId) {
-          console.warn('⚠️ mlid not in API response, using instrumentlocation');
-          console.warn('⚠️ Note: Backend should return materiallocation.id as mlid');
-          mlid = instrumentLocationId;
-        }
-        
-        console.log('📍 Location ID for submission (mlid):', mlid);
-        console.log('📍 Instrument Location ID:', instrumentLocationId);
-        
-        // Check issue status for typeofuse 2
-        if (typeofuse === 2) {
-          const issuestatus = parseInt(instrumentData.issuestatus);
-          if (issuestatus === 0) {
-            setIsIssued(true);
-            toast.error('This instrument is currently issued and cannot be dumped.');
-          }
-        }
-        
-        // ✅ Fetch location name from labs table
+        // Fetch location name
         let locationName = 'N/A';
-        if (instrumentLocationId) {
-          locationName = await fetchLocationName(instrumentLocationId);
+        if (extractedData.instrumentlocation) {
+          locationName = await fetchLocationName(extractedData.instrumentlocation);
           console.log('🏢 Final location name:', locationName);
         }
-        
-        // ✅ Quantity - directly from API (no unit fetch needed)
-        const quantityDisplay = instrumentData.quantity || '';
         
         // Set form data for display
         setFormData({
           name: instrumentData.name || '',
           idNumber: instrumentData.idno || '',
           serialNo: instrumentData.serialno || '',
-          quantity: quantityDisplay,  // ✅ Just the quantity value
-          location: locationName,  // ✅ Display location name
+          quantity: extractedData.quantity,
+          location: locationName,
           reasonForDumping: ''
         });
         
-        // ✅ Set API data for submission - use mlid NOT instrumentlocation
+        // ✅ Set API data for submission - these exact values will be sent
         setApiData({
-          mlid: mlid,  // ✅ Material Location ID (this goes to API)
-          typeofuse: typeofuse,
-          issueStatus: instrumentData.issuestatus
+          instrumentId: extractedData.id,                                    // mminstid
+          locationId: parseInt(extractedData.instrumentlocation),            // location
+          typeofuse: extractedData.typeofuse,                                // typeofuse
+          quantity: parseInt(extractedData.quantity) || 1,                   // qty
+          issueStatus: extractedData.issuestatus
         });
         
         console.log('✅ Form data prepared successfully');
+        console.log('📦 API Data that will be sent:', {
+          mminstid: extractedData.id,
+          location: parseInt(extractedData.instrumentlocation),
+          typeofuse: extractedData.typeofuse,
+          qty: parseInt(extractedData.quantity) || 1
+        });
         
       } catch (error) {
         console.error('❌ Error loading instrument:', error);
@@ -178,6 +164,7 @@ const Dump = () => {
   };
 
   const handleSave = async () => {
+    // Validation
     const newErrors = {};
     
     if (!formData.reasonForDumping.trim()) {
@@ -190,11 +177,22 @@ const Dump = () => {
       return;
     }
     
-    // ✅ Validate mlid exists
-    if (!apiData.mlid) {
-      toast.error('Material location ID is missing. Cannot submit dump request.');
-      console.error('❌ Missing mlid. API Data:', apiData);
-      console.error('❌ This usually means the backend API needs to return mlid field');
+    // Validate required API data
+    if (!apiData.instrumentId) {
+      toast.error('Instrument ID is missing. Cannot submit dump request.');
+      console.error('❌ Missing instrumentId. API Data:', apiData);
+      return;
+    }
+    
+    if (!apiData.locationId) {
+      toast.error('Location ID is missing. Cannot submit dump request.');
+      console.error('❌ Missing locationId. API Data:', apiData);
+      return;
+    }
+    
+    if (!apiData.typeofuse) {
+      toast.error('Type of use is missing. Cannot submit dump request.');
+      console.error('❌ Missing typeofuse. API Data:', apiData);
       return;
     }
     
@@ -203,25 +201,31 @@ const Dump = () => {
     try {
       setLoading(prev => ({ ...prev, submitting: true }));
       
-      // ✅ CRITICAL: Send mlid as "location" parameter (like PHP does)
+      // ✅ Prepare exact payload as per your requirement
       const requestData = {
-        mminstid: parseInt(instrumentId),
-        location: parseInt(apiData.mlid),  // ✅ Send mlid NOT instrumentlocation
-        typeofuse: parseInt(apiData.typeofuse),
-        qty: 1,  // For typeofuse 2, always 1
-        reason: formData.reasonForDumping.trim()
+        mminstid: apiData.instrumentId,        // 96
+        location: apiData.locationId,          // 1
+        typeofuse: apiData.typeofuse,          // 2
+        qty: apiData.quantity,                 // 1
+        reason: formData.reasonForDumping.trim() // "This is for test"
       };
       
-      console.log('📤 Submitting dump request:', requestData);
-      console.log('📍 Using mlid as location:', apiData.mlid);
+      console.log('📤 Submitting dump request with payload:', requestData);
       
-      const response = await axios.post('/material/dump-instrument', requestData);
+      // ✅ Make POST request with proper error handling
+      const response = await axios.post('/material/dump-instrument', requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       
       console.log('✅ Dump response:', response.data);
       
       toast.dismiss(loadingToast);
       
-      if (response.data?.status) {
+      // ✅ Check response status
+      if (response.data?.status === true) {
         toast.success(
           response.data?.message || 'Dump request submitted successfully',
           { duration: 3000 }
@@ -236,11 +240,26 @@ const Dump = () => {
       
     } catch (error) {
       console.error('❌ Error submitting dump:', error);
+      console.error('❌ Error response:', error.response);
       console.error('❌ Error details:', error.response?.data);
+      
       toast.dismiss(loadingToast);
       
-      const errorMessage = error.response?.data?.message || 
-                          'Failed to submit dump request. Please try again.';
+      // Better error handling for CORS and network issues
+      let errorMessage = 'Failed to submit dump request. Please try again.';
+      
+      if (error.response) {
+        // Server responded with error
+        errorMessage = error.response?.data?.message || errorMessage;
+      } else if (error.request) {
+        // Request made but no response (CORS, network issues)
+        errorMessage = 'Network error. Please check your connection and try again.';
+        console.error('❌ No response received. Possible CORS issue or network problem.');
+      } else {
+        // Something else went wrong
+        errorMessage = error.message || errorMessage;
+      }
+      
       toast.error(errorMessage, { duration: 4000 });
     } finally {
       setLoading(prev => ({ ...prev, submitting: false }));
@@ -308,14 +327,6 @@ const Dump = () => {
           </div>
         </div>
 
-        {/* Issue Warning */}
-        {isIssued && (
-          <div className="p-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-center text-lg font-semibold">
-              ⚠️ Instrument has Been Issued Right Now. Cannot proceed with dump.
-            </div>
-          </div>
-        )}
 
         {/* Form */}
         <div className="p-6 bg-white">
@@ -377,7 +388,7 @@ const Dump = () => {
                 />
               </div>
 
-              {/* Location Field - Shows lab name */}
+              {/* Location Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Location
@@ -401,7 +412,7 @@ const Dump = () => {
                   onChange={(e) => handleInputChange('reasonForDumping', e.target.value)}
                   className="w-full min-h-[100px] p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical bg-yellow-50"
                   placeholder="Enter reason for dumping"
-                  disabled={isIssued}
+                 
                 />
                 {errors.reasonForDumping && (
                   <p className="mt-1 text-sm text-red-600">
@@ -414,7 +425,7 @@ const Dump = () => {
               <div className="flex justify-start pt-4">
                 <Button
                   onClick={handleSave}
-                  disabled={isIssued || loading.submitting}
+                  disabled={loading.submitting}
                   className="bg-indigo-500 hover:bg-fuchsia-500 text-white px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading.submitting ? 'Saving...' : 'Save'}

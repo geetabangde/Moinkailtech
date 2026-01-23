@@ -9,9 +9,10 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { useRef, useState, useEffect, useCallback } from "react"; // ✅ Added useCallback
+import { useRef, useState, useEffect, useCallback } from "react";
 import axios from "utils/axios";
 import { useLocation } from "react-router";
+import toast, { Toaster } from 'react-hot-toast';
 
 // Local Imports
 import { TableSortIcon } from "components/shared/table/TableSortIcon";
@@ -41,13 +42,15 @@ export default function ValidityDetailsTable() {
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
-  // ✅ Matrix Data State
+  // Get URL params
+  const [urlParams, setUrlParams] = useState({ fid: '', cid: '', labId: '' });
+
+  // Matrix Data State
   const [matrixData, setMatrixData] = useState([]);
   const [matrixLoading, setMatrixLoading] = useState(true);
-  const [matrixRecordsTotal, setMatrixRecordsTotal] = useState(0);
   const [matrixRecordsFiltered, setMatrixRecordsFiltered] = useState(0);
 
-  // ✅ Uncertainty Data State
+  // Uncertainty Data State
   const [uncertaintyData, setUncertaintyData] = useState([]);
   const [uncertaintyLoading, setUncertaintyLoading] = useState(true);
   const [uncertaintyRecordsTotal, setUncertaintyRecordsTotal] = useState(0);
@@ -90,7 +93,74 @@ export default function ValidityDetailsTable() {
   const cardRef = useRef();
   const uncertaintyCardRef = useRef();
 
-  // ✅ API: Fetch Matrix Data (wrapped with useCallback)
+  // Extract URL params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fid = params.get("fid") || "";
+    const cid = params.get("cid") || "";
+    const labId = params.get("labId") || "";
+
+    setUrlParams({ fid, cid, labId });
+  }, [location.search]);
+
+  // Function to handle back navigation with params
+  const handleBackNavigation = () => {
+    if (urlParams.fid && urlParams.labId) {
+      navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${urlParams.fid}&labId=${urlParams.labId}`);
+    } else if (urlParams.fid) {
+      navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${urlParams.fid}`);
+    } else {
+      navigate('/dashboards/material-list/electro-technical/maintenance-equipment-history');
+    }
+  };
+
+  // API: Delete Master Matrix
+  const deleteMasterMatrix = async (id) => {
+    try {
+      const response = await axios.delete(`/material/delete-mastermatrix`, {
+        params: { id }
+      });
+
+      if (response.data?.success || response.data?.status) {
+        // Immediately remove from UI
+        setMatrixData((prev) => prev.filter((row) => row.id !== id));
+        // Show success toast
+        toast.success(response.data?.message || "Record deleted successfully");
+        return true;
+      } else {
+        toast.error(response.data?.message || "Failed to delete record");
+        return false;
+      }
+    } catch (err) {
+      console.error("Error deleting master matrix:", err);
+      toast.error(err.response?.data?.message || "Failed to delete record");
+      return false;
+    }
+  };
+
+  // API: Delete Master Uncertainty Matrix
+  const deleteMasterUncertaintyMatrix = async (id) => {
+    try {
+      const response = await axios.delete(`/material/delete-MasterUncertainty-Matrix/${id}`);
+
+      if (response.data?.success || response.data?.status) {
+        // Immediately remove from UI
+        setUncertaintyData((prev) => prev.filter((row) => row.id !== id));
+        // Show success toast
+        toast.success(response.data?.message || "Record deleted successfully");
+        return true;
+      } else {
+        toast.error(response.data?.message || "Failed to delete record");
+        return false;
+      }
+    } catch (err) {
+      console.error("Error deleting master uncertainty matrix:", err);
+      toast.error(err.response?.data?.message || "Failed to delete record");
+      return false;
+    }
+  };
+
+  // API: Fetch Matrix Data
   const fetchMatrixData = useCallback(async (fid, cid) => {
     try {
       setMatrixLoading(true);
@@ -110,7 +180,6 @@ export default function ValidityDetailsTable() {
         setMatrixData(
           Array.isArray(response.data.data) ? response.data.data : []
         );
-        setMatrixRecordsTotal(response.data.recordsTotal || 0);
         setMatrixRecordsFiltered(response.data.recordsFiltered || 0);
       }
     } catch (err) {
@@ -119,9 +188,9 @@ export default function ValidityDetailsTable() {
     } finally {
       setMatrixLoading(false);
     }
-  }, [matrixPagination.pageIndex, matrixPagination.pageSize, globalFilter]); // ✅ Dependencies
+  }, [matrixPagination.pageIndex, matrixPagination.pageSize, globalFilter]);
 
-  // ✅ API: Fetch Uncertainty Data (wrapped with useCallback)
+  // API: Fetch Uncertainty Data
   const fetchUncertaintyData = useCallback(async (fid, cid) => {
     try {
       setUncertaintyLoading(true);
@@ -149,9 +218,9 @@ export default function ValidityDetailsTable() {
     } finally {
       setUncertaintyLoading(false);
     }
-  }, [uncertaintyPagination.pageIndex, uncertaintyPagination.pageSize, uncertaintyGlobalFilter]); // ✅ Dependencies
+  }, [uncertaintyPagination.pageIndex, uncertaintyPagination.pageSize, uncertaintyGlobalFilter]);
 
-  // ✅ Fetch Matrix Data
+  // Fetch Matrix Data
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const fid = params.get("fid") || "";
@@ -163,9 +232,9 @@ export default function ValidityDetailsTable() {
       setMatrixLoading(false);
       setMatrixData([]);
     }
-  }, [location.search, fetchMatrixData]); // ✅ Fixed dependency
+  }, [location.search, fetchMatrixData]);
 
-  // ✅ Fetch Uncertainty Data
+  // Fetch Uncertainty Data
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const fid = params.get("fid") || "";
@@ -177,7 +246,7 @@ export default function ValidityDetailsTable() {
       setUncertaintyLoading(false);
       setUncertaintyData([]);
     }
-  }, [location.search, fetchUncertaintyData]); // ✅ Fixed dependency
+  }, [location.search, fetchUncertaintyData]);
 
   // Main Matrix Table
   const table = useReactTable({
@@ -193,14 +262,15 @@ export default function ValidityDetailsTable() {
     },
     meta: {
       setTableSettings,
-      deleteRow: (row) => {
+      deleteRow: async (row) => {
+        await deleteMasterMatrix(row.original.id);
         skipAutoResetPageIndex();
-        setMatrixData((old) => old.filter((oldRow) => oldRow.id !== row.original.id));
       },
-      deleteRows: (rows) => {
+      deleteRows: async (rows) => {
         skipAutoResetPageIndex();
-        const rowIds = rows.map((row) => row.original.id);
-        setMatrixData((old) => old.filter((row) => !rowIds.includes(row.id)));
+        for (const row of rows) {
+          await deleteMasterMatrix(row.original.id);
+        }
       },
     },
     filterFns: { fuzzy: fuzzyFilter },
@@ -235,18 +305,15 @@ export default function ValidityDetailsTable() {
     },
     meta: {
       isUncertaintyTable: true,
-      deleteRow: (row) => {
+      deleteRow: async (row) => {
+        await deleteMasterUncertaintyMatrix(row.original.id);
         skipAutoResetPageIndex();
-        setUncertaintyData((old) =>
-          old.filter((oldRow) => oldRow.id !== row.original.id)
-        );
       },
-      deleteRows: (rows) => {
+      deleteRows: async (rows) => {
         skipAutoResetPageIndex();
-        const rowIds = rows.map((row) => row.original.id);
-        setUncertaintyData((old) =>
-          old.filter((row) => !rowIds.includes(row.id))
-        );
+        for (const row of rows) {
+          await deleteMasterUncertaintyMatrix(row.original.id);
+        }
       },
     },
     filterFns: { fuzzy: fuzzyFilter },
@@ -272,7 +339,7 @@ export default function ValidityDetailsTable() {
   useDidUpdate(() => uncertaintyTable.resetRowSelection(), [uncertaintyData]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // ✅ Loading State
+  // Loading State
   if (matrixLoading && uncertaintyLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center text-gray-600">
@@ -301,21 +368,44 @@ export default function ValidityDetailsTable() {
 
   return (
     <div className="transition-content grid grid-cols-1 grid-rows-[auto_auto_1fr] px-(--margin-x) py-4">
+      {/* Toast Notification */}
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+
       <div className="flex items-center justify-between space-x-4">
         <div className="min-w-0">
           <h2 className="truncate text-xl font-medium tracking-wide text-gray-800 dark:text-dark-50">
-            Masters Validity Detail
+            Masters Validity Details
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button
             className="h-8 space-x-1.5 rounded-md px-3 text-xs"
             color="primary"
-            onClick={() =>
-              navigate(
-                "/dashboards/material-list/electro-technical/maintenance-equipment-history"
-              )
-            }
+            onClick={handleBackNavigation}
           >
             ← Back To Master Validity
           </Button>
@@ -323,11 +413,16 @@ export default function ValidityDetailsTable() {
           <Button
             className="h-8 space-x-1.5 rounded-md px-3 text-xs"
             color="primary"
-            onClick={() =>
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (urlParams.fid) params.append('fid', urlParams.fid);
+              if (urlParams.cid) params.append('cid', urlParams.cid);
+              if (urlParams.labId) params.append('labId', urlParams.labId);
+
               navigate(
-                "/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-master-matrix"
-              )
-            }
+                `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-master-matrix?${params.toString()}`
+              );
+            }}
           >
             Add New Master Matrix
           </Button>
@@ -361,9 +456,9 @@ export default function ValidityDetailsTable() {
                           "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                           header.column.getCanPin() && [
                             header.column.getIsPinned() === "left" &&
-                              "sticky z-2 ltr:left-0 rtl:right-0",
+                            "sticky z-2 ltr:left-0 rtl:right-0",
                             header.column.getIsPinned() === "right" &&
-                              "sticky z-2 ltr:right-0 rtl:left-0",
+                            "sticky z-2 ltr:right-0 rtl:left-0",
                           ]
                         )}
                       >
@@ -376,9 +471,9 @@ export default function ValidityDetailsTable() {
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                  )}
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
                             </span>
                             <TableSortIcon
                               sorted={header.column.getIsSorted()}
@@ -405,8 +500,8 @@ export default function ValidityDetailsTable() {
                     className={clsx(
                       "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
                       row.getIsSelected() &&
-                        !isSafari &&
-                        "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500"
+                      !isSafari &&
+                      "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500"
                     )}
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -419,9 +514,9 @@ export default function ValidityDetailsTable() {
                             : "dark:bg-dark-900",
                           cell.column.getCanPin() && [
                             cell.column.getIsPinned() === "left" &&
-                              "sticky z-2 ltr:left-0 rtl:right-0",
+                            "sticky z-2 ltr:left-0 rtl:right-0",
                             cell.column.getIsPinned() === "right" &&
-                              "sticky z-2 ltr:right-0 rtl:left-0",
+                            "sticky z-2 ltr:right-0 rtl:left-0",
                           ]
                         )}
                       >
@@ -448,30 +543,8 @@ export default function ValidityDetailsTable() {
           </div>
           <SelectedRowsActions table={table} />
           {matrixData.length > 0 && (
-            <div
-              className={clsx(
-                "px-4 pb-4 sm:px-5 sm:pt-4",
-                tableSettings.enableFullScreen &&
-                  "bg-gray-50 dark:bg-dark-800",
-                !(
-                  table.getIsSomeRowsSelected() || table.getIsAllRowsSelected()
-                ) && "pt-4"
-              )}
-            >
-              {/* ✅ Show record count using matrixRecordsTotal */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Showing {matrixPagination.pageIndex * matrixPagination.pageSize + 1} to{" "}
-                  {Math.min(
-                    (matrixPagination.pageIndex + 1) * matrixPagination.pageSize,
-                    matrixRecordsFiltered
-                  )}{" "}
-                  of {matrixRecordsFiltered} entries
-                  {matrixRecordsFiltered !== matrixRecordsTotal && 
-                    ` (filtered from ${matrixRecordsTotal} total entries)`}
-                </div>
-                <PaginationSection table={table} />
-              </div>
+            <div className="px-4 pb-4 sm:px-5 sm:pt-4">
+              <PaginationSection table={table} />
             </div>
           )}
         </Card>
@@ -491,11 +564,16 @@ export default function ValidityDetailsTable() {
             <Button
               className="h-8 space-x-1.5 rounded-md px-3 text-xs"
               color="primary"
-              onClick={() =>
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (urlParams.fid) params.append('fid', urlParams.fid);
+                if (urlParams.cid) params.append('cid', urlParams.cid);
+                if (urlParams.labId) params.append('labId', urlParams.labId);
+
                 navigate(
-                  "/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-uncertainty-matrix"
-                )
-              }
+                  `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-uncertainty-matrix?${params.toString()}`
+                );
+              }}
             >
               Add New Uncertainty Matrix
             </Button>
@@ -526,9 +604,9 @@ export default function ValidityDetailsTable() {
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                  )}
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
                             </span>
                             <TableSortIcon
                               sorted={header.column.getIsSorted()}
