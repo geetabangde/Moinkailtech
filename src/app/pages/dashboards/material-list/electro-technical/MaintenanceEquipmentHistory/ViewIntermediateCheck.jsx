@@ -249,6 +249,7 @@ export default function ViewIntermediateCheck() {
       cell: ({ row }) => (
         <div className="flex items-center justify-center gap-2">
           <button
+            style={{ cursor: "pointer" }}
             onClick={() => {
               navigate(
                 `/dashboards/material-list/electro-technical/maintenance-equipment-history/view-planner?index=${row.original.index}&fid=${fid}&cid=${cid}&labId=${labId}`
@@ -259,6 +260,7 @@ export default function ViewIntermediateCheck() {
             View
           </button>
           <button
+            style={{ cursor: "pointer" }}
             onClick={() => handleEdit(row.original)}
             className="px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors"
           >

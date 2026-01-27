@@ -1,108 +1,198 @@
-import { useState } from 'react';
+import { useParams, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { Button, Input } from "components/ui";
+import { Page } from "components/shared/Page";
+import axios from "utils/axios";
+import { toast } from "sonner";
 
 export default function EditStatuaryDetail() {
-  const [formData, setFormData] = useState({
-    statuaryDetailName: 'Type of MSME',
-    value: 'Small Scale',
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const [statuaryDetail, setStatuaryDetail] = useState({
+    name: "",
+    description: "",
   });
 
-  const handleInputChange = (e) => {
+  useEffect(() => {
+    const fetchStatuaryDetail = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`/master/get-statuary-detail-byid/${id}`);
+        const result = response.data;
+
+        if (result.status === "true" && result.data && result.data.length > 0) {
+          // Data is an array, get first element
+          const detail = result.data[0];
+          setStatuaryDetail({
+            name: detail.name || "",
+            description: detail.description || "",
+          });
+        } else {
+          toast.error(result.message || "Failed to load statuary detail data.");
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+        toast.error("Something went wrong while loading statuary detail.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatuaryDetail();
+  }, [id]);
+
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setStatuaryDetail((prev) => ({
       ...prev,
       [name]: value,
     }));
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
   };
 
-  const handleUpdate = () => {
-    console.log('Updated Data:', formData);
+  // Custom validation function
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!statuaryDetail.name.trim()) {
+      newErrors.name = "This is required field";
+    }
+    
+    if (!statuaryDetail.description.trim()) {
+      newErrors.description = "This is required field";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleBack = () => {
-    console.log('Going back to Statuary Detail');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate form before submitting
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+
+    try {
+      const form = new FormData();
+      form.append("name", statuaryDetail.name);
+      form.append("description", statuaryDetail.description);
+
+      const response = await axios.post(`/master/update-statuary-detail/${id}`, form);
+      const result = response.data;
+
+      console.log("Update response:", result);
+      console.log("Status value:", result.status);
+      console.log("Status type:", typeof result.status);
+
+      if (result.status === "true" || result.status === true) {
+        toast.success("Statuary Detail updated successfully ✅", {
+          duration: 1000,
+          icon: "✅",
+        });
+        
+        // Force navigation using setTimeout
+        setTimeout(() => {
+          window.location.href = "/dashboards/master-data/statuary-detail";
+        }, 1200);
+      } else {
+        toast.error(result.message || "Failed to update statuary detail ❌");
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+      toast.error("Something went wrong while updating.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Edit Statuary Detail</h1>
-          <button
-            onClick={handleBack}
-            className="bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-2 rounded transition-colors text-sm font-medium"
+    <Page title="Edit Statuary Detail">
+      <div className="p-6">
+        {/* Header + Back Button */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+            Edit Statuary Detail
+          </h2>
+          <Button
+            variant="outline"
+            className="text-white bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate("/dashboards/master-data/statuary-detail")}
           >
-            &lt;&lt; Back to Statuary Detail
-          </button>
+            Back to List
+          </Button>
         </div>
 
-        {/* Form Container */}
-        <div className="bg-white rounded-lg p-8 shadow-sm">
-          {/* Statuary Detail Name Field */}
-          <div className="mb-8">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Statuary Detail Name
-            </label>
-            <input
-              type="text"
-              name="statuaryDetailName"
-              value={formData.statuaryDetailName}
-              onChange={handleInputChange}
-              placeholder="Type of MSME"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 text-gray-700"
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Input
+              label="Statuary Detail Name"
+              name="name"
+              value={statuaryDetail.name}
+              onChange={handleChange}
+              // removed required attribute
             />
+            {errors.name && (
+              <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+            )}
           </div>
 
-          {/* Value Field */}
-          <div className="mb-8">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Value
-            </label>
-            <input
-              type="text"
-              name="value"
-              value={formData.value}
-              onChange={handleInputChange}
-              placeholder="Small Scale"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 text-gray-700"
+          <div>
+            <Input
+              label="Description"
+              name="description"
+              value={statuaryDetail.description}
+              onChange={handleChange}
+              // removed required attribute
             />
+            {errors.description && (
+              <p className="text-red-500 text-sm mt-1">{errors.description}</p>
+            )}
           </div>
 
-          {/* Slider */}
-          {/* <div className="mb-12 flex items-center gap-4">
-            <button className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              defaultValue="50"
-              className="flex-1 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, #d1d5db 0%, #d1d5db 50%, #d1d5db 100%)`
-              }}
-            />
-            <button className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
-          </div> */}
-
-          {/* Update Button */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleUpdate}
-              className="bg-green-500 hover:bg-green-600 text-white px-6 py-2.5 rounded font-semibold transition-colors"
-            >
-              Update Statuary Detail
-            </button>
-          </div>
-        </div>
+          <Button type="submit" color="primary" disabled={loading}>
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <svg
+                  className="animate-spin h-4 w-4 text-white"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+                  ></path>
+                </svg>
+                Updating...
+              </div>
+            ) : (
+              "Update"
+            )}
+          </Button>
+        </form>
       </div>
-    </div>
+    </Page>
   );
 }

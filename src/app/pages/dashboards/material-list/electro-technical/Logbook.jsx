@@ -15,7 +15,7 @@ import { PaginationSection } from "components/shared/table/PaginationSection";
 
 const Logbook = () => {
   const navigate = useNavigate();
-  const { id } = useParams(); // Get instrument ID from URL
+  const { id } = useParams(); 
   
   // State for API data
   const [logData, setLogData] = useState([]);

@@ -62,36 +62,36 @@ export default function AddModes() {
       form.append("name", formData.name);
       form.append("description", formData.description);
 
-      await axios.post("/master/mode-create", form); // token attached via interceptor
+      await axios.post("/master/create-statuary-detail", form); // token attached via interceptor
 
-      toast.success("Mode created successfully ✅", {
+      toast.success("Statuary Detail created successfully ✅", {
         duration: 1000,
         icon: "✅",
       });
 
-      navigate("/dashboards/master-data/modes");
+      navigate("/dashboards/master-data/statuary-detail");
     } catch (err) {
-      console.error("Error creating mode:", err);
-      toast.error(err?.response?.data?.message || "Failed to create mode ❌");
+      console.error("Error creating statuary detail:", err);
+      toast.error(err?.response?.data?.message || "Failed to create statuary detail ❌");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Page title="Add Modes">
+    <Page title="Add Statuary Detail">
       <div className="p-6">
         {/* ✅ Header + Back Button */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Add Modes
+            Add Statuary Detail
           </h2>
           <Button
             variant="outline"
             className="text-white bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/dashboards/master-data/modes")}
+            onClick={() => navigate("/dashboards/master-data/statuary-detail")}
           >
-            Back to Modes
+            Back to Statuary Detail
           </Button>
         </div>
 

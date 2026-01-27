@@ -105,15 +105,15 @@ export const generateLabRoutes = (labs) => {
             }),
           },
           {
-  path: "view-planner",
-  lazy: async () => ({
-    Component: (
-      await import(
-        "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewPlanner"
-      )
-    ).default,
-  }),
-},
+            path: "view-planner",
+            lazy: async () => ({
+              Component: (
+                await import(
+                  "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewPlanner"
+                )
+              ).default,
+            }),
+          },
           {
             path: "add-new-equipment-history",
             lazy: async () => ({

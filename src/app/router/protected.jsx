@@ -133,15 +133,15 @@ const protectedRoutes = {
                           }),
                         },
                         {
-  path: "view-planner",
-  lazy: async () => ({
-    Component: (
-      await import(
-        "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewPlanner"
-      )
-    ).default,
-  }),
-},
+                          path: "view-planner",
+                          lazy: async () => ({
+                            Component: (
+                              await import(
+                                "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewPlanner"
+                              )
+                            ).default,
+                          }),
+                        },
                         {
                           path: "add-new-equipment-history",
                           lazy: async () => ({
@@ -564,7 +564,7 @@ const protectedRoutes = {
                     //   }),
                     // },
                     {
-                      path: "edit",
+                      path: "edit/:id",
                       lazy: async () => ({
                         Component: (
                           await import(
@@ -573,6 +573,7 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
+                  
                     {
                       path: "add-new-statuary-detail",
                       lazy: async () => ({

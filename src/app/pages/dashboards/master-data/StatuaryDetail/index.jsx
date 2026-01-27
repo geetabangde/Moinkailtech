@@ -1,4 +1,3 @@
-
 import {
   flexRender,
   getCoreRowModel,
@@ -10,7 +9,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -26,19 +25,19 @@ import { SelectedRowsActions } from "./SelectedRowsActions";
 import { useThemeContext } from "app/contexts/theme/context";
 import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
 import { ChevronDown } from "lucide-react";
-
-// Import Static Data
-import { dummyData } from "./data";
+import axios from "utils/axios";
+import { toast } from "sonner";
 
 const isSafari = getUserAgentBrowser() === "Safari";
 
 // Columns with chevron badges
 const CHEVRON_COLUMNS = ["doc_in", "search_in", "value"];
 
-export default function OrdersDatatableV1() {
+export default function StatuaryDetailDatatable() {
   const { cardSkin } = useThemeContext();
 
-  const [orders, setOrders] = useState(dummyData);
+  const [statuaryDetails, setStatuaryDetails] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
@@ -50,19 +49,43 @@ export default function OrdersDatatableV1() {
   const [sorting, setSorting] = useState([]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
-    "column-visibility-orders-1",
+    "column-visibility-statuary-detail",
     {},
   );
 
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "column-pinning-orders-1",
+    "column-pinning-statuary-detail",
     {},
   );
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
+  // Fetch statuary detail list from API
+  useEffect(() => {
+    const fetchStatuaryDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get("/master/get-statuary-detail-list");
+        const result = response.data;
+
+        if (result.status === "true" && result.data) {
+          setStatuaryDetails(result.data);
+        } else {
+          toast.error(result.message || "Failed to load statuary details");
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+        toast.error("Something went wrong while loading data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatuaryDetails();
+  }, []);
+
   const table = useReactTable({
-    data: orders,
+    data: statuaryDetails,
     columns: columns,
     state: {
       globalFilter,
@@ -74,7 +97,7 @@ export default function OrdersDatatableV1() {
     meta: {
       updateData: (rowIndex, columnId, value) => {
         skipAutoResetPageIndex();
-        setOrders((old) =>
+        setStatuaryDetails((old) =>
           old.map((row, index) => {
             if (index === rowIndex) {
               return {
@@ -88,14 +111,14 @@ export default function OrdersDatatableV1() {
       },
       deleteRow: (row) => {
         skipAutoResetPageIndex();
-        setOrders((old) =>
+        setStatuaryDetails((old) =>
           old.filter((oldRow) => oldRow.id !== row.original.id)
         );
       },
       deleteRows: (rows) => {
         skipAutoResetPageIndex();
         const rowIds = rows.map((row) => row.original.id);
-        setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
+        setStatuaryDetails((old) => old.filter((row) => !rowIds.includes(row.id)));
       },
       setTableSettings,
     },
@@ -118,12 +141,24 @@ export default function OrdersDatatableV1() {
     autoResetPageIndex,
   });
 
-  useDidUpdate(() => table.resetRowSelection(), [orders]);
+  useDidUpdate(() => table.resetRowSelection(), [statuaryDetails]);
 
   useLockScrollbar(tableSettings.enableFullScreen);
 
+  // Show loading state
+  if (loading) {
+    return (
+      <Page title="Statuary Detail List">
+        <div className="flex items-center justify-center h-96">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <p className="ml-4 text-gray-600 text-lg">Loading...</p>
+        </div>
+      </Page>
+    );
+  }
+
   return (
-    <Page title="Modes List">
+    <Page title="Statuary Detail List">
       <div className="transition-content w-full pb-5">
         <div
           className={clsx(
@@ -208,58 +243,66 @@ export default function OrdersDatatableV1() {
                     ))}
                   </THead>
                   <TBody>
-                    {table.getRowModel().rows.map((row) => {
-                      return (
-                        <Tr
-                          key={row.id}
-                          className={clsx(
-                            "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
-                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
-                          )}
-                        >
-                          {row.getVisibleCells().map((cell) => {
-                            return (
-                              <Td
-                                key={cell.id}
-                                className={clsx(
-                                  "relative bg-white",
-                                  cardSkin === "shadow"
-                                    ? "dark:bg-dark-700"
-                                    : "dark:bg-dark-900",
-                                  cell.column.getCanPin() && [
-                                    cell.column.getIsPinned() === "left" &&
-                                      "sticky z-2 ltr:left-0 rtl:right-0",
-                                    cell.column.getIsPinned() === "right" &&
-                                      "sticky z-2 ltr:right-0 rtl:left-0",
-                                  ],
-                                )}
-                              >
-                                {cell.column.getIsPinned() && (
-                                  <div
-                                    className={clsx(
-                                      "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
-                                      cell.column.getIsPinned() === "left"
-                                        ? "ltr:border-r rtl:border-l"
-                                        : "ltr:border-l rtl:border-r",
-                                    )}
-                                  ></div>
-                                )}
-                                {flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext(),
-                                )}
-                              </Td>
-                            );
-                          })}
-                        </Tr>
-                      );
-                    })}
+                    {table.getRowModel().rows.length > 0 ? (
+                      table.getRowModel().rows.map((row) => {
+                        return (
+                          <Tr
+                            key={row.id}
+                            className={clsx(
+                              "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
+                              row.getIsSelected() && !isSafari &&
+                                "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                            )}
+                          >
+                            {row.getVisibleCells().map((cell) => {
+                              return (
+                                <Td
+                                  key={cell.id}
+                                  className={clsx(
+                                    "relative bg-white",
+                                    cardSkin === "shadow"
+                                      ? "dark:bg-dark-700"
+                                      : "dark:bg-dark-900",
+                                    cell.column.getCanPin() && [
+                                      cell.column.getIsPinned() === "left" &&
+                                        "sticky z-2 ltr:left-0 rtl:right-0",
+                                      cell.column.getIsPinned() === "right" &&
+                                        "sticky z-2 ltr:right-0 rtl:left-0",
+                                    ],
+                                  )}
+                                >
+                                  {cell.column.getIsPinned() && (
+                                    <div
+                                      className={clsx(
+                                        "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
+                                        cell.column.getIsPinned() === "left"
+                                          ? "ltr:border-r rtl:border-l"
+                                          : "ltr:border-l rtl:border-r",
+                                      )}
+                                    ></div>
+                                  )}
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext(),
+                                  )}
+                                </Td>
+                              );
+                            })}
+                          </Tr>
+                        );
+                      })
+                    ) : (
+                      <Tr>
+                        <Td colSpan={columns.length} className="text-center py-8">
+                          <p className="text-gray-500">No data available</p>
+                        </Td>
+                      </Tr>
+                    )}
                   </TBody>
                 </Table>
               </div>
               <SelectedRowsActions table={table} />
-              {table.getCoreRowModel().rows.length && (
+              {table.getCoreRowModel().rows.length > 0 && (
                 <div
                   className={clsx(
                     "px-4 pb-4 sm:px-5 sm:pt-4",
