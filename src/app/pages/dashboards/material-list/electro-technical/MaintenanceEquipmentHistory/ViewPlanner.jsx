@@ -19,26 +19,10 @@ import { useLockScrollbar, useLocalStorage, useDidUpdate } from "hooks";
 import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
 
-// Month mapping
-const monthNames = {
-  1: "January",
-  2: "February",
-  3: "March",
-  4: "April",
-  5: "May",
-  6: "June",
-  7: "July",
-  8: "August",
-  9: "September",
-  10: "October",
-  11: "November",
-  12: "December"
-};
-
 // Column Definitions
-const createColumns = (navigate, checkData) => [
+const createColumns = (navigate, handleView, handleAddObservation) => [
   {
-    accessorKey: "sno",
+    accessorKey: "index",
     header: "S.No",
     size: 80,
     cell: ({ row }) => row.index + 1,
@@ -47,22 +31,19 @@ const createColumns = (navigate, checkData) => [
     accessorKey: "name",
     header: "Name",
     size: 300,
-    cell: () => checkData?.name || "N/A",
+    cell: ({ row }) => row.original.name || "N/A",
   },
   {
     accessorKey: "year",
     header: "Year",
     size: 120,
-    cell: () => checkData?.year || "N/A",
+    cell: ({ row }) => row.original.year || "N/A",
   },
   {
     accessorKey: "month",
     header: "Month",
     size: 150,
-    cell: () => {
-      const monthNum = parseInt(checkData?.month);
-      return monthNames[monthNum] || "N/A";
-    },
+    cell: ({ row }) => row.original.month || "N/A",
   },
   {
     accessorKey: "actions",
@@ -90,28 +71,18 @@ const createColumns = (navigate, checkData) => [
   },
 ];
 
-// Placeholder handlers (you can implement navigation logic)
-const handleView = (row) => {
-  console.log("View clicked for:", row);
-  // Add your view navigation logic here
-};
-
-const handleAddObservation = (row) => {
-  console.log("Add Observation clicked for:", row);
-  // Add your add observation navigation logic here
-};
-
 export default function ViewPlanner() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   // Extract URL parameters
-  const index = searchParams.get('index');
+  // The URL uses fid and cid, but API expects instid and validityid
+  const instid = searchParams.get('fid');
+  const validityid = searchParams.get('cid');
 
   const [autoResetPageIndex] = useSkipper();
 
-  const [checkData, setCheckData] = useState(null);
-  const [observations, setObservations] = useState([]);
+  const [checkData, setCheckData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [tableSettings, setTableSettings] = useState({
@@ -142,9 +113,23 @@ export default function ViewPlanner() {
 
   const cardRef = useRef();
 
+  // Handlers for View and Add Observation buttons
+  const handleView = (row) => {
+    console.log("View clicked for:", row);
+    // Navigate to view intermediate check page with the index from API
+    navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history/view-planner-intermediate-check?hakuna=${row.index}`);
+  };
+
+  const handleAddObservation = (row) => {
+    console.log("Add Observation clicked for:", row);
+    // Navigate to add observation page with the index parameter
+    navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history/add-observation?hakuna=${row.index}`);
+  };
+
   // API call function
   const fetchPlannerData = useCallback(async () => {
-    if (!index) {
+    if (!instid || !validityid) {
+      console.warn("Missing required parameters: instid or validityid");
       setLoading(false);
       return;
     }
@@ -152,31 +137,23 @@ export default function ViewPlanner() {
     try {
       setLoading(true);
 
-      const response = await axios.get(`/material/view-intermidiate-check/${index}`);
+      const response = await axios.get(
+        `/material/intermidiatecheck-detail?instid=${instid}&validityid=${validityid}`
+      );
 
       if (response.data && response.data.success) {
-        setCheckData(response.data.check);
-        
-        // If observations exist, use them, otherwise create a single row for display
-        if (Array.isArray(response.data.observations) && response.data.observations.length > 0) {
-          setObservations(response.data.observations);
-        } else {
-          // Create a single dummy row to display the data
-          setObservations([{ id: 1 }]);
-        }
+        setCheckData(response.data.data || []);
       } else {
         console.warn("Unexpected response structure:", response.data);
-        setCheckData(null);
-        setObservations([]);
+        setCheckData([]);
       }
     } catch (err) {
       console.error("Error fetching planner data:", err);
-      setCheckData(null);
-      setObservations([]);
+      setCheckData([]);
     } finally {
       setLoading(false);
     }
-  }, [index]);
+  }, [instid, validityid]);
 
   // Fetch data on mount
   useEffect(() => {
@@ -188,10 +165,10 @@ export default function ViewPlanner() {
     navigate(-1);
   };
 
-  const columns = createColumns(navigate, checkData);
+  const columns = createColumns(navigate, handleView, handleAddObservation);
 
   const table = useReactTable({
-    data: observations,
+    data: checkData,
     columns: columns,
     state: {
       globalFilter,
@@ -224,7 +201,7 @@ export default function ViewPlanner() {
     autoResetPageIndex,
   });
 
-  useDidUpdate(() => table.resetRowSelection(), [observations]);
+  useDidUpdate(() => table.resetRowSelection(), [checkData]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
   if (loading) {
@@ -367,7 +344,7 @@ export default function ViewPlanner() {
               </TBody>
             </Table>
           </div>
-          {observations.length > 0 && (
+          {checkData.length > 0 && (
             <div className="px-4 pb-4 sm:px-5 sm:pt-4 pt-4">
               <PaginationSection table={table} />
             </div>

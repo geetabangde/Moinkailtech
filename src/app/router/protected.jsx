@@ -133,6 +133,15 @@ const protectedRoutes = {
                           }),
                         },
                         {
+                          path: "edit-imc", lazy: async () => ({
+                            Component: (
+                              await import(
+                                "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/EditIntermediateCheck"
+                              )
+                            ).default,
+                          }),
+                        },
+                        {
                           path: "view-planner",
                           lazy: async () => ({
                             Component: (
@@ -141,6 +150,24 @@ const protectedRoutes = {
                               )
                             ).default,
                           }),
+                        },
+                        {
+                          path: "view-planner-intermediate-check",
+                          lazy: async () => ({
+                            Component: (
+                              await import(
+                                "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/ViewPlannerIntermediateCheck"
+                              )
+                            ).default,
+                          }),
+                        },
+                        {
+                          path: "add-observation",
+                          lazy: async () => ({
+                            Component: (await import(
+                              "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/AddObservation"
+                            )).default,
+                          }), 
                         },
                         {
                           path: "add-new-equipment-history",
@@ -311,8 +338,6 @@ const protectedRoutes = {
                     },
                   ],
                 },
-                // ❌ Remove all hardcoded routes like:
-                // electro-technical, site-calibration, calibration, etc.
               ],
             },
 
@@ -524,12 +549,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    // {
-                    //   path: "view",
-                    //   lazy: async () => ({
-                    //     Component: (await import("app/pages/dashboards/master-data/MasterDocument/view")).default,
-                    //   }),
-                    // },
                     {
                       path: "add-master-document",
                       lazy: async () => ({
@@ -557,12 +576,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    // {
-                    //   path: "view",
-                    //   lazy: async () => ({
-                    //     Component: (await import("app/pages/dashboards/master-data/MasterDocument/view")).default,
-                    //   }),
-                    // },
                     {
                       path: "edit/:id",
                       lazy: async () => ({
@@ -573,7 +586,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                  
                     {
                       path: "add-new-statuary-detail",
                       lazy: async () => ({
@@ -612,21 +624,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    //  {
-                    //   path: "edit",
-                    //   lazy: async () => ({
-                    //     Component: (await import("app/pages/dashboards/master-data/StatuaryDetail/Edit")).default,
-                    //   }),
-                    // },
-                    //  {
-                    //   path: "add-new-statuary-detail",
-                    //   lazy: async () => ({
-                    //     Component: (
-                    //       await import(
-                    //         "app/pages/dashboards/master-data/StatuaryDetail/AddNewStatuaryDetail")
-                    //   ).default,
-                    //   }),
-                    // },
                   ],
                 },
 
@@ -654,12 +651,7 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    //  {
-                    //   path: "edit",
-                    //   lazy: async () => ({
-                    //     Component: (await import("app/pages/dashboards/master-data/StatuaryDetail/Edit")).default,
-                    //   }),
-                    // },
+                    
                   ],
                 },
 
@@ -798,27 +790,56 @@ const protectedRoutes = {
                   ],
                 },
 
-                // {
-                //   path: "activity-log",
-                //   lazy: async () => ({
-                //     Component: (await import("app/pages/dashboards/master-data/ViewActivityLog")).default,
-                //   }),
-                // },
-                // {
-                //   path: "master-calibration-return",
-                //   lazy: async () => ({
-                //     Component: (await import("app/pages/dashboards/master-data/MasterCalibrationReturn")).default,
-                //   }),
-                // },
-                // {
-                //   path: "general-checklists",
-                //   lazy: async () => ({
-                //     Component: (await import("app/pages/dashboards/master-data/GeneralChecklists")).default,
-                //   }),
-                // },
+                //  -------------------------------------------general-checklistst---------------------------------
+                
+                {
+                  path: "general-checklists",
+                  children: [
+                    {
+                      index: true,
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/master-data/GeneralChecklists"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "add-new-master-matrix",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/master-data/GeneralChecklists/AddGeneralChecklistMatrix"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "add-new-general-checklist-matrix",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/master-data/GeneralChecklists/AddGeneralChecklist"
+                          )
+                        ).default,
+                      }),
+                    }
+                  ],
+                },
+                {
+                  path: "view-activity-log",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/master-data/ViewActivityLog"
+                      )
+                    ).default,
+                  }),
+                },
+
               ],
             },
-
             {
               path: "calibration-process",
               children: [

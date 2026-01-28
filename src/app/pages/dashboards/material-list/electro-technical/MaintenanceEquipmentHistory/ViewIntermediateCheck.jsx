@@ -27,9 +27,7 @@ import { useNavigate, useSearchParams } from "react-router";
 
 
 
-const handleEdit = (record) => {
-  console.log("Edit clicked:", record);
-};
+
 
 export default function ViewIntermediateCheck() {
   const navigate = useNavigate();
@@ -37,7 +35,7 @@ export default function ViewIntermediateCheck() {
   
   const fid = searchParams.get('fid');
   const cid = searchParams.get('cid');
-  const labId = searchParams.get('labId');
+  // ❌ labId removed
 
   const [autoResetPageIndex] = useSkipper();
 
@@ -72,7 +70,7 @@ export default function ViewIntermediateCheck() {
 
   const cardRef = useRef();
 
-  // ✅ Define columns using useMemo inside the component
+  // ✅ labId removed from dependencies
   const columns = useMemo(() => [
     {
       accessorKey: "index",
@@ -251,8 +249,9 @@ export default function ViewIntermediateCheck() {
           <button
             style={{ cursor: "pointer" }}
             onClick={() => {
+              // ✅ labId removed from URL
               navigate(
-                `/dashboards/material-list/electro-technical/maintenance-equipment-history/view-planner?index=${row.original.index}&fid=${fid}&cid=${cid}&labId=${labId}`
+                `/dashboards/material-list/electro-technical/maintenance-equipment-history/view-planner?index=${row.original.index}&fid=${fid}&cid=${cid}`
               );
             }}
             className="px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
@@ -261,7 +260,12 @@ export default function ViewIntermediateCheck() {
           </button>
           <button
             style={{ cursor: "pointer" }}
-            onClick={() => handleEdit(row.original)}
+            onClick={() => {
+              // ✅ labId removed from URL
+              navigate(
+                `/dashboards/material-list/electro-technical/maintenance-equipment-history/edit-imc?index=${row.original.index}&fid=${fid}&cid=${cid}`
+              );
+            }}
             className="px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors"
           >
             Edit
@@ -270,7 +274,7 @@ export default function ViewIntermediateCheck() {
       ),
       size: 120,
     },
-  ], [navigate, fid, cid, labId]); // ✅ Dependencies add kiye
+  ], [navigate, fid, cid]); // ✅ labId removed from dependencies
 
   const fetchIntermediateCheckData = useCallback(async () => {
     try {
@@ -311,6 +315,7 @@ export default function ViewIntermediateCheck() {
 
   const handleBack = () => {
     if (fid && cid) {
+      // ✅ labId removed from URL
       navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history/add-imc?fid=${fid}&cid=${cid}`);
     } else {
       navigate("/dashboards/material-list/electro-technical");

@@ -30,20 +30,7 @@ const AddMasterDocument = () => {
 
   const [errors, setErrors] = useState({});
 
-  // const requiredFields = [
-  //   'documentType',
-  //   'category',
-  //   'orientation',
-  //   'name',
-  //   'documentNo',
-  //   'department',
-  //   'effectiveDate',
-  //   'reviewBefore',
-  //   'deadlineInDays',
-  //   'reviewedBy',
-  //   'approvedBy',
-  //   'isTrainingRequired'
-  // ];
+
 
   const validateForm = () => {
     const newErrors = {};
