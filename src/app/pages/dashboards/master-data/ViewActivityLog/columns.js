@@ -2,7 +2,7 @@
 import { createColumnHelper } from "@tanstack/react-table";
 
 // Local Imports
-import { RowActions } from "./RowActions";
+// import { RowActions } from "./RowActions";
 import {
   SelectCell,
   SelectHeader,
@@ -86,10 +86,5 @@ export const columns = [
     cell: (info) => info.getValue() || "-",
   }),
 
-  // ✅ Actions
-  columnHelper.display({
-    id: "actions",
-    header: "Actions",
-    cell: RowActions,
-  }),
+  
 ];
