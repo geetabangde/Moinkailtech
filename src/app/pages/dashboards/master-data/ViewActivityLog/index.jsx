@@ -55,7 +55,7 @@ export default function OrdersDatatableV1() {
       
       console.log("Fetching activity log for month:", selectedMonth);
       
-      const response = await axios.get("/api/master/get-activity-log", {
+      const response = await axios.get("/master/get-activity-log", {
         params: {
           month: selectedMonth
         }
