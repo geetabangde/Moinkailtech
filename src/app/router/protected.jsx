@@ -1485,7 +1485,7 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                      path: "edit-visual-test-form",
+                      path: "edit-visual-test-form/:id",
                       lazy: async () => ({
                         Component: (
                           await import(
@@ -1523,7 +1523,7 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                      path: "edit-visual-test-form",
+                      path: "edit-visual-test-form/:id",
                       lazy: async () => ({
                         Component: (
                           await import(

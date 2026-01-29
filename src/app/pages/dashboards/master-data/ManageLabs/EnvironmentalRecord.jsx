@@ -1,32 +1,87 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Button } from "components/ui";
+import { useNavigate, useParams } from "react-router";
+import axios from "utils/axios";
+import { toast } from "sonner";
 
 export default function ViewEnvironmentalRecord() {
-  const [loading] = useState(false);
+  const navigate = useNavigate();
+  const params = useParams();
+  
+  // Get labId from URL params - check what params are available
+  console.log("All URL Params:", params);
+  const labId = params.labId || params.id || params['*']?.split('/').pop();
+  
+  console.log("Extracted Lab ID:", labId);
+  
+  const [loading, setLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState("September");
+  const [selectedMonth, setSelectedMonth] = useState("02");
   const [selectedYear, setSelectedYear] = useState("2025");
+  const [environmentalData, setEnvironmentalData] = useState(null);
 
-  // Sample environmental data
-  const environmentalData = {
-    qfNo: "KTRCGC/003/01",
-    issueNo: "01",
-    issueDate: "01/05/2019",
-    revisionNo: "01",
-    revisionDate: "20/03/2021",
-    page: "1 of 1",
-    location: "",
-    department: "",
-    records: [
-      { date: "01/09/2025", addedBy: "" },
-      { date: "02/09/2025", addedBy: "" },
-      { date: "03/09/2025", addedBy: "" },
-      { date: "04/09/2025", addedBy: "" },
-      { date: "05/09/2025", addedBy: "" },
-      { date: "06/09/2025", addedBy: "" },
-      { date: "07/09/2025", addedBy: "" },
-      { date: "08/09/2025", addedBy: "" },
-      { date: "09/09/2025", addedBy: "" },
-    ]
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  // Fetch environmental data from API
+  useEffect(() => {
+    const fetchEnvironmentalData = async () => {
+      console.log("Lab ID from URL:", labId); // Debug log
+      
+      if (!labId) {
+        console.error("Lab ID is missing. Current URL:", window.location.href);
+        toast.error("Lab ID is required. Please navigate from the lab list.");
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        console.log("Fetching data with params:", {
+          labid: labId,
+          year: selectedYear,
+          month: selectedMonth
+        });
+
+        const response = await axios.get(
+          `/master/get-enviornmental-record`,
+          {
+            params: {
+              labid: labId,
+              year: selectedYear,
+              month: selectedMonth
+            }
+          }
+        );
+
+        console.log("API Response:", response.data);
+
+        // Check if response has data
+        if (response.data) {
+          setEnvironmentalData(response.data);
+        } else {
+          toast.error("No data found");
+        }
+      } catch (err) {
+        console.error("Error fetching environmental data:", err);
+        toast.error("Failed to load environmental data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEnvironmentalData();
+  }, [labId, selectedYear, selectedMonth]);
+
+  const getMonthName = (monthNum) => {
+    const num = parseInt(monthNum);
+    return monthNames[num - 1] || "";
+  };
+
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-GB');
   };
 
   const handlePrint = () => {
@@ -35,11 +90,6 @@ export default function ViewEnvironmentalRecord() {
       window.print();
       setPrintLoading(false);
     }, 500);
-  };
-
-  const handleGoBack = () => {
-    // Navigate back functionality
-    console.log("Navigate back");
   };
 
   if (loading) {
@@ -56,8 +106,68 @@ export default function ViewEnvironmentalRecord() {
     );
   }
 
+  if (!labId && !loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <div className="text-red-600 text-lg font-semibold mb-2">Lab ID Missing</div>
+            <div className="text-gray-600 mb-4">
+              Please navigate to this page from the lab list with a valid Lab ID.
+            </div>
+            <div className="text-sm text-gray-500 mb-4">
+              Current URL: {window.location.href}
+            </div>
+            <Button
+              variant="outline"
+              className="text-white bg-blue-600 hover:bg-blue-700"
+              onClick={() => navigate("/dashboards/master-data/manage-labs")}
+            >
+              Back to List
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!environmentalData && !loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <div className="text-gray-600 text-lg mb-4">No data available</div>
+            <Button
+              variant="outline"
+              className="text-white bg-blue-600 hover:bg-blue-700"
+              onClick={() => navigate("/dashboards/master-data/manage-labs")}
+            >
+              Back to List
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <style>
+        {`
+          @media print {
+            .no-print { display: none !important; }
+            .printable-area { 
+              padding: 0;
+              background: white;
+            }
+            body { 
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
+          }
+        `}
+      </style>
+
       <div className="max-w-7xl mx-auto bg-white shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 no-print">
@@ -69,10 +179,11 @@ export default function ViewEnvironmentalRecord() {
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option>September</option>
-                <option>October</option>
-                <option>November</option>
-                <option>December</option>
+                {monthNames.map((month, idx) => (
+                  <option key={idx} value={String(idx + 1).padStart(2, '0')}>
+                    {month}
+                  </option>
+                ))}
               </select>
               <select 
                 value={selectedYear}
@@ -84,12 +195,13 @@ export default function ViewEnvironmentalRecord() {
                 <option>2023</option>
               </select>
             </div>
-            <button
-              onClick={handleGoBack}
-              className="px-4 py-2 bg-blue-600 text-white border border-blue-600 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+            <Button
+              variant="outline"
+              className="text-white bg-blue-600 hover:bg-blue-700"
+              onClick={() => navigate("/dashboards/master-data/manage-labs")}
             >
-              Go Back
-            </button>
+              Back to List
+            </Button>
           </div>
         </div>
 
@@ -124,14 +236,14 @@ export default function ViewEnvironmentalRecord() {
                   <table className="w-full h-full text-xs text-gray-800 border-collapse">
                     <tbody>
                       {[
-                        ["Q.F. No.", environmentalData.qfNo],
-                        ["Issue No.", environmentalData.issueNo],
-                        ["Issue Date", environmentalData.issueDate],
-                        ["Revision No.", environmentalData.revisionNo],
-                        ["Revision Date", environmentalData.revisionDate],
-                        ["Page", environmentalData.page],
+                        ["Q.F. No.", environmentalData.qfNo || "KTRCGC/003/01"],
+                        ["Issue No.", environmentalData.issueNo || "01"],
+                        ["Issue Date", environmentalData.issueDate || "01/05/2019"],
+                        ["Revision No.", environmentalData.revisionNo || "01"],
+                        ["Revision Date", environmentalData.revisionDate || "20/03/2021"],
+                        ["Page", environmentalData.page || "1 of 1"],
                       ].map(([label, value]) => (
-                        <tr key={label} className="border-b border-gray-300">
+                        <tr key={label} className="border-b border-gray-300 last:border-b-0">
                           <td className="p-1 font-semibold border-r border-gray-300 bg-gray-50">{label}</td>
                           <td className="p-1">{value}</td>
                         </tr>
@@ -141,33 +253,82 @@ export default function ViewEnvironmentalRecord() {
                 </div>
               </div>
 
-              {/* Location and Month Info */}
+              {/* Location and Equipment Info */}
               <div className="space-y-4">
                 <div className="flex gap-6 text-sm text-gray-700">
-                  <span><strong>MONTH:</strong> {selectedMonth}</span>
-                  <span><strong>YEAR:</strong> {selectedYear}</span>
+                  <span><strong>EQUIPMENT:</strong> {environmentalData.lab_name}</span>
                 </div>
                 <div className="flex gap-6 text-sm text-gray-700">
-                  <span><strong>LOCATION:</strong> {environmentalData.location || ""}</span>
+                  <span><strong>MONTH:</strong> {getMonthName(environmentalData.month)}</span>
+                  <span><strong>YEAR:</strong> {environmentalData.year}</span>
                 </div>
               </div>
 
+              {/* Measurement Type and Ranges */}
+              {environmentalData.types?.map((type) => (
+                <div key={type.type_id} className="space-y-2">
+                  <div className="text-sm text-gray-700">
+                    <strong>TYPE:</strong> {type.type} ({type.frequency})
+                  </div>
+                  <div className="flex gap-6 text-sm text-gray-700">
+                    {type.ranges?.map((range, idx) => (
+                      <span key={idx}>
+                        <strong>{range.subtype}:</strong>{' '}
+                        {range.rangetype === 'Range' 
+                          ? `${range.minrange}-${range.maxrange} ${range.unit}`
+                          : `${range.minrange} ${range.unit}`
+                        }
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
               {/* Environmental Records Table */}
               <div>
-                <table className="w-full border border-gray-300 text-sm text-gray-800 table-fixed">
+                <table className="w-full border border-gray-300 text-sm text-gray-800">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="p-3 border border-gray-300 text-left font-semibold">Date</th>
+                      <th className="p-3 border border-gray-300 text-left font-semibold w-32">Date</th>
+                      <th className="p-3 border border-gray-300 text-left font-semibold w-24">Time</th>
+                      <th className="p-3 border border-gray-300 text-left font-semibold w-32">Temperature (°C)</th>
+                      <th className="p-3 border border-gray-300 text-left font-semibold w-32">Humidity (%RH)</th>
                       <th className="p-3 border border-gray-300 text-left font-semibold">Added By</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {environmentalData.records.map((record, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="p-3 border border-gray-300">{record.date}</td>
-                        <td className="p-3 border border-gray-300 h-12">{record.addedBy}</td>
-                      </tr>
-                    ))}
+                    {environmentalData.records?.map((record, idx) => {
+                      const readings = record.data[0]?.records || [];
+                      return readings.map((reading, readingIdx) => (
+                        <tr key={`${idx}-${readingIdx}`} className="hover:bg-gray-50">
+                          {readingIdx === 0 && (
+                            <td 
+                              className="p-3 border border-gray-300 font-medium" 
+                              rowSpan={readings.length}
+                            >
+                              {formatDate(record.date)}
+                            </td>
+                          )}
+                          <td className="p-3 border border-gray-300">
+                            {reading.time || '-'}
+                          </td>
+                          <td className="p-3 border border-gray-300">
+                            {reading.temperature || '-'}
+                          </td>
+                          <td className="p-3 border border-gray-300">
+                            {reading.humidity || '-'}
+                          </td>
+                          {readingIdx === 0 && (
+                            <td 
+                              className="p-3 border border-gray-300" 
+                              rowSpan={readings.length}
+                            >
+                              {record.added_by || '-'}
+                            </td>
+                          )}
+                        </tr>
+                      ));
+                    })}
                   </tbody>
                 </table>
               </div>

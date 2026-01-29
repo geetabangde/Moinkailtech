@@ -1,45 +1,3 @@
-// // Import Dependencies
-// import { createColumnHelper } from "@tanstack/react-table";
-
-// // Local Imports
-// import { RowActions } from "./RowActions";
-// import {
-//   SelectCell,
-//   SelectHeader,
-// } from "components/shared/table/SelectCheckbox";
-
-// const columnHelper = createColumnHelper();
-
-// export const columns = [
-//   columnHelper.display({
-//     id: "select",
-//     header: SelectHeader,
-//     cell: SelectCell,
-//   }),
-
-//   // ✅ Serial Number
-
-
-//   // ✅ Mode Name (from API)
-//   columnHelper.accessor("name", {
-//     id: "name",
-//     header: "Mode Name",
-//     cell: (info) => info.getValue(),
-//   }),
-
-
-
-//   // ✅ Actions
-//   columnHelper.display({
-//     id: "actions",
-//     header: "Actions",
-//     cell: RowActions,
-//   }),
-// ];
-
-
-
-
 // Import Dependencies
 import { createColumnHelper } from "@tanstack/react-table";
 
@@ -67,22 +25,33 @@ export const columns = [
     cell: (info) => info.getValue(),
   }),
 
-  // ✅ From
+  // ✅ From Value
+  columnHelper.accessor("fromValue", {
+    id: "fromValue",
+    header: "From Value",
+    cell: (info) => info.getValue(),
+  }),
+
+  // ✅ From Unit
   columnHelper.accessor("from", {
     id: "from",
-    header: "From",
+    header: "From Unit",
     cell: (info) => info.getValue(),
   }),
 
-  // ✅ To
+  // ✅ To Value
+  columnHelper.accessor("toValue", {
+    id: "toValue",
+    header: "To Value",
+    cell: (info) => info.getValue(),
+  }),
+
+  // ✅ To Unit
   columnHelper.accessor("to", {
     id: "to",
-    header: "To",
+    header: "To Unit",
     cell: (info) => info.getValue(),
   }),
-
-  // ✅ Mode Name
-
 
   // ✅ Actions
   columnHelper.display({

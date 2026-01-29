@@ -35,10 +35,12 @@ const confirmMessages = {
 
 export function RowActions({ row, table }) {
     const navigate = useNavigate(); // 👈 Hook
-   const handleEdit = () => {
-    
-    navigate(`/dashboards/calibration-operations/bio-medical-visual-test/edit-visual-test-form`);
-  };
+  const handleEdit = () => {
+  const id = row.original.id;
+  navigate(
+    `/dashboards/calibration-operations/bio-medical-visual-test/edit-visual-test-form/${id}`
+  );
+};
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
@@ -56,27 +58,30 @@ export function RowActions({ row, table }) {
   };
 
   const handleDeleteRows = useCallback(async () => {
-  const id = row.original.id; // Assuming your row contains `id`
+  const id = row.original.id;
   setConfirmDeleteLoading(true);
 
   try {
-    await axios.delete(`/calibrationoperations/calibration-method-destroy/${id}`);
-    table.options.meta?.deleteRow(row); // remove row from UI
+    await axios.delete(
+      `/calibrationoperations/delete-visualtest/${id}`
+    );
+
+    table.options.meta?.deleteRow(row);
+
+    toast.success("Visual Test deleted successfully 🗑️", {
+      duration: 1200,
+    });
+
     setDeleteSuccess(true);
-     toast.success("calibration operations deleted successfully ✅", {
-      duration: 1000,
-      icon: "🗑️",
-    });
   } catch (error) {
-    console.error("Delete failed:", error);
+    console.error(error);
+    toast.error("Failed to delete visual test ❌");
     setDeleteError(true);
-     toast.error("Failed to delete calibration operations ❌", {
-      duration: 2000,
-    });
   } finally {
     setConfirmDeleteLoading(false);
   }
 }, [row, table]);
+
 
   const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
 

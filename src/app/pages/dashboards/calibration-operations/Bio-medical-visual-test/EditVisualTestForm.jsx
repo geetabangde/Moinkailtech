@@ -1,64 +1,114 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router";
+import axios from "utils/axios";
+import { toast } from "sonner";
 
+const EditVisualTest = () => {
+  const navigate = useNavigate();
+  const { id } = useParams(); // 👈 ID from URL
 
-const AddVisualTest = () => {
-  const navigate=useNavigate();
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSave = () => {
-    console.log('Saving:', description);
-    // Add your save logic here
-  };
+  useEffect(() => {
+    const fetchVisualTest = async () => {
+      try {
+        const res = await axios.get(
+          `/calibrationoperations/get-visualtest-byid/${id}`,
+        );
 
-  const handleVisualTestList = () => {
-   
-      navigate("/dashboards/calibration-operations/bio-medical-visual-test")
-    
-    console.log('Navigate to Visual Test List');
-    // Add your navigation logic here
+        console.log("GET RESPONSE 👉", res.data);
+
+        if (res.data?.status) {
+          const record = Array.isArray(res.data.data)
+            ? res.data.data[0]
+            : res.data.data;
+
+          setDescription(record?.description || "");
+        } else {
+          toast.error("Failed to load visual test");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Something went wrong while fetching data");
+      }
+    };
+
+    if (id) fetchVisualTest();
+  }, [id]);
+
+  // ✅ UPDATE API
+  const handleSave = async () => {
+    if (!description.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await axios.post(
+        `/calibrationoperations/update-visualtest/${id}`,
+        { description },
+      );
+
+      console.log("UPDATE RESPONSE 👉", res.data);
+
+      if (res.data?.status === true) {
+        toast.success(res.data.message || "Updated successfully ✅");
+
+        setTimeout(() => {
+          navigate(
+            "/dashboards/calibration-operations/bio-medical-visual-test",
+          );
+        }, 1000);
+      } else {
+        toast.error(res.data?.message || "Update failed ❌");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong while updating ❌");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-white p-8">
-      {/* Header */}
-      <h1 className="text-3xl font-normal text-gray-800 mb-6">Edit visual Test Form</h1>
+      <h1 className="mb-6 text-3xl font-normal text-gray-800">
+        Edit Visual Test
+      </h1>
 
-      {/* Visual Test List Button */}
       <button
-        onClick={handleVisualTestList}
-        className="px-6 py-2.5 bg-cyan-500 text-white text-sm font-medium rounded hover:bg-cyan-600 transition-colors mb-8"
-      
-      
+        onClick={() =>
+          navigate("/dashboards/calibration-operations/bio-medical-visual-test")
+        }
+        className="mb-8 rounded bg-cyan-500 px-6 py-2.5 text-sm text-white hover:bg-cyan-600"
       >
-       Back To Units
+        Back To List
       </button>
 
-      {/* Description Field */}
-      <div className="flex items-start mb-8">
-        <label className="w-40 pt-3 text-gray-800 font-medium">
+      <div className="mb-8 flex items-start">
+        <label className="w-40 pt-3 font-medium text-gray-800">
           Description
         </label>
-        <div className="flex-1">
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Parameter Description"
-            className="w-full px-4 py-3 border border-gray-300 rounded text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          />
-        </div>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="w-full rounded border px-4 py-3 focus:ring-2 focus:ring-cyan-500"
+        />
       </div>
 
-      {/* Save Changes Button */}
       <button
         onClick={handleSave}
-        className="px-6 py-2.5 bg-blue-500 text-white text-sm font-medium rounded hover:bg-blue-600 transition-colors"
+        disabled={loading}
+        className="rounded bg-blue-500 px-6 py-2.5 text-white hover:bg-blue-600 disabled:opacity-60"
       >
-        Save changes
+        {loading ? "Updating..." : "Save changes"}
       </button>
     </div>
   );
 };
 
-export default AddVisualTest;
+export default EditVisualTest;

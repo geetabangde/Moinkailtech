@@ -11,8 +11,7 @@ import {
 } from "@tanstack/react-table";
 import clsx from "clsx";
 import { useState, useEffect } from "react";
-import unitConversions from "./data";
-
+import axios from "utils/axios";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -37,18 +36,36 @@ export default function OrdersDatatableV1() {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // ✅ Fetch from API
-useEffect(() => {
-  setLoading(true);
-  setTimeout(() => {
-    setOrders(unitConversions); // ✅ load static data
-    setLoading(false);
-  }, 500); // optional fake delay
-}, []);
+  useEffect(() => {
+    const fetchUnitConversions = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get("master/get-unitconversion-list");
+        
+        // Transform API data to match table structure
+        const transformedData = response.data.data.map((item) => ({
+          id: item.id,
+          fromValue: item.fromvalue,
+          toValue: item.tovalue,
+          from: item.from_unit_name || "N/A",
+          to: item.to_unit_name || "N/A",
+        }));
+        
+        setOrders(transformedData);
+      } catch (err) {
+        console.error("Error fetching unit conversions:", err);
+        setError(err.message || "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-
-
+    fetchUnitConversions();
+  }, []);
 
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
@@ -81,34 +98,34 @@ useEffect(() => {
       columnPinning,
       tableSettings,
     },
-        meta: {
-  updateData: (rowIndex, columnId, value) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.map((row, index) => {
-        if (index === rowIndex) {
-          return {
-            ...old[rowIndex],
-            [columnId]: value,
-          };
-        }
-        return row;
-      })
-    );
-  },
-  deleteRow: (row) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.filter((oldRow) => oldRow.id !== row.original.id)
-    );
-  },
-  deleteRows: (rows) => {
-    skipAutoResetPageIndex();
-    const rowIds = rows.map((row) => row.original.id);
-    setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
-  },
-  setTableSettings
-},
+    meta: {
+      updateData: (rowIndex, columnId, value) => {
+        skipAutoResetPageIndex();
+        setOrders((old) =>
+          old.map((row, index) => {
+            if (index === rowIndex) {
+              return {
+                ...old[rowIndex],
+                [columnId]: value,
+              };
+            }
+            return row;
+          })
+        );
+      },
+      deleteRow: (row) => {
+        skipAutoResetPageIndex();
+        setOrders((old) =>
+          old.filter((oldRow) => oldRow.id !== row.original.id)
+        );
+      },
+      deleteRows: (rows) => {
+        skipAutoResetPageIndex();
+        const rowIds = rows.map((row) => row.original.id);
+        setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
+      },
+      setTableSettings,
+    },
     filterFns: {
       fuzzy: fuzzyFilter,
     },
@@ -122,11 +139,9 @@ useEffect(() => {
     globalFilterFn: fuzzyFilter,
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-
     getPaginationRowModel: getPaginationRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
-
     autoResetPageIndex,
   });
 
@@ -134,14 +149,53 @@ useEffect(() => {
 
   useLockScrollbar(tableSettings.enableFullScreen);
 
+  // ✅ Error UI
+  if (error) {
+    return (
+      <Page title="Unit Conversion List">
+        <div className="flex h-[60vh] flex-col items-center justify-center text-gray-600">
+          <svg
+            className="mb-4 h-12 w-12 text-red-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p className="text-lg font-medium">Error loading data</p>
+          <p className="text-sm text-gray-500">{error}</p>
+        </div>
+      </Page>
+    );
+  }
+
   // ✅ Loading UI
   if (loading) {
     return (
       <Page title="Unit Conversion List">
         <div className="flex h-[60vh] items-center justify-center text-gray-600">
-          <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
+          <svg
+            className="mr-2 h-6 w-6 animate-spin text-blue-600"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+            ></path>
           </svg>
           Loading Unit Conversion List...
         </div>
@@ -232,11 +286,11 @@ useEffect(() => {
                           key={row.id}
                           className={clsx(
                             "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
+                            row.getIsSelected() &&
+                              !isSafari &&
                               "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
                           )}
                         >
-                          {/* first row is a normal row */}
                           {row.getVisibleCells().map((cell) => {
                             return (
                               <Td
