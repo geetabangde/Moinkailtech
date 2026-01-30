@@ -10,10 +10,9 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { electricalSafetyList } from "./data";
 import { useState, useEffect } from "react";
-
-
+import axios from "utils/axios";
+import { toast } from "react-hot-toast";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -24,7 +23,6 @@ import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
 import { Toolbar } from "./Toolbar";
 import { columns } from "./columns";
-// import { ordersList } from "./data";
 import { PaginationSection } from "components/shared/table/PaginationSection";
 import { SelectedRowsActions } from "./SelectedRowsActions";
 import { useThemeContext } from "app/contexts/theme/context";
@@ -39,26 +37,39 @@ export default function OrdersDatatableV1() {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // ✅ Fetch from API
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
-      setOrders(electricalSafetyList); // Load static data
-      setLoading(false);
-    }, 500); // small delay to mimic API call
+    const fetchDisciplines = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get("/calibrationoperations/get-disciplines");
+        
+        if (response.data.status && response.data.data) {
+          setOrders(response.data.data);
+        } else {
+          throw new Error("Invalid response format");
+        }
+      } catch (err) {
+        console.error("Error fetching disciplines:", err);
+        setError(err.message || "Failed to fetch data");
+        toast.error("Failed to load disciplines. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDisciplines();
   }, []);
 
- 
-
-  
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
     enableRowDense: false,
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
-
   const [sorting, setSorting] = useState([]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
@@ -84,33 +95,33 @@ export default function OrdersDatatableV1() {
       tableSettings,
     },
     meta: {
-  updateData: (rowIndex, columnId, value) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.map((row, index) => {
-        if (index === rowIndex) {
-          return {
-            ...old[rowIndex],
-            [columnId]: value,
-          };
-        }
-        return row;
-      })
-    );
-  },
-  deleteRow: (row) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.filter((oldRow) => oldRow.id !== row.original.id)
-    );
-  },
-  deleteRows: (rows) => {
-    skipAutoResetPageIndex();
-    const rowIds = rows.map((row) => row.original.id);
-    setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
-  },
-  setTableSettings
-},
+      updateData: (rowIndex, columnId, value) => {
+        skipAutoResetPageIndex();
+        setOrders((old) =>
+          old.map((row, index) => {
+            if (index === rowIndex) {
+              return {
+                ...old[rowIndex],
+                [columnId]: value,
+              };
+            }
+            return row;
+          })
+        );
+      },
+      deleteRow: (row) => {
+        skipAutoResetPageIndex();
+        setOrders((old) =>
+          old.filter((oldRow) => oldRow.id !== row.original.id)
+        );
+      },
+      deleteRows: (rows) => {
+        skipAutoResetPageIndex();
+        const rowIds = rows.map((row) => row.original.id);
+        setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
+      },
+      setTableSettings
+    },
     filterFns: {
       fuzzy: fuzzyFilter,
     },
@@ -124,34 +135,51 @@ export default function OrdersDatatableV1() {
     globalFilterFn: fuzzyFilter,
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-
     getPaginationRowModel: getPaginationRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
-
     autoResetPageIndex,
   });
 
   useDidUpdate(() => table.resetRowSelection(), [orders]);
-
   useLockScrollbar(tableSettings.enableFullScreen);
   
   // ✅ Loading UI
   if (loading) {
     return (
-      <Page title="Modes List">
+      <Page title="Disciplines List">
         <div className="flex h-[60vh] items-center justify-center text-gray-600">
           <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
           </svg>
-          Loading Modes...
+          Loading Disciplines...
         </div>
       </Page>
     );
   }
 
-  
+  // ✅ Error UI
+  if (error) {
+    return (
+      <Page title="Disciplines List">
+        <div className="flex h-[60vh] flex-col items-center justify-center text-gray-600">
+          <svg className="h-12 w-12 mb-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-lg font-medium">Failed to load disciplines</p>
+          <p className="text-sm text-gray-500 mt-2">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </Page>
+    );
+  }
+
   return (
     <Page title="Calibration Method List">
       <div className="transition-content w-full pb-5">
@@ -239,7 +267,6 @@ export default function OrdersDatatableV1() {
                               "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
                           )}
                         >
-                          {/* first row is a normal row */}
                           {row.getVisibleCells().map((cell) => {
                             return (
                               <Td
@@ -281,7 +308,7 @@ export default function OrdersDatatableV1() {
                 </Table>
               </div>
               <SelectedRowsActions table={table} />
-              {table.getCoreRowModel().rows.length && (
+              {table.getCoreRowModel().rows.length > 0 && (
                 <div
                   className={clsx(
                     "px-4 pb-4 sm:px-5 sm:pt-4",
