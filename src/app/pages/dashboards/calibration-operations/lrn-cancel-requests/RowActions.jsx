@@ -6,12 +6,7 @@ import {
   MenuItems,
   Transition,
 } from "@headlessui/react";
-import { 
-  EllipsisHorizontalIcon,
-  PencilIcon,
-  TrashIcon,
-  DocumentDuplicateIcon,
-  CurrencyDollarIcon,
+import { EllipsisHorizontalIcon,PencilIcon,TrashIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { Fragment, useCallback, useState } from "react";
@@ -25,34 +20,24 @@ import axios from "utils/axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router";
 
+
 // ----------------------------------------------------------------------
 
 const confirmMessages = {
   pending: {
     description:
-      "Are you sure you want to delete this calibration instrument? Once deleted, it cannot be restored.",
+      "Are you sure you want to delete this calibration operations? Once deleted, it cannot be restored.",
   },
   success: {
-    title: "calibration standards Deleted",
+    title: "calibration operations Deleted",
   },
 };
 
 export function RowActions({ row, table }) {
-  const navigate = useNavigate();
-
-  const handleEdit = () => {
-    const id = row.original.id;
-    navigate(`/dashboards/calibration-operations/instrument-list/edit/${id}`);
-  };
-
-  const handleClone = () => {
-    const id = row.original.id;
-    navigate(`/dashboards/calibration-operations/instrument-list/clone/${id}`);
-  };
-
-  const handleViewPrices = () => {
-    const id = row.original.id;
-    navigate(`/dashboards/calibration-operations/instrument-list/view-prices/${id}`);
+    const navigate = useNavigate(); // 👈 Hook
+   const handleEdit = () => {
+    
+    navigate(`/dashboards/calibration-operations/bio-medical-safety-test/edit-visual-test-form`);
   };
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -70,16 +55,12 @@ export function RowActions({ row, table }) {
     setDeleteSuccess(false);
   };
 
-
-
-
-const handleDeleteRows = useCallback(async () => {
+  const handleDeleteRows = useCallback(async () => {
   const id = row.original.id; // Assuming your row contains `id`
   setConfirmDeleteLoading(true);
 
   try {
-  
-    await axios.delete(`/calibrationoperations/delete-Calibration-price/${id}`);
+    await axios.delete(`/calibrationoperations/calibration-method-destroy/${id}`);
     table.options.meta?.deleteRow(row); // remove row from UI
     setDeleteSuccess(true);
      toast.success("calibration operations deleted successfully ✅", {
@@ -101,7 +82,9 @@ const handleDeleteRows = useCallback(async () => {
 
   return (
     <>
-      <div className="flex justify-center space-x-1.5">
+      <div className="flex justify-center space-x-1.5 ">
+      
+
         <Menu as="div" className="relative inline-block text-left">
           <MenuButton as={Button} isIcon className="size-8 rounded-full">
             <EllipsisHorizontalIcon className="size-4.5" />
@@ -119,61 +102,33 @@ const handleDeleteRows = useCallback(async () => {
               anchor={{ to: "bottom end", gap: 12 }}
               className="absolute z-100 w-[10rem] rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-750 dark:shadow-none ltr:right-0 rtl:left-0"
             >
+              
               <MenuItem>
                 {({ focus }) => (
-                  <button
-                    onClick={handleEdit}
+                  <button onClick={handleEdit}
                     className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
+                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors ",
                       focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
+                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
                     )}
+
+
+                    // onClick={()=>
+                    //   navigate("/dashboards/calibration-operations/bio-medical-visual-test/")
+                    // }
                   >
                     <PencilIcon className="size-4.5 stroke-1" />
                     <span>Edit</span>
                   </button>
                 )}
               </MenuItem>
-
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={handleClone}
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <DocumentDuplicateIcon className="size-4.5 stroke-1" />
-                    <span>Clone</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={handleViewPrices}
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <CurrencyDollarIcon className="size-4.5 stroke-1" />
-                    <span>View Prices</span>
-                  </button>
-                )}
-              </MenuItem>
-
               <MenuItem>
                 {({ focus }) => (
                   <button
                     onClick={openModal}
                     className={clsx(
-                      "this:error flex h-9 w-full items-center space-x-3 px-3 tracking-wide text-this outline-hidden transition-colors dark:text-this-light",
-                      focus && "bg-this/10 dark:bg-this-light/10"
+                      "this:error flex h-9 w-full items-center space-x-3 px-3 tracking-wide text-this outline-hidden transition-colors dark:text-this-light ",
+                      focus && "bg-this/10 dark:bg-this-light/10",
                     )}
                   >
                     <TrashIcon className="size-4.5 stroke-1" />
@@ -194,6 +149,8 @@ const handleDeleteRows = useCallback(async () => {
         confirmLoading={confirmDeleteLoading}
         state={state}
       />
+
+    
     </>
   );
 }

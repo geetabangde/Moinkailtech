@@ -48,8 +48,8 @@ export default function ApproveRejectModal({
     try {
       const url =
         actionType === "approve"
-          ? "/calibrationoperations/approve-rev-requests"
-          : "/calibrationoperations/reject-rev-requests";
+          ? "/calibrationoperations/approve-lrncancel-requests"
+          : "/calibrationoperations/reject-lrncancel-requests";
 
       const payload = {
         revrequestid: Number(revRequestId), // ✅ Ensure number type

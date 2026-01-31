@@ -100,7 +100,7 @@ export const columns = [
     ),
   }),
 
-  columnHelper.accessor("instname", {
+  columnHelper.accessor("name", {
     header: "Name",
     cell: (info) => info.getValue() || "—",
   }),

@@ -1324,32 +1324,13 @@ const protectedRoutes = {
                   }),
                 },
 
-                // {
-                //   path: "create",
-                //   lazy: async () => ({
-                //     Component: (
-                //       await import(
-                //         "app/pages/dashboards/master-data/Modes/AddModes"
-                //       )
-                //     ).default,
-                //   }),
-                // },
+                
               ],
             },
 
             {
               path: "calibration-operations",
               children: [
-                {
-                  path: "lrn-cancel-requests",
-                  lazy: async () => ({
-                    Component: (
-                      await import(
-                        "app/pages/dashboards/calibration-operations/lrn-cancel-requests/lrncancel"
-                      )
-                    ).default,
-                  }),
-                },
                 {
                   path: "calibration-standards",
                   children: [
@@ -1550,29 +1531,27 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    {
-                      path: "add-new-visual-test", // Add Page
-                      lazy: async () => ({
-                        Component: (
-                          await import(
-                            "app/pages/dashboards/calibration-operations/Bio-medical-safety-test/AddVisualTest"
-                          )
-                        ).default,
-                      }),
-                    },
-                    {
-                      path: "edit-visual-test-form",
-                      lazy: async () => ({
-                        Component: (
-                          await import(
-                            "app/pages/dashboards/calibration-operations/Bio-medical-safety-test/EditVisualtestForm"
-                          )
-                        ).default,
-                      }),
-                    },
+                  
                   ],
                 },
-
+                
+                //-------------------LRN Cancel Requests----------------------- 
+                  {
+                  path: "lrn-cancel-requests",
+                  children: [
+                    {
+                      path: "", // List Page
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/calibration-operations/lrn-cancel-requests"
+                          )
+                        ).default,
+                      }),
+                    },
+                  
+                  ],
+                },
                 //--------------------Discipline------------------
 
                 {
@@ -1644,6 +1623,36 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
+                    {
+                       path: "clone/:id",
+                       lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/calibration-operations/instrument-list/Cloneinstrument"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                    path: "view-prices/:instrumentId",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/calibration-operations/instrument-list/CalibrationPriceList"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "view-matrix/:instrumentId/:priceId", 
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                              "app/pages/dashboards/calibration-operations/instrument-list/ViewMatrixPage"
+                          )
+                        ).default,
+                      }),
+                    }
                   ],
                 },
               ],

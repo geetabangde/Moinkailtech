@@ -53,7 +53,7 @@ export default function OrdersDatatableV1() {
       setLoading(true);
       try {
         const response = await axios.get(
-          "/calibrationoperations/get-rev-requests",
+          "/calibrationoperations/get-lrncancel-requests",
         );
 
         if (response.data.status && response.data.data) {
@@ -364,7 +364,7 @@ export default function OrdersDatatableV1() {
         onSuccess={async () => {
           try {
             const res = await axios.get(
-              "/calibrationoperations/get-rev-requests"
+              "/calibrationoperations/get-lrncancel-requests"
             );
             if (res.data.status) {
               setOrders(res.data.data);
