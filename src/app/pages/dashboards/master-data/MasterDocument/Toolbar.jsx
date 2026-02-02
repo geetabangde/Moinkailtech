@@ -1,5 +1,4 @@
 // Import Dependencies
-
 import clsx from "clsx";
 import {
   Menu,
@@ -9,8 +8,6 @@ import {
   Transition,
 } from "@headlessui/react";
 import { EllipsisHorizontalIcon } from "@heroicons/react/20/solid";
-
-
 import { useNavigate } from "react-router";
 
 import { Button, Input } from "components/ui";
@@ -22,7 +19,18 @@ import { useBreakpointsContext } from "app/contexts/breakpoint/context";
 export function Toolbar({ table }) {
   const { isXs } = useBreakpointsContext();
   const isFullScreenEnabled = table.getState().tableSettings.enableFullScreen;
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+
+  // Get filter states from table meta
+  const {
+    docType,
+    setDocType,
+    searchField,
+    setSearchField,
+    searchValue,
+    setSearchValue,
+    handleSearch,
+  } = table.options.meta;
 
   return (
     <div className="table-toolbar">
@@ -36,21 +44,22 @@ export function Toolbar({ table }) {
           {/* Heading */}
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-wide text-gray-800 dark:text-dark-50">
-            View Master Document
+              View Master Document
             </h2>
           </div>
 
           {/* Button */}
           <div>
-          <Button
+            <Button
               onClick={() => navigate("/dashboards/master-data/document-master/add-master-document")}
               className="h-9 rounded-md px-4 text-sm font-medium"
               color="primary"
-            >+ Add Master Document </Button>
-          
+            >
+              + Add Master Document
+            </Button>
           </div>
         </div>
-        
+
         {isXs ? (
           <Menu as="div" className="relative inline-block text-left">
             <MenuButton
@@ -79,51 +88,10 @@ export function Toolbar({ table }) {
                         "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
                     )}
                   >
-                    <span>+ Add New Unittype/ Parameter</span>
+                    <span>Share Selected</span>
                   </button>
                 )}
               </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Share</span>
-                  </button>
-                )}
-              </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Print</span>
-                  </button>
-                )}
-              </MenuItem>
-              <hr className="mx-3 my-1.5 h-px border-gray-150 dark:border-dark-500" />
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Import Orders</span>
-                  </button>
-                )}
-              </MenuItem>
-              <hr className="mx-3 my-1.5 h-px border-gray-150 dark:border-dark-500" />
               <MenuItem>
                 {({ focus }) => (
                   <button
@@ -150,97 +118,85 @@ export function Toolbar({ table }) {
                   </button>
                 )}
               </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Save Table as View</span>
-                  </button>
-                )}
-              </MenuItem>
             </Transition>
           </Menu>
         ) : (
-          <div className="flex space-x-2 ">
+          <div className="flex space-x-2">
+            <TableConfig table={table} />
           </div>
         )}
       </div>
 
-      {isXs ? (
-        <>
-          <div
-            className={clsx(
-              "flex space-x-2 pt-4  [&_.input-root]:flex-1",
-              isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
-            )}
+      {/* Filter Section */}
+      <div
+        className={clsx(
+          "transition-content flex items-end justify-between gap-6 pb-4 pt-6",
+          isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
+        )}
+      >
+        {/* Doc In Section */}
+        <div className="flex flex-col gap-2 w-48">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            Doc in :
+          </label>
+          <select
+            value={docType}
+            onChange={(e) => setDocType(e.target.value)}
+            className="h-8 px-3 py-1 text-xs border border-gray-300 rounded bg-white dark:bg-dark-700 dark:border-dark-500 dark:text-white w-full focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
-            {/* <SearchInput table={table} /> */}
-            <TableConfig table={table} />
-          </div>
-        </>
-      ) : (
-        <div
-          className={clsx(
-            "transition-content flex items-end justify-between gap-6 pb-4 pt-6",
-            isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
-          )}
-        >
-       
-          {/* Doc In Section */}
-          <div className="flex flex-col gap-2 w-48">
-          
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Doc in :
-            </label>
-            <select className="h-8 px-3 py-1 text-xs border border-gray-300 rounded bg-white dark:bg-dark-700 dark:border-dark-500 dark:text-white w-full">
-              <option>Active</option>
-            </select>
-          </div>
+            <option value="active">Active</option>
+            <option value="obsolete">Obsolete</option>
+            <option value="pending">Pending</option>
+            <option value="save">Save</option>
+          </select>
+        </div>
 
-          {/* Search In Section */}
-          <div className="flex flex-col gap-2 w-48">
-           
-           
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Search in :
-            </label>
-            <select className="h-8 px-3 py-1 text-xs border border-gray-300 rounded bg-white dark:bg-dark-700 dark:border-dark-500 dark:text-white w-full">
-              <option>All</option>
-            </select>
-          </div>
+        {/* Search In Section */}
+        <div className="flex flex-col gap-2 w-48">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            Search in :
+          </label>
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value)}
+            className="h-8 px-3 py-1 text-xs border border-gray-300 rounded bg-white dark:bg-dark-700 dark:border-dark-500 dark:text-white w-full focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="All">All</option>
+            <option value="name">Name</option>
+            <option value="Code">Document No./Procedure No</option>
+          </select>
+        </div>
 
-          {/* Value Section */}
-          <div className="flex flex-col gap-2 flex-1">
-           
-           
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Value :
-            </label>
-            <div className="flex gap-2">
-              <Input
-                value={table.getState().globalFilter}
-                onChange={(e) => table.setGlobalFilter(e.target.value)}
-                classNames={{
-                  input: "h-8 text-xs ring-primary-500/50 focus:ring-3",
-                  root: "flex-1 max-w-md",
-                }}
-                placeholder="Search ID, Customer..."
-              />
-              <Button
-                className="h-8 rounded px-4 text-xs font-medium"
-                color="primary"
-              >
-                Go
-              </Button>
-            </div>
+        {/* Value Section */}
+        <div className="flex flex-col gap-2 flex-1">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            Value :
+          </label>
+          <div className="flex gap-2">
+            <Input
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
+                }
+              }}
+              classNames={{
+                input: "h-8 text-xs ring-primary-500/50 focus:ring-3",
+                root: "flex-1 max-w-md",
+              }}
+              placeholder="Search by name or document no..."
+            />
+            <Button
+              onClick={handleSearch}
+              className="h-8 rounded px-4 text-xs font-medium"
+              color="primary"
+            >
+              Go
+            </Button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

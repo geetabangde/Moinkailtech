@@ -1,4 +1,3 @@
-
 import {
   flexRender,
   getCoreRowModel,
@@ -10,7 +9,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "utils/axios";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -25,20 +25,20 @@ import { PaginationSection } from "components/shared/table/PaginationSection";
 import { SelectedRowsActions } from "./SelectedRowsActions";
 import { useThemeContext } from "app/contexts/theme/context";
 import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
-import { ChevronDown } from "lucide-react";
-
-// Import Static Data
-import { dummyData } from "./data";
 
 const isSafari = getUserAgentBrowser() === "Safari";
 
-// Columns with chevron badges
-const CHEVRON_COLUMNS = ["doc_in", "search_in", "value"];
-
-export default function OrdersDatatableV1() {
+export default function ViewMasterDocument() {
   const { cardSkin } = useThemeContext();
 
-  const [orders, setOrders] = useState(dummyData);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Filter states - matching PHP logic
+  const [docType, setDocType] = useState("active");
+  const [searchField, setSearchField] = useState("All");
+  const [searchValue, setSearchValue] = useState("");
 
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
@@ -46,23 +46,65 @@ export default function OrdersDatatableV1() {
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
-
   const [sorting, setSorting] = useState([]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
-    "column-visibility-orders-1",
+    "column-visibility-master-document",
     {},
   );
 
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "column-pinning-orders-1",
+    "column-pinning-master-document",
     {},
   );
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
+  // Fetch documents from API
+  const fetchDocuments = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = {
+        type: docType,
+      };
+
+      // Add search parameters if search value is provided
+      if (searchValue && searchValue.trim() !== "") {
+        params.fieldType = searchField;
+        params.fieldVal = searchValue.trim();
+      }
+
+      const response = await axios.get("/master/view-document-module-list", {
+        params,
+      });
+
+      if (response.data.status) {
+        setDocuments(response.data.data || []);
+      } else {
+        setError("Failed to fetch documents");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Error fetching documents");
+      console.error("Error fetching documents:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch documents on component mount and when docType changes
+  useEffect(() => {
+    fetchDocuments();
+  }, [docType]);
+
+  // Handle search button click
+  const handleSearch = () => {
+    fetchDocuments();
+  };
+
   const table = useReactTable({
-    data: orders,
+    data: documents,
     columns: columns,
     state: {
       globalFilter,
@@ -74,7 +116,7 @@ export default function OrdersDatatableV1() {
     meta: {
       updateData: (rowIndex, columnId, value) => {
         skipAutoResetPageIndex();
-        setOrders((old) =>
+        setDocuments((old) =>
           old.map((row, index) => {
             if (index === rowIndex) {
               return {
@@ -86,18 +128,86 @@ export default function OrdersDatatableV1() {
           })
         );
       },
-      deleteRow: (row) => {
-        skipAutoResetPageIndex();
-        setOrders((old) =>
-          old.filter((oldRow) => oldRow.id !== row.original.id)
-        );
+      deleteRow: async (row) => {
+        try {
+          // Using the PHP endpoint from your code
+          await axios.post("/deletemasterdocument.php", {
+            id: row.original.id,
+          });
+          
+          skipAutoResetPageIndex();
+          setDocuments((old) =>
+            old.filter((oldRow) => oldRow.id !== row.original.id)
+          );
+          
+          alert("Document deleted successfully");
+        } catch (err) {
+          console.error("Error deleting document:", err);
+          alert("Failed to delete document");
+        }
       },
-      deleteRows: (rows) => {
-        skipAutoResetPageIndex();
-        const rowIds = rows.map((row) => row.original.id);
-        setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
+      deleteRows: async (rows) => {
+        try {
+          const rowIds = rows.map((row) => row.original.id);
+          
+          // Delete each document - you may need to update this based on your API
+          for (const id of rowIds) {
+            await axios.post("/deletemasterdocument.php", { id });
+          }
+          
+          skipAutoResetPageIndex();
+          setDocuments((old) => old.filter((row) => !rowIds.includes(row.id)));
+          
+          alert("Documents deleted successfully");
+        } catch (err) {
+          console.error("Error deleting documents:", err);
+          alert("Failed to delete documents");
+        }
+      },
+      approveDocument: async (id) => {
+        try {
+          const effectiveDate = prompt("Enter Effective Date (YYYY-MM-DD):");
+          if (!effectiveDate) return;
+
+          // Using the PHP endpoint from your code
+          await axios.post("/approvedocumentnew.php", {
+            id,
+            effectiveDate,
+          });
+          
+          alert("Document approved successfully");
+          fetchDocuments();
+        } catch (err) {
+          console.error("Error approving document:", err);
+          alert("Failed to approve document");
+        }
+      },
+      reviewDocument: async (id) => {
+        try {
+          const confirmed = window.confirm("Are you sure you want to mark document as reviewed?");
+          if (!confirmed) return;
+
+          // Using the PHP endpoint from your code
+          await axios.post("/reviewdocumentnew.php", {
+            id,
+          });
+          
+          alert("Document reviewed successfully");
+          fetchDocuments();
+        } catch (err) {
+          console.error("Error reviewing document:", err);
+          alert("Failed to review document");
+        }
       },
       setTableSettings,
+      // Pass filter states to meta
+      docType,
+      setDocType,
+      searchField,
+      setSearchField,
+      searchValue,
+      setSearchValue,
+      handleSearch,
     },
     filterFns: {
       fuzzy: fuzzyFilter,
@@ -118,12 +228,11 @@ export default function OrdersDatatableV1() {
     autoResetPageIndex,
   });
 
-  useDidUpdate(() => table.resetRowSelection(), [orders]);
-
+  useDidUpdate(() => table.resetRowSelection(), [documents]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
   return (
-    <Page title="Modes List">
+    <Page title="View Master Document">
       <div className="transition-content w-full pb-5">
         <div
           className={clsx(
@@ -147,6 +256,21 @@ export default function OrdersDatatableV1() {
                 tableSettings.enableFullScreen && "overflow-hidden",
               )}
             >
+              {loading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-dark-900/50">
+                  <div className="text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-500 border-r-transparent"></div>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading documents...</p>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="mx-4 my-2 rounded-md bg-red-50 p-4 dark:bg-red-900/20">
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              )}
+
               <div className="table-wrapper min-w-full grow overflow-x-auto">
                 <Table
                   hoverable
@@ -161,7 +285,7 @@ export default function OrdersDatatableV1() {
                           <Th
                             key={header.id}
                             className={clsx(
-                              "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg relative",
+                              "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                               header.column.getCanPin() && [
                                 header.column.getIsPinned() === "left" &&
                                   "sticky z-2 ltr:left-0 rtl:right-0",
@@ -170,18 +294,9 @@ export default function OrdersDatatableV1() {
                               ],
                             )}
                           >
-                            {CHEVRON_COLUMNS.includes(header.column.id) && (
-                              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                <ChevronDown 
-                                  size={24} 
-                                  className="text-yellow-400 fill-yellow-400"
-                                  strokeWidth={3}
-                                />
-                              </div>
-                            )}
                             {header.column.getCanSort() ? (
                               <div
-                                className="flex cursor-pointer select-none items-center space-x-3 "
+                                className="flex cursor-pointer select-none items-center space-x-3"
                                 onClick={header.column.getToggleSortingHandler()}
                               >
                                 <span className="flex-1">
@@ -208,58 +323,68 @@ export default function OrdersDatatableV1() {
                     ))}
                   </THead>
                   <TBody>
-                    {table.getRowModel().rows.map((row) => {
-                      return (
-                        <Tr
-                          key={row.id}
-                          className={clsx(
-                            "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
-                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
-                          )}
-                        >
-                          {row.getVisibleCells().map((cell) => {
-                            return (
-                              <Td
-                                key={cell.id}
-                                className={clsx(
-                                  "relative bg-white",
-                                  cardSkin === "shadow"
-                                    ? "dark:bg-dark-700"
-                                    : "dark:bg-dark-900",
-                                  cell.column.getCanPin() && [
-                                    cell.column.getIsPinned() === "left" &&
-                                      "sticky z-2 ltr:left-0 rtl:right-0",
-                                    cell.column.getIsPinned() === "right" &&
-                                      "sticky z-2 ltr:right-0 rtl:left-0",
-                                  ],
-                                )}
-                              >
-                                {cell.column.getIsPinned() && (
-                                  <div
-                                    className={clsx(
-                                      "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
-                                      cell.column.getIsPinned() === "left"
-                                        ? "ltr:border-r rtl:border-l"
-                                        : "ltr:border-l rtl:border-r",
-                                    )}
-                                  ></div>
-                                )}
-                                {flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext(),
-                                )}
-                              </Td>
-                            );
-                          })}
-                        </Tr>
-                      );
-                    })}
+                    {table.getRowModel().rows.length === 0 ? (
+                      <Tr>
+                        <Td colSpan={columns.length} className="text-center py-8">
+                          <p className="text-gray-500 dark:text-gray-400">
+                            {loading ? "Loading..." : "No documents found"}
+                          </p>
+                        </Td>
+                      </Tr>
+                    ) : (
+                      table.getRowModel().rows.map((row) => {
+                        return (
+                          <Tr
+                            key={row.id}
+                            className={clsx(
+                              "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
+                              row.getIsSelected() && !isSafari &&
+                                "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                            )}
+                          >
+                            {row.getVisibleCells().map((cell) => {
+                              return (
+                                <Td
+                                  key={cell.id}
+                                  className={clsx(
+                                    "relative bg-white",
+                                    cardSkin === "shadow"
+                                      ? "dark:bg-dark-700"
+                                      : "dark:bg-dark-900",
+                                    cell.column.getCanPin() && [
+                                      cell.column.getIsPinned() === "left" &&
+                                        "sticky z-2 ltr:left-0 rtl:right-0",
+                                      cell.column.getIsPinned() === "right" &&
+                                        "sticky z-2 ltr:right-0 rtl:left-0",
+                                    ],
+                                  )}
+                                >
+                                  {cell.column.getIsPinned() && (
+                                    <div
+                                      className={clsx(
+                                        "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
+                                        cell.column.getIsPinned() === "left"
+                                          ? "ltr:border-r rtl:border-l"
+                                          : "ltr:border-l rtl:border-r",
+                                      )}
+                                    ></div>
+                                  )}
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext(),
+                                  )}
+                                </Td>
+                              );
+                            })}
+                          </Tr>
+                        );
+                      })
+                    )}
                   </TBody>
                 </Table>
               </div>
               <SelectedRowsActions table={table} />
-              {table.getCoreRowModel().rows.length && (
+              {table.getCoreRowModel().rows.length > 0 && (
                 <div
                   className={clsx(
                     "px-4 pb-4 sm:px-5 sm:pt-4",

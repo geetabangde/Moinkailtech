@@ -99,9 +99,9 @@ export default function AddModes() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Input
-              label="Mode Name"
+              label="Statuary Name"
               name="name"
-              placeholder="Enter mode name"
+              placeholder="Enter Statuary name"
               value={formData.name}
               onChange={handleChange}
               // removed required attribute
@@ -115,7 +115,7 @@ export default function AddModes() {
             <Input
               label="Description"
               name="description"
-              placeholder="Enter mode description"
+              placeholder="Enter Statuary description"
               value={formData.description}
               onChange={handleChange}
               // removed required attribute

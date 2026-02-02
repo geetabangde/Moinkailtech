@@ -1,199 +1,220 @@
-// // Import Dependencies
-// import {
-//   Menu,
-//   MenuButton,
-//   MenuItem,
-//   MenuItems,
-//   Transition,
-// } from "@headlessui/react";
-// import {
-
-//   EllipsisHorizontalIcon,
-
-//   PencilIcon,
-//   TrashIcon,
-// } from "@heroicons/react/24/outline";
-// import clsx from "clsx";
-// import { Fragment, useCallback, useState } from "react";
-// import PropTypes from "prop-types";
-
-// // Local Imports
-// import { ConfirmModal } from "components/shared/ConfirmModal";
-// import { Button } from "components/ui";
-// import axios from "utils/axios";
-// import { toast } from "sonner";
-// import { useNavigate } from "react-router";
-
-
-
-// // ----------------------------------------------------------------------
-
-// const confirmMessages = {
-//   pending: {
-//     description:
-//       "Are you sure you want to delete this modes? Once deleted, it cannot be restored.",
-//   },
-//   success: {
-//     title: "modes Deleted",
-//   },
-// };
-
-// export function RowActions({ row, table }) {
-//   const navigate = useNavigate(); // 👈 Hook
-//    const handleEdit = () => {
-//     const id = row.original.id; // 👈 your API data should return "id"
-//     navigate(`/dashboards/master-data/modes/edit/${id}`);
-//   };
-
-
-//   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-//   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
-//   const [deleteSuccess, setDeleteSuccess] = useState(false);
-//   const [deleteError, setDeleteError] = useState(false);
-
-
-
-//   const closeModal = () => {
-//     setDeleteModalOpen(false);
-//   };
-
-//   const openModal = () => {
-//     setDeleteModalOpen(true);
-//     setDeleteError(false);
-//     setDeleteSuccess(false);
-//   };
-
-//   const handleDeleteRows = useCallback(async () => {
-//   const id = row.original.id; // Assuming your row contains `id`
-//   setConfirmDeleteLoading(true);
-
-//   try {
-//     await axios.delete(`/master/mode-delete/${id}`);
-//     table.options.meta?.deleteRow(row); // remove row from UI
-//     setDeleteSuccess(true);
-//      toast.success("Unit type deleted successfully ✅", {
-//       duration: 1000,
-//       icon: "🗑️",
-//     });
-//   } catch (error) {
-//     console.error("Delete failed:", error);
-//     setDeleteError(true);
-//      toast.error("Failed to delete unit type ❌", {
-//       duration: 2000,
-//     });
-//   } finally {
-//     setConfirmDeleteLoading(false);
-//   }
-// }, [row, table]);
-
-//   const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
-
-//   return (
-//     <>
-//       <div className="flex justify-center space-x-1.5 ">
-      
-
-//         <Menu as="div" className="relative inline-block text-left">
-//           <MenuButton as={Button} isIcon className="size-8 rounded-full">
-//             <EllipsisHorizontalIcon className="size-4.5" />
-//           </MenuButton>
-//           <Transition
-//             as={Fragment}
-//             enter="transition ease-out"
-//             enterFrom="opacity-0 translate-y-2"
-//             enterTo="opacity-100 translate-y-0"
-//             leave="transition ease-in"
-//             leaveFrom="opacity-100 translate-y-0"
-//             leaveTo="opacity-0 translate-y-2"
-//           >
-//             <MenuItems
-//               anchor={{ to: "bottom end", gap: 12 }}
-//               className="absolute z-100 w-[10rem] rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-750 dark:shadow-none ltr:right-0 rtl:left-0"
-//             >
-              
-//               <MenuItem>
-//                 {({ focus }) => (
-//                   <button onClick={handleEdit}
-//                     className={clsx(
-//                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors ",
-//                       focus &&
-//                         "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-//                     )}
-//                   >
-//                     <PencilIcon className="size-4.5 stroke-1" />
-//                     <span>view</span>
-//                   </button>
-//                 )}
-//               </MenuItem>
-//               <MenuItem>
-//                 {({ focus }) => (
-//                   <button
-//                     onClick={openModal}
-//                     className={clsx(
-//                       "this:error flex h-9 w-full items-center space-x-3 px-3 tracking-wide text-this outline-hidden transition-colors dark:text-this-light ",
-//                       focus && "bg-this/10 dark:bg-this-light/10",
-//                     )}
-//                   >
-//                     <TrashIcon className="size-4.5 stroke-1" />
-//                     <span>Delete</span>
-//                   </button>
-//                 )}
-//               </MenuItem>
-//             </MenuItems>
-//           </Transition>
-//         </Menu>
-//       </div>
-
-//       <ConfirmModal
-//         show={deleteModalOpen}
-//         onClose={closeModal}
-//         messages={confirmMessages}
-//         onOk={handleDeleteRows}
-//         confirmLoading={confirmDeleteLoading}
-//         state={state}
-//       />
-
-    
-//     </>
-//   );
-// }
-
-// RowActions.propTypes = {
-//   row: PropTypes.object,
-//   table: PropTypes.object,
-// };
-// Import Dependencies
-import { EyeIcon } from "@heroicons/react/24/outline";
-
-import PropTypes from "prop-types";
+import { useState } from "react";
 import { Button } from "components/ui";
-import { useNavigate } from "react-router";
-
-// ----------------------------------------------------------------------
-
-export function RowActions() {
-  const navigate = useNavigate();
 
 
+export function RowActions({ row, table }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const data = row.original;
+  
+  const { 
+    deleteRow, 
+    approveDocument, 
+    reviewDocument 
+  } = table.options.meta;
+
+  // Get current user ID from localStorage
+  const currentUserId = localStorage.getItem('employeeId') || null;
+
+  const handleView = () => {
+    // Open in new tab - adjust URL as per your routing
+    window.open(`/textmasterdoument.php?docID=${data.id}`, '_blank');
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm("Are you sure you want to delete this document?")) {
+      setIsDeleting(true);
+      try {
+        await deleteRow(row);
+      } catch (error) {
+        console.error("Error deleting:", error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const handleResume = () => {
+    window.open(`/resumeMasterDocument.php?docID=${data.id}`, '_blank');
+  };
+
+  const handleReview = async () => {
+    await reviewDocument(data.id);
+  };
+
+  const handleApprove = async () => {
+    await approveDocument(data.id);
+  };
+
+  // const handleAddRevision = () => {
+  //   window.open(`/addRevMasterDocument.php?docID=${data.id}`, '_blank');
+  // };
+
+  // const handleShareDocument = () => {
+  //   // Implement share document modal
+  //   alert("Share document functionality - implement modal");
+  // };
+
+  // Convert to numbers for comparison (handle both string and number types)
+  const status = Number(data.status);
+  const approvalStatus = Number(data.approval_status);
+  const obsoleteStatus = Number(data.obsoletestatus);
+  const reviewedBy = data.reviewedby ? String(data.reviewedby) : null;
+  const approvedBy = data.approvedby ? String(data.approvedby) : null;
+
+  // PHP Condition: if ($row['status'] == "-1" || $row['status'] == "0" || $row['status'] == "1")
+  const showDelete = status === -1 || status === 0 || status === 1;
+  
+  // PHP Condition: if (($row['approval_status'] == 0 && $row['obsoletestatus'] == 0) && ($row['status'] == -1 || $row['status'] == 0 || $row['status'] == 1))
+  const showResume = 
+    approvalStatus === 0 && 
+    obsoleteStatus === 0 && 
+    (status === -1 || status === 0 || status === 1);
+  
+  // PHP Condition: if (($row['approval_status'] == 0) && ($row['obsoletestatus'] == 0) && ($row['status'] == 0))
+  // AND if ($row['reviewedby'] == $employeeid)
+  const showReview = 
+    approvalStatus === 0 && 
+    obsoleteStatus === 0 && 
+    status === 0 &&
+    reviewedBy && 
+    currentUserId && 
+    reviewedBy === currentUserId;
+  
+  // PHP Condition: elseif (($row['approval_status'] == 0) && ($row['obsoletestatus'] == 0) && ($row['status'] == 1))
+  // AND if ($row['approvedby'] == $employeeid)
+  const showApprove = 
+    approvalStatus === 0 && 
+    obsoleteStatus === 0 && 
+    status === 1 &&
+    approvedBy && 
+    currentUserId && 
+    approvedBy === currentUserId;
+
+  // PHP Condition: if (($row['approval_status'] == 1) && ($row['obsoletestatus'] == 0) && ($row['status'] == 2))
+  // const showAddRevAndShare = 
+  //   approvalStatus === 1 && 
+  //   obsoleteStatus === 0 && 
+  //   status === 2;
 
   return (
-    <div className="flex justify-center">
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* View Button - Always visible */}
       <Button
-        onClick={()=>
-          navigate("/dashboards/master-data/document-master/view")
-          
-        }
-        className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
-        color="primary"
         size="sm"
+        variant="flat"
+        color="primary"
+        onClick={handleView}
+        className="h-7 px-3 text-xs whitespace-nowrap"
       >
-        <EyeIcon className="w-4 h-4 mr-1 inline" />
         View
       </Button>
+
+      {/* Delete Button */}
+      {showDelete && (
+        <Button
+          size="sm"
+          variant="flat"
+          color="error"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="h-7 px-3 text-xs whitespace-nowrap"
+        >
+          {isDeleting ? "Deleting..." : "Delete"}
+        </Button>
+      )}
+
+      {/* Resume Button */}
+      {showResume && (
+        <Button
+          size="sm"
+          variant="flat"
+          color="primary"
+          onClick={handleResume}
+          className="h-7 px-3 text-xs whitespace-nowrap"
+        >
+          Resume
+        </Button>
+      )}
+
+      {/* Review Button */}
+      {showReview && (
+        <Button
+          size="sm"
+          variant="flat"
+          color="warning"
+          onClick={handleReview}
+          className="h-7 px-3 text-xs whitespace-nowrap"
+        >
+          Review
+        </Button>
+      )}
+
+      {/* Approve Button */}
+      {showApprove && (
+        <Button
+          size="sm"
+          variant="flat"
+          color="success"
+          onClick={handleApprove}
+          className="h-7 px-3 text-xs whitespace-nowrap"
+        >
+          Approve
+        </Button>
+      )}
+
+      {/* More Actions Menu - Only show for active documents */}
+      {/* COMMENTED OUT - As per PHP code, these options are commented */}
+      {/* {showAddRevAndShare && (
+        <Menu as="div" className="relative inline-block text-left">
+          <MenuButton
+            as={Button}
+            variant="flat"
+            size="sm"
+            className="size-7 p-0"
+          >
+            <EllipsisHorizontalIcon className="size-4" />
+          </MenuButton>
+          <Transition
+            as={MenuItems}
+            enter="transition ease-out"
+            enterFrom="opacity-0 translate-y-2"
+            enterTo="opacity-100 translate-y-0"
+            leave="transition ease-in"
+            leaveFrom="opacity-100 translate-y-0"
+            leaveTo="opacity-0 translate-y-2"
+            className="absolute z-100 mt-1.5 min-w-[10rem] whitespace-nowrap rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-700 dark:shadow-none ltr:right-0 rtl:left-0"
+          >
+            <MenuItem>
+              {({ focus }) => (
+                <button
+                  onClick={handleAddRevision}
+                  className={clsx(
+                    "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
+                    focus &&
+                      "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
+                  )}
+                >
+                  <span>Add Revision</span>
+                </button>
+              )}
+            </MenuItem>
+            <MenuItem>
+              {({ focus }) => (
+                <button
+                  onClick={handleShareDocument}
+                  className={clsx(
+                    "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
+                    focus &&
+                      "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
+                  )}
+                >
+                  <span>Share Document</span>
+                </button>
+              )}
+            </MenuItem>
+          </Transition>
+        </Menu>
+      )} */}
     </div>
   );
 }
-
-RowActions.propTypes = {
-  row: PropTypes.object,
-};

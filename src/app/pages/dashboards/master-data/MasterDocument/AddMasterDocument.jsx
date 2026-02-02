@@ -100,12 +100,6 @@ const AddMasterDocument = () => {
     alert('Form saved successfully!');
   };
 
-  const handlePreview = (e) => {
-    e.preventDefault();
-    console.log('Form preview:', formData);
-    alert('Preview opened!');
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -116,10 +110,7 @@ const AddMasterDocument = () => {
              onClick={() =>
                  navigate("/dashboards/master-data/document-master")
              }
-          
-          
-          
-           >&lt;&lt; Back</Button>
+           > Back</Button>
          </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -597,19 +588,7 @@ const AddMasterDocument = () => {
 
           {/* Buttons */}
           <div className="flex gap-3 pt-6">
-            <button
-              type="submit"
-              className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-medium rounded-md transition"
-            >
-              Submit
-            </button>
-            <button
-              type="button"
-              onClick={handlePreview}
-              className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-medium rounded-md transition"
-            >
-              Preview
-            </button>
+            
             <button
               type="button"
               onClick={handleSave}
