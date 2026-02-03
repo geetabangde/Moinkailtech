@@ -51,7 +51,7 @@ export function Toolbar({ table }) {
           {/* Button */}
           <div>
             <Button
-              onClick={() => navigate("/dashboards/master-data/document-master/add-master-document")}
+              onClick={() => navigate("/dashboards/master-data/document-master/add")}
               className="h-9 rounded-md px-4 text-sm font-medium"
               color="primary"
             >

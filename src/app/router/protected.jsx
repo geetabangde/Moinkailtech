@@ -550,7 +550,7 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                      path: "add-master-document",
+                      path: "add",
                       lazy: async () => ({
                         Component: (
                           await import(
@@ -559,6 +559,14 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
+                    {
+                      path: "edit/:id",
+                      lazy: async () => ({
+                        Component: (await import(
+                          "app/pages/dashboards/master-data/MasterDocument/EditTrainingModule"
+                        )).default,
+                      }),
+                    }
                   ],
                 },
 

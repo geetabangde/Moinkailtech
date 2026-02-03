@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Button } from "components/ui";
+import { useNavigate } from "react-router";
 
 
 export function RowActions({ row, table }) {
+  const navigate = useNavigate();
   const [isDeleting, setIsDeleting] = useState(false);
   const data = row.original;
   
@@ -16,8 +18,9 @@ export function RowActions({ row, table }) {
   const currentUserId = localStorage.getItem('employeeId') || null;
 
   const handleView = () => {
-    // Open in new tab - adjust URL as per your routing
-    window.open(`/textmasterdoument.php?docID=${data.id}`, '_blank');
+    // Open document_path in new tab if available, otherwise fallback to old URL
+    const viewUrl = data.document_path || `/textmasterdoument.php?docID=${data.id}`;
+    window.open(viewUrl, '_blank');
   };
 
   const handleDelete = async () => {
@@ -34,7 +37,8 @@ export function RowActions({ row, table }) {
   };
 
   const handleResume = () => {
-    window.open(`/resumeMasterDocument.php?docID=${data.id}`, '_blank');
+    // Navigate to Add Master Document form with resume parameter
+    navigate(`/dashboards/master-data/document-master/add?resumeId=${data.id}`);
   };
 
   const handleReview = async () => {
@@ -44,15 +48,6 @@ export function RowActions({ row, table }) {
   const handleApprove = async () => {
     await approveDocument(data.id);
   };
-
-  // const handleAddRevision = () => {
-  //   window.open(`/addRevMasterDocument.php?docID=${data.id}`, '_blank');
-  // };
-
-  // const handleShareDocument = () => {
-  //   // Implement share document modal
-  //   alert("Share document functionality - implement modal");
-  // };
 
   // Convert to numbers for comparison (handle both string and number types)
   const status = Number(data.status);
@@ -89,12 +84,6 @@ export function RowActions({ row, table }) {
     approvedBy && 
     currentUserId && 
     approvedBy === currentUserId;
-
-  // PHP Condition: if (($row['approval_status'] == 1) && ($row['obsoletestatus'] == 0) && ($row['status'] == 2))
-  // const showAddRevAndShare = 
-  //   approvalStatus === 1 && 
-  //   obsoleteStatus === 0 && 
-  //   status === 2;
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -161,60 +150,6 @@ export function RowActions({ row, table }) {
           Approve
         </Button>
       )}
-
-      {/* More Actions Menu - Only show for active documents */}
-      {/* COMMENTED OUT - As per PHP code, these options are commented */}
-      {/* {showAddRevAndShare && (
-        <Menu as="div" className="relative inline-block text-left">
-          <MenuButton
-            as={Button}
-            variant="flat"
-            size="sm"
-            className="size-7 p-0"
-          >
-            <EllipsisHorizontalIcon className="size-4" />
-          </MenuButton>
-          <Transition
-            as={MenuItems}
-            enter="transition ease-out"
-            enterFrom="opacity-0 translate-y-2"
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-2"
-            className="absolute z-100 mt-1.5 min-w-[10rem] whitespace-nowrap rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-700 dark:shadow-none ltr:right-0 rtl:left-0"
-          >
-            <MenuItem>
-              {({ focus }) => (
-                <button
-                  onClick={handleAddRevision}
-                  className={clsx(
-                    "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                    focus &&
-                      "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                  )}
-                >
-                  <span>Add Revision</span>
-                </button>
-              )}
-            </MenuItem>
-            <MenuItem>
-              {({ focus }) => (
-                <button
-                  onClick={handleShareDocument}
-                  className={clsx(
-                    "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                    focus &&
-                      "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                  )}
-                >
-                  <span>Share Document</span>
-                </button>
-              )}
-            </MenuItem>
-          </Transition>
-        </Menu>
-      )} */}
     </div>
   );
 }
