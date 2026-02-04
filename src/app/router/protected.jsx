@@ -1660,7 +1660,33 @@ const protectedRoutes = {
                           )
                         ).default,
                       }),
-                    }
+                    },
+                    {
+                      path: "view-calib-points/:priceId/:matrixId", lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/calibration-operations/instrument-list/ViewCalibPointsPage"
+                          )
+                        ).default,
+                      }) ,
+                    },
+                    {
+                   path: "add-calib-point/:priceId/:matrixId",
+                      lazy: async () => ({
+                        Component: (await import(
+                          "app/pages/dashboards/calibration-operations/instrument-list/AddCalibPoint"
+                        )).default,
+                      }),
+                    },
+                    {
+                       path: "edit-calib-point/:priceId/:matrixId/:calibPointId",                        lazy: async () => ({
+                          Component: (
+                            await import(
+                              "app/pages/dashboards/calibration-operations/instrument-list/EditCalibPoint"
+                            ) 
+                          ).default,
+                        }),
+                      }
                   ],
                 },
               ],

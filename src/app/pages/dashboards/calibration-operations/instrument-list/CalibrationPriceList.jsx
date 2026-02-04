@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { Button } from "components/ui";
 import axios from "utils/axios";
 import { ConfirmModal } from "components/shared/ConfirmModal";
 
@@ -183,6 +184,16 @@ export default function CalibrationPriceList() {
         <p className="mt-1 text-sm text-gray-600 dark:text-dark-300">
           Manage all calibration prices for Instrument ID: {instrumentId}
         </p>
+        <Button
+          variant="outline"
+          className="bg-blue-600 text-white hover:bg-blue-700"
+          onClick={() =>
+          
+            navigate(`/dashboards/calibration-operations/instrument-list/view-prices/${instrumentId}`)
+          }
+        >
+          Back to List
+        </Button>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-500 dark:bg-dark-750">

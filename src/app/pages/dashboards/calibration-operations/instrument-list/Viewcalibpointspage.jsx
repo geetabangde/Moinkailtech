@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import axios from "utils/axios";
 import { Button } from "components/ui";
+
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { ConfirmModal } from "components/shared/ConfirmModal";
 
 const confirmMessages = {
@@ -15,11 +17,11 @@ const confirmMessages = {
   },
 };
 
-export default function ViewMatrixPage() {
-  const { instrumentId, priceId } = useParams();
+export default function ViewCalibPoints() {
+  const { priceId, matrixId } = useParams();
   const navigate = useNavigate();
   
-  const [matrixData, setMatrixData] = useState([]);
+  const [calibPointsData, setCalibPointsData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
   
@@ -27,13 +29,16 @@ export default function ViewMatrixPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(25);
   
-  // Search states
+  // Search states - Updated to match all 8 columns
   const [searchFilters, setSearchFilters] = useState({
     id: "",
-    unittype: "",
-    mode: "",
-    unit: "",
-    instrumentRange: "",
+    parameter: "",
+    setpoint: "",
+    uuc: "",
+    master: "",
+    error: "",
+    specification: "",
+    remark: "",
   });
 
   // Global search
@@ -44,66 +49,52 @@ export default function ViewMatrixPage() {
   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
-  const [selectedMatrixId, setSelectedMatrixId] = useState(null);
+  const [selectedCalibPointId, setSelectedCalibPointId] = useState(null);
 
-  const fetchMatrixData = useCallback(async () => {
-    if (!instrumentId || !priceId) return;
+  const fetchCalibPointsData = useCallback(async () => {
+    console.log("=== Fetching calib points ===");
+    console.log("priceId:", priceId, "matrixId:", matrixId);
+    
+    if (!priceId || !matrixId) return;
     
     setLoading(true);
     try {
-      const response = await axios.get(
-        `/calibrationoperations/get-matrix-byid/${instrumentId}/${priceId}`
-      );
+      const url = `/calibrationoperations/get-calibpoint-byid_withmatrixid/${priceId}/${matrixId}`;
+      console.log("Fetching from:", url);
+      
+      const response = await axios.get(url);
+      console.log("Response:", response.data);
       
       if (response.data.status) {
-        setMatrixData(response.data.data || []);
-        setFilteredData(response.data.data || []);
+        const data = response.data.data || [];
+        console.log("Data count:", data.length);
+        setCalibPointsData(data);
+        setFilteredData(data);
       } else {
-        toast.error("Failed to fetch matrix data");
-        setMatrixData([]);
+        toast.error("Failed to fetch calibration points data");
+        setCalibPointsData([]);
         setFilteredData([]);
       }
     } catch (error) {
-      console.error("Error fetching matrix data:", error);
-      toast.error("Error loading matrix data");
-      setMatrixData([]);
+      console.error("Error fetching calibration points data:", error);
+      toast.error("Error loading calibration points data");
+      setCalibPointsData([]);
       setFilteredData([]);
     } finally {
       setLoading(false);
     }
-  }, [instrumentId, priceId]);
+  }, [priceId, matrixId]);
 
   const filterData = useCallback(() => {
-    let filtered = [...matrixData];
+    let filtered = [...calibPointsData];
 
     // Apply column filters
     Object.keys(searchFilters).forEach((key) => {
       const searchValue = searchFilters[key].toLowerCase().trim();
       if (searchValue) {
         filtered = filtered.filter((item) => {
-          let itemValue = "";
-          
-          switch (key) {
-            case "id":
-              itemValue = String(item.id || "");
-              break;
-            case "unittype":
-              itemValue = String(item.unittype || "");
-              break;
-            case "mode":
-              itemValue = String(item.mode || "");
-              break;
-            case "unit":
-              itemValue = String(item.unit || "");
-              break;
-            case "instrumentRange":
-              itemValue = String(item.instrangemin || "") + " to " + String(item.instrangemax || "");
-              break;
-            default:
-              itemValue = "";
-          }
-          
-          return itemValue.toLowerCase().includes(searchValue);
+          const itemValue = String(item[key] || "").toLowerCase();
+          return itemValue.includes(searchValue);
         });
       }
     });
@@ -114,22 +105,24 @@ export default function ViewMatrixPage() {
       filtered = filtered.filter((item) => {
         return (
           String(item.id || "").toLowerCase().includes(search) ||
-          String(item.unittype || "").toLowerCase().includes(search) ||
-          String(item.mode || "").toLowerCase().includes(search) ||
-          String(item.unit || "").toLowerCase().includes(search) ||
-          String(item.instrangemin || "").toLowerCase().includes(search) ||
-          String(item.instrangemax || "").toLowerCase().includes(search)
+          String(item.parameter || "").toLowerCase().includes(search) ||
+          String(item.setpoint || "").toLowerCase().includes(search) ||
+          String(item.uuc || "").toLowerCase().includes(search) ||
+          String(item.master || "").toLowerCase().includes(search) ||
+          String(item.error || "").toLowerCase().includes(search) ||
+          String(item.specification || "").toLowerCase().includes(search) ||
+          String(item.remark || "").toLowerCase().includes(search)
         );
       });
     }
 
     setFilteredData(filtered);
     setCurrentPage(1);
-  }, [matrixData, searchFilters, globalSearch]);
+  }, [calibPointsData, searchFilters, globalSearch]);
 
   useEffect(() => {
-    fetchMatrixData();
-  }, [fetchMatrixData]);
+    fetchCalibPointsData();
+  }, [fetchCalibPointsData]);
 
   useEffect(() => {
     filterData();
@@ -142,51 +135,74 @@ export default function ViewMatrixPage() {
     }));
   };
 
-  
-
-  const handleViewCalibPoints = (matrixId) => {
-    // Navigate to calibration points page with priceId and matrixId
-    navigate(`/dashboards/calibration-operations/instrument-list/view-calib-points/${priceId}/${matrixId}`);
+  const handleBack = () => {
+    navigate(-1);
   };
 
-  const openDeleteModal = (matrixId) => {
-    setSelectedMatrixId(matrixId);
+  const openDeleteModal = (calibPointId) => {
+    console.log("🗑️ Opening delete modal for calibPointId:", calibPointId);
+    setSelectedCalibPointId(calibPointId);
     setDeleteModalOpen(true);
     setDeleteError(false);
     setDeleteSuccess(false);
   };
 
   const closeDeleteModal = () => {
+    console.log("✖️ Closing delete modal");
     setDeleteModalOpen(false);
-    setSelectedMatrixId(null);
+    setSelectedCalibPointId(null);
   };
 
   const handleDelete = async () => {
-    if (!selectedMatrixId) return;
+    if (!selectedCalibPointId) {
+      console.error("❌ No calibPointId selected!");
+      toast.error("No calibration point selected");
+      return;
+    }
+
+    console.log("🗑️ Attempting to delete calibration point:");
+    console.log("  - Selected Calib Point ID:", selectedCalibPointId);
+    console.log("  - Delete URL:", `/calibrationoperations/delete-matrix-calibpoint/${selectedCalibPointId}`);
 
     setConfirmDeleteLoading(true);
     try {
-      // Using the correct endpoint format with priceId and matrixId
-      await axios.delete(
-        `/calibrationoperations/delete-matrix-calibpoint/${priceId}/${selectedMatrixId}`
+      const response = await axios.delete(
+        `/calibrationoperations/delete-Calibration-point/${selectedCalibPointId}`
       );
       
-      setDeleteSuccess(true);
-      toast.success("Calibration matrix deleted successfully ✅", {
-        duration: 1000,
-        icon: "🗑️",
-      });
+      console.log("✅ Delete response:", response.data);
       
-      setMatrixData((prev) => prev.filter((item) => item.id !== selectedMatrixId));
-      
-      setTimeout(() => {
-        closeDeleteModal();
-      }, 1000);
+      if (response.data.status) {
+        setDeleteSuccess(true);
+        toast.success("Calibration point deleted successfully ✅", {
+          duration: 1000,
+          icon: "🗑️",
+        });
+        
+        // Remove from local state
+        setCalibPointsData((prev) => prev.filter((item) => item.id !== selectedCalibPointId));
+        
+        setTimeout(() => {
+          closeDeleteModal();
+          fetchCalibPointsData(); 
+        }, 1000);
+      } else {
+        throw new Error(response.data.message || "Delete failed");
+      }
     } catch (error) {
-      console.error("Delete failed:", error);
+      console.error("❌ Delete failed:", error);
+      console.error("  - Error response:", error.response?.data);
+      console.error("  - Error status:", error.response?.status);
+      
       setDeleteError(true);
-      toast.error("Failed to delete calibration matrix ❌", {
-        duration: 2000,
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message ||
+                          "Failed to delete calibration point";
+      
+      toast.error(`Delete failed: ${errorMessage} ❌`, {
+        duration: 3000,
       });
     } finally {
       setConfirmDeleteLoading(false);
@@ -210,25 +226,44 @@ export default function ViewMatrixPage() {
 
   return (
     <div className="p-6">
-      
-
       {/* Page Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          className="bg-blue-600 text-white hover:bg-blue-700"
-          onClick={() =>
-            navigate(`/dashboards/calibration-operations/instrument-list/view-prices/${instrumentId}`)
-          }
-        >
-          Back to List
-        </Button>
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-dark-500 dark:text-dark-200 dark:hover:bg-dark-700"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back
+          </button>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">
-              Calibration Matrix
+              Calibration Points
             </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-dark-300">
+              Price ID: {priceId} | Matrix ID: {matrixId}
+            </p>
           </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2"
+            onClick={() =>
+              navigate(`/dashboards/calibration-operations/instrument-list/view-matrix/${priceId}/${matrixId}`)
+            }
+          >
+            Back to List
+          </Button>
+         
+          <button
+            onClick={() => navigate(`/dashboards/calibration-operations/instrument-list/add-calib-point/${priceId}/${matrixId}`)}
+            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+          >
+            + Add Calib Point
+          </button>
         </div>
       </div>
 
@@ -273,7 +308,7 @@ export default function ViewMatrixPage() {
                 ></path>
               </svg>
               <span className="text-gray-600 dark:text-dark-300">
-                Loading matrix data...
+                Loading calibration points...
               </span>
             </div>
           </div>
@@ -288,13 +323,22 @@ export default function ViewMatrixPage() {
                   Parameter ^
                 </th>
                 <th className="border-r border-gray-300 px-4 py-3 text-left text-xs font-medium text-gray-700 dark:border-dark-500 dark:text-dark-200">
-                  Mode ^
+                  Setpoint ^
                 </th>
                 <th className="border-r border-gray-300 px-4 py-3 text-left text-xs font-medium text-gray-700 dark:border-dark-500 dark:text-dark-200">
-                  Unit ^
+                  UUC ^
                 </th>
                 <th className="border-r border-gray-300 px-4 py-3 text-left text-xs font-medium text-gray-700 dark:border-dark-500 dark:text-dark-200">
-                  Instrument range ^
+                  Master ^
+                </th>
+                <th className="border-r border-gray-300 px-4 py-3 text-left text-xs font-medium text-gray-700 dark:border-dark-500 dark:text-dark-200">
+                  Error ^
+                </th>
+                <th className="border-r border-gray-300 px-4 py-3 text-left text-xs font-medium text-gray-700 dark:border-dark-500 dark:text-dark-200">
+                  Specification ^
+                </th>
+                <th className="border-r border-gray-300 px-4 py-3 text-left text-xs font-medium text-gray-700 dark:border-dark-500 dark:text-dark-200">
+                  Remark ^
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-dark-200">
                   Actions ^
@@ -315,35 +359,62 @@ export default function ViewMatrixPage() {
                   <input
                     type="text"
                     placeholder="Search Param"
-                    value={searchFilters.unittype}
-                    onChange={(e) => handleSearchChange("unittype", e.target.value)}
+                    value={searchFilters.parameter}
+                    onChange={(e) => handleSearchChange("parameter", e.target.value)}
                     className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
                   />
                 </td>
                 <td className="border-r border-gray-300 px-2 py-2 dark:border-dark-500">
                   <input
                     type="text"
-                    placeholder="Search Mode"
-                    value={searchFilters.mode}
-                    onChange={(e) => handleSearchChange("mode", e.target.value)}
+                    placeholder="Search Setpoi"
+                    value={searchFilters.setpoint}
+                    onChange={(e) => handleSearchChange("setpoint", e.target.value)}
                     className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
                   />
                 </td>
                 <td className="border-r border-gray-300 px-2 py-2 dark:border-dark-500">
                   <input
                     type="text"
-                    placeholder="Search Unit"
-                    value={searchFilters.unit}
-                    onChange={(e) => handleSearchChange("unit", e.target.value)}
+                    placeholder="Search UUC"
+                    value={searchFilters.uuc}
+                    onChange={(e) => handleSearchChange("uuc", e.target.value)}
                     className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
                   />
                 </td>
                 <td className="border-r border-gray-300 px-2 py-2 dark:border-dark-500">
                   <input
                     type="text"
-                    placeholder="Search Instru"
-                    value={searchFilters.instrumentRange}
-                    onChange={(e) => handleSearchChange("instrumentRange", e.target.value)}
+                    placeholder="Search Master"
+                    value={searchFilters.master}
+                    onChange={(e) => handleSearchChange("master", e.target.value)}
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
+                  />
+                </td>
+                <td className="border-r border-gray-300 px-2 py-2 dark:border-dark-500">
+                  <input
+                    type="text"
+                    placeholder="Search Error"
+                    value={searchFilters.error}
+                    onChange={(e) => handleSearchChange("error", e.target.value)}
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
+                  />
+                </td>
+                <td className="border-r border-gray-300 px-2 py-2 dark:border-dark-500">
+                  <input
+                    type="text"
+                    placeholder="Search Specif"
+                    value={searchFilters.specification}
+                    onChange={(e) => handleSearchChange("specification", e.target.value)}
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
+                  />
+                </td>
+                <td className="border-r border-gray-300 px-2 py-2 dark:border-dark-500">
+                  <input
+                    type="text"
+                    placeholder="Search Remar"
+                    value={searchFilters.remark}
+                    onChange={(e) => handleSearchChange("remark", e.target.value)}
                     className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100"
                   />
                 </td>
@@ -361,48 +432,55 @@ export default function ViewMatrixPage() {
               {currentEntries.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="9"
                     className="px-4 py-8 text-center text-sm text-gray-500 dark:text-dark-400"
                   >
-                    No matrix data available
+                    No calibration points available
                   </td>
                 </tr>
               ) : (
-                currentEntries.map((matrix) => (
+                currentEntries.map((calibPoint) => (
                   <tr
-                    key={matrix.id}
+                    key={calibPoint.id}
                     className="hover:bg-gray-50 dark:hover:bg-dark-700"
                   >
                     <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
-                      {matrix.id}
+                      {calibPoint.id}
                     </td>
                     <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
-                      {matrix.unittype || "N/A"}
+                      {calibPoint.parameter || "N/A"}
+                    </td>
+                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
+                      {calibPoint.setpoint || "N/A"}
+                    </td>
+                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
+                      {calibPoint.uuc || "N/A"}
+                    </td>
+                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
+                      {calibPoint.master || "N/A"}
+                    </td>
+                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
+                      {calibPoint.error || "N/A"}
                     </td>
                     <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-600 dark:border-dark-500 dark:text-dark-300">
-                      {matrix.mode || ""}
+                      {calibPoint.specification || "N/A"}
                     </td>
-                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
-                      {matrix.unit || "N/A"}
-                    </td>
-                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-900 dark:border-dark-500 dark:text-dark-100">
-                      {matrix.instrangemin && matrix.instrangemax
-                        ? `${matrix.instrangemin} to ${matrix.instrangemax}`
-                        : "N/A"}
+                    <td className="border-r border-gray-300 px-4 py-3 text-sm text-gray-600 dark:border-dark-500 dark:text-dark-300">
+                      {calibPoint.remark || "N/A"}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleViewCalibPoints(matrix.id)}
-                          className="rounded bg-orange-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                          onClick={() => navigate(`/dashboards/calibration-operations/instrument-list/edit-calib-point/${priceId}/${matrixId}/${calibPoint.id}`)}
+                          className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                         >
-                          View Calib Points
+                          Edit
                         </button>
                         <button
-                          onClick={() => openDeleteModal(matrix.id)}
+                          onClick={() => openDeleteModal(calibPoint.id)}
                           className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                         >
-                          delete
+                          Delete
                         </button>
                       </div>
                     </td>
