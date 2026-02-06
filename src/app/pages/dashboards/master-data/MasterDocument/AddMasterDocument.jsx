@@ -8,6 +8,7 @@ const AddMasterDocument = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const resumeDocId = searchParams.get('resumeId'); // Get resume document ID from URL
+  
   const [formData, setFormData] = useState({
     documentType: '',
     category: '',
@@ -18,7 +19,7 @@ const AddMasterDocument = () => {
     code: '',
     department: '',
     issueNo: '01',
-    issueDate: '16/10/2025',
+    issueDate: new Date().toLocaleDateString('en-GB'),
     effectiveDate: '',
     reviewBefore: '',
     revNo: '00',
@@ -84,7 +85,7 @@ const AddMasterDocument = () => {
           code: doc.code || '',
           department: doc.department || '',
           issueNo: doc.issueno || '01',
-          issueDate: formatDate(doc.issuedate) || '16/10/2025',
+          issueDate: formatDate(doc.issuedate) || new Date().toLocaleDateString('en-GB'),
           effectiveDate: formatDate(doc.effdate) || '',
           reviewBefore: formatDate(doc.revbefore) || '',
           revNo: doc.revno || '00',
@@ -234,6 +235,7 @@ const AddMasterDocument = () => {
       setLoading(true);
 
       // Prepare payload according to API structure
+      // PHP Logic: status = 0 (Pending Review) when submitting
       const payload = {
         documenttype: parseInt(formData.documentType),
         category: parseInt(formData.category),
@@ -256,26 +258,26 @@ const AddMasterDocument = () => {
         approvedby: parseInt(formData.approvedBy),
         reviewed_on: formData.reviewedOn || formData.reviewBefore,
         istrainingrequired: formData.isTrainingRequired,
-        content: formData.content
+        content: formData.content,
+        status: 0  // PHP Logic: status = 0 for Submit (Pending Review)
       };
 
       const response = await axios.post('/master/add-master-document', payload);
 
       if (response.data.status === true || response.data.status === 'true') {
         const documentId = response.data.document_id;
-        toast.success(`Document saved successfully! Document ID: ${documentId}`);
+        toast.success(`Document submitted successfully! Document ID: ${documentId}`);
         console.log('Document path:', response.data.docpath);
         
-        // If training is required, redirect to training module edit page
+        // PHP Logic: If training is required, redirect to training module
         if (formData.isTrainingRequired === 'Yes') {
           setTimeout(() => {
-            navigate(`/dashboards/master-data/document-master/edit/${documentId}`);
-            
+            navigate(`/dashboards/master-data/document-master/edit-training/${documentId}`);
           }, 1500);
         } else {
-          // Navigate back to document master list
+          // Navigate back to pending document list
           setTimeout(() => {
-            navigate("/dashboards/master-data/document-master");
+            navigate("/dashboards/master-data/document-master?type=pending");
           }, 1500);
         }
       } else {
@@ -292,7 +294,8 @@ const AddMasterDocument = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    // Save without validation (draft save)
+    
+    // PHP Logic: status = -1 for Save (Draft)
     try {
       setLoading(true);
 
@@ -318,14 +321,20 @@ const AddMasterDocument = () => {
         approvedby: formData.approvedBy ? parseInt(formData.approvedBy) : 0,
         reviewed_on: formData.reviewedOn || formData.reviewBefore,
         istrainingrequired: formData.isTrainingRequired,
-        content: formData.content
+        content: formData.content,
+        status: -1  // PHP Logic: status = -1 for Save (Draft/Saved)
       };
 
       const response = await axios.post('/master/add-master-document', payload);
 
       if (response.data.status === true || response.data.status === 'true') {
-        toast.success('Form saved successfully as draft!');
+        toast.success('Document saved as draft successfully!');
         console.log('Document path:', response.data.docpath);
+        
+        // Navigate to saved documents list
+        setTimeout(() => {
+          navigate("/dashboards/master-data/document-master?type=saved");
+        }, 1500);
       } else {
         toast.error('Error saving form: ' + (response.data.message || 'Unknown error'));
       }
@@ -333,6 +342,61 @@ const AddMasterDocument = () => {
     } catch (error) {
       console.error('Error saving form:', error);
       toast.error('Error saving form: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreview = async (e) => {
+    e.preventDefault();
+    
+    // PHP Logic: Generate preview without changing status
+    try {
+      setLoading(true);
+
+      const payload = {
+        documenttype: formData.documentType ? parseInt(formData.documentType) : 0,
+        category: formData.category ? parseInt(formData.category) : 0,
+        orientation: formData.orientation,
+        letterhead: formData.letterHead,
+        name: formData.name,
+        code: formData.code,
+        procedureno: formData.documentNo,
+        department: formData.department ? parseInt(formData.department) : 0,
+        issueno: formData.issueNo,
+        issuedate: formData.issueDate,
+        effdate: formData.effectiveDate,
+        revbefore: formData.reviewBefore,
+        revno: formData.revNo,
+        revdate: formData.revDate === 'NA' ? formData.effectiveDate : formData.revDate,
+        header: formData.header,
+        footer: formData.footer,
+        deadline: formData.deadlineInDays ? parseInt(formData.deadlineInDays) : 0,
+        reviewedby: formData.reviewedBy ? parseInt(formData.reviewedBy) : 0,
+        approvedby: formData.approvedBy ? parseInt(formData.approvedBy) : 0,
+        reviewed_on: formData.reviewedOn || formData.reviewBefore,
+        istrainingrequired: formData.isTrainingRequired,
+        content: formData.content,
+        preview: true  // Flag to indicate preview mode
+      };
+
+      const response = await axios.post('/master/preview-master-document', payload);
+
+      if (response.data.status === true || response.data.status === 'true') {
+        const documentId = response.data.document_id;
+        const previewUrl = response.data.preview_url;
+        
+        toast.success('Preview generated successfully!');
+        
+        // Open preview in new tab
+        window.open(previewUrl || `/textmasterdoument.php?docID=${documentId}`, '_blank');
+      } else {
+        toast.error('Error generating preview: ' + (response.data.message || 'Unknown error'));
+      }
+
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      toast.error('Error generating preview: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -357,25 +421,26 @@ const AddMasterDocument = () => {
             {resumeDocId ? 'Resume Master Document' : 'Add Master Document'}
           </h1>
           <Button 
-            className="text-blue-600 hover:text-blue-800 font-medium"
+            className="flex items-center gap-2"
             color="primary"
+            variant="outline"
             onClick={() => navigate("/dashboards/master-data/document-master")}
           >
-            Back
+            &lt;&lt; Back
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form className="space-y-6">
           {/* Row 1 */}
           <div className="grid grid-cols-4 gap-4">
             {/* Document Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Document Type:
+                Document Type: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.documentType ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.documentType && `This field is required x`}
-              </div>
+              {errors.documentType && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <select
                 name="documentType"
                 value={formData.documentType}
@@ -396,11 +461,11 @@ const AddMasterDocument = () => {
             {/* Category */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category:
+                Category: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.category ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.category && `This field is required x`}
-              </div>
+              {errors.category && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <select
                 name="category"
                 value={formData.category}
@@ -421,11 +486,11 @@ const AddMasterDocument = () => {
             {/* Orientation */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Orientation of the document:
+                Orientation: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.orientation ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.orientation && `This field is required x`}
-              </div>
+              {errors.orientation && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <select
                 name="orientation"
                 value={formData.orientation}
@@ -435,8 +500,8 @@ const AddMasterDocument = () => {
                 }`}
               >
                 <option value="">Select</option>
-                <option value="horizontal">Vertical</option>
-                <option value="vertical">Horizontal</option>
+                <option value="vertical">Vertical</option>
+                <option value="horizontal">Horizontal</option>
               </select>
             </div>
 
@@ -466,11 +531,11 @@ const AddMasterDocument = () => {
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name:
+                Name: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.name ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.name && `This field is required x`}
-              </div>
+              {errors.name && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <input
                 type="text"
                 name="name"
@@ -485,11 +550,11 @@ const AddMasterDocument = () => {
             {/* Document No/Procedure No */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Document No./Procedure No:
+                Document No./Procedure No: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.documentNo ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.documentNo && `This field is required x`}
-              </div>
+              {errors.documentNo && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <input
                 type="text"
                 name="documentNo"
@@ -518,11 +583,11 @@ const AddMasterDocument = () => {
             {/* Department */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Department:
+                Department: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.department ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.department && `This field is required x`}
-              </div>
+              {errors.department && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <select
                 name="department"
                 value={formData.department}
@@ -553,6 +618,7 @@ const AddMasterDocument = () => {
                 name="issueNo"
                 value={formData.issueNo}
                 onChange={handleInputChange}
+                maxLength={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -575,11 +641,11 @@ const AddMasterDocument = () => {
             {/* Effective Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Effective Date:
+                Effective Date: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.effectiveDate ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.effectiveDate && `This field is required x`}
-              </div>
+              {errors.effectiveDate && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <input
                 type="text"
                 name="effectiveDate"
@@ -595,11 +661,11 @@ const AddMasterDocument = () => {
             {/* Review Before */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Review Before:
+                Review Before: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.reviewBefore ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.reviewBefore && `This field is required x`}
-              </div>
+              {errors.reviewBefore && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <input
                 type="text"
                 name="reviewBefore"
@@ -625,6 +691,7 @@ const AddMasterDocument = () => {
                 name="revNo"
                 value={formData.revNo}
                 onChange={handleInputChange}
+                maxLength={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -640,7 +707,8 @@ const AddMasterDocument = () => {
                 value={formData.revDate}
                 onChange={handleInputChange}
                 placeholder="DD/MM/YYYY"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
               />
             </div>
 
@@ -682,11 +750,11 @@ const AddMasterDocument = () => {
             {/* Dead line(in days) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Dead line(in days):
+                Dead line(in days): <span className="text-red-600">*</span>
               </label>
-              <div className={errors.deadlineInDays ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.deadlineInDays && `This field is required x`}
-              </div>
+              {errors.deadlineInDays && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <input
                 type="number"
                 name="deadlineInDays"
@@ -701,11 +769,11 @@ const AddMasterDocument = () => {
             {/* Reviewed by */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reviewed by:
+                Reviewed by: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.reviewedBy ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.reviewedBy && `This field is required x`}
-              </div>
+              {errors.reviewedBy && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <select
                 name="reviewedBy"
                 value={formData.reviewedBy}
@@ -726,11 +794,11 @@ const AddMasterDocument = () => {
             {/* Approved BY */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Approved BY:
+                Approved BY: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.approvedBy ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.approvedBy && `This field is required x`}
-              </div>
+              {errors.approvedBy && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
               <select
                 name="approvedBy"
                 value={formData.approvedBy}
@@ -751,13 +819,13 @@ const AddMasterDocument = () => {
             {/* Is Training Required */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Is Training Required:
+                Is Training Required: <span className="text-red-600">*</span>
               </label>
-              <div className={errors.isTrainingRequired ? 'text-red-600 text-xs mb-1' : ''}>
-                {errors.isTrainingRequired && `This field is required x`}
-              </div>
-              <div className="flex items-center space-x-4 mt-2">
-                <label className="flex items-center">
+              {errors.isTrainingRequired && (
+                <div className="text-red-600 text-xs mb-1">This field is required x</div>
+              )}
+              <div className="flex items-center space-x-4 mt-2 border border-gray-300 rounded-md px-3 py-2 bg-white">
+                <label className="flex items-center cursor-pointer">
                   <input
                     type="radio"
                     name="trainingRequired"
@@ -768,7 +836,7 @@ const AddMasterDocument = () => {
                   />
                   <span className="ml-2">Yes</span>
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-center cursor-pointer">
                   <input
                     type="radio"
                     name="trainingRequired"
@@ -786,66 +854,12 @@ const AddMasterDocument = () => {
           {/* Content Editor */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Content:
+              Content: <span className="text-red-600">*</span>
             </label>
             <div className="border border-gray-300 rounded-md overflow-hidden">
-              {/* Toolbar */}
-              <div className="bg-gray-50 border-b border-gray-300 p-3">
-                {/* Row 1 - File, Edit, Insert, View, Format, Table, Tools */}
-                <div className="flex gap-4 mb-3 border-b border-gray-300 pb-3">
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">File</button>
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">Edit</button>
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">Insert</button>
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">View</button>
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">Format</button>
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">Table</button>
-                  <button type="button" className="text-sm font-medium text-gray-700 hover:text-gray-900">Tools</button>
-                </div>
-
-                {/* Row 2 - Formatting buttons */}
-                <div className="flex gap-2 items-center flex-wrap mb-3">
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Undo">←</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Redo">→</button>
-                  <button type="button" className="px-2 py-1 hover:bg-gray-200 rounded font-bold" title="Bold">B</button>
-                  <button type="button" className="px-2 py-1 hover:bg-gray-200 rounded italic" title="Italic">I</button>
-                  <button type="button" className="px-2 py-1 hover:bg-gray-200 rounded underline" title="Underline">U</button>
-                  <button type="button" className="px-2 py-1 hover:bg-gray-200 rounded line-through" title="Strikethrough">S</button>
-                  <button type="button" className="px-2 py-1 hover:bg-gray-200 rounded text-sm" title="Superscript">x²</button>
-                  <button type="button" className="px-2 py-1 hover:bg-gray-200 rounded text-sm" title="Subscript">x₂</button>
-                  <div className="border-l border-gray-300 mx-2 h-5"></div>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Left align">⬅</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Center align">⬌</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Right align">➡</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Justify">≡</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Bullet list">•</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Numbered list">1.</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Decrease indent">«</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Increase indent">»</button>
-                  <div className="border-l border-gray-300 mx-2 h-5"></div>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Horizontal line">—</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Table">□</button>
-                </div>
-
-                {/* Row 3 - Font options */}
-                <div className="flex gap-2 items-center flex-wrap">
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Image">🖼</button>
-                  <button type="button" className="p-1 hover:bg-gray-200 rounded" title="Chart">📊</button>
-                  <select className="px-2 py-1 border border-gray-300 rounded text-sm" title="Font Color">
-                    <option>A</option>
-                  </select>
-                  <select className="px-2 py-1 border border-gray-300 rounded text-sm" title="Highlight">
-                    <option>A ▼</option>
-                  </select>
-                  <select className="px-2 py-1 border border-gray-300 rounded text-sm">
-                    <option>Font Sizes</option>
-                  </select>
-                  <select className="px-2 py-1 border border-gray-300 rounded text-sm">
-                    <option>Font Family</option>
-                  </select>
-                  <select className="px-2 py-1 border border-gray-300 rounded text-sm">
-                    <option>Formats</option>
-                  </select>
-                </div>
+              {/* Simple Toolbar */}
+              <div className="bg-gray-50 border-b border-gray-300 p-2 flex gap-2 items-center flex-wrap">
+                <span className="text-xs text-gray-600">Basic Text Editor</span>
               </div>
 
               {/* Editor Content Area */}
@@ -864,15 +878,26 @@ const AddMasterDocument = () => {
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-3 pt-6">
+          <div className="flex gap-3 pt-6 border-t border-gray-300">
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={loading}
               className={`px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition ${
                 loading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
               {loading ? 'Submitting...' : 'Submit'}
+            </button>
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={loading}
+              className={`px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition ${
+                loading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {loading ? 'Generating...' : 'Preview'}
             </button>
             <button
               type="button"

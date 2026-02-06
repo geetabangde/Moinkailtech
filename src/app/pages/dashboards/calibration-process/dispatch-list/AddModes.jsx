@@ -31,7 +31,7 @@ export default function AddModes() {
       form.append("name", formData.name);
       form.append("description", formData.description);
 
-      await axios.post("/master/mode-create", form); // token attached via interceptor
+      await axios.post("/master/mode-create", form); 
 
       toast.success("Mode created successfully ✅", {
         duration: 1000,

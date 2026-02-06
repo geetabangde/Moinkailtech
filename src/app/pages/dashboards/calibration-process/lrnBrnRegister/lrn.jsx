@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "components/ui";
 import appLogo from "/images/logo.png";
+import axios from "utils/axios";
 
 const LrnBrnRegister = () => {
   const [startDate, setStartDate] = useState('');
@@ -11,6 +12,30 @@ const LrnBrnRegister = () => {
   const [showExport, setShowExport] = useState(false);
   const [showStartCalendar, setShowStartCalendar] = useState(false);
   const [showEndCalendar, setShowEndCalendar] = useState(false);
+  const [registerData, setRegisterData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [customers, setCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+
+  // Fetch customers on component mount
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setLoadingCustomers(true);
+      try {
+        const response = await axios.get('/people/get-all-customers');
+        if (response.data.success) {
+          setCustomers(response.data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching customers:', err);
+      } finally {
+        setLoadingCustomers(false);
+      }
+    };
+
+    fetchCustomers();
+  }, []);
 
   // Generate calendar days for current month
   const generateCalendarDays = () => {
@@ -32,15 +57,59 @@ const LrnBrnRegister = () => {
     }
   };
 
-  const handleSearch = () => {
-    if (startDate && endDate && startCustomer && endCustomer) {
-      setShowResults(true);
+  // Convert DD/MM/YYYY to YYYY-MM-DD for API
+  const formatDateForAPI = (dateStr) => {
+    if (!dateStr) return '';
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Extract customer ID from customer string (e.g., "DILIP BUILDCON LIMITED(826729681)" -> "826729681")
+  const extractCustomerId = (customerStr) => {
+    if (!customerStr) return '';
+    const match = customerStr.match(/\((\d+)\)/);
+    return match ? match[1] : '';
+  };
+
+  const handleSearch = async () => {
+    if (!startDate || !endDate || !startCustomer || !endCustomer) {
+      setError('Please fill in all search fields');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = {
+        startdate: formatDateForAPI(startDate),
+        enddate: formatDateForAPI(endDate),
+        customerid: extractCustomerId(startCustomer),
+        reportcustomerid: extractCustomerId(endCustomer)
+      };
+
+      const response = await axios.get('/api/calibrationprocess/search-lrn-brn-register', {
+        params
+      });
+
+      if (response.data.success) {
+        setRegisterData(response.data.data || []);
+        setShowResults(true);
+      } else {
+        setError('Failed to fetch data');
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred while fetching data');
+      console.error('API Error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleExport = () => {
     setShowExport(true);
-    // Create a simple export document
+    
+    // Create export content with actual data
     const exportContent = `
 LRN BRN Register Export
 ======================
@@ -51,13 +120,18 @@ Search Parameters:
 - Start Customer: ${startCustomer}
 - End Customer: ${endCustomer}
 
-Sample Records:
-- QF No: KTROCF070401
-- Issue No: 01
-- Issue Date: 01/08/2019
-- Revision No: 01
-- Revision Date: 20/08/2021
-- Page: 1 of 1
+Total Records: ${registerData.length}
+
+Records:
+${registerData.map((record, index) => `
+Record ${index + 1}:
+- ID: ${record.id}
+- Inward Date: ${record.inwarddate}
+- BRN: ${record.bookingrefno}
+- LRN: ${record.labreferenceno}
+- Customer: ${record.customername}
+- Total Amount: ${record.total}
+`).join('\n')}
 `;
     
     // Create and download file
@@ -65,11 +139,18 @@ Sample Records:
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'lrn_brn_register.txt';
+    a.download = `lrn_brn_register_${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  };
+
+  // Format date for display (YYYY-MM-DD to DD/MM/YYYY)
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr || dateStr === '0000-00-00') return '-';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
   };
 
   if (showExport) {
@@ -194,12 +275,19 @@ Sample Records:
                     value={startCustomer}
                     onChange={(e) => setStartCustomer(e.target.value)}
                     className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                    disabled={loadingCustomers}
                   >
-                    <option value="">Select Customer</option>
-                    <option value="DILIP BUILDCON LIMITED(826729681)">DILIP BUILDCON LIMITED(826729681)</option>
-                    <option value="MAHINDRA & MAHINDRA LTD.(870226037)">MAHINDRA & MAHINDRA LTD.(870226037)</option>
-                    <option value="ULTRATECH CEMENT LTD">ULTRATECH CEMENT LTD</option>
-                    <option value="TATA MOTORS">TATA MOTORS</option>
+                    <option value="">
+                      {loadingCustomers ? 'Loading customers...' : 'Select Customer'}
+                    </option>
+                    {customers.map((customer) => (
+                      <option 
+                        key={customer.id} 
+                        value={`${customer.customername}(${customer.id})`}
+                      >
+                        {customer.customername} ({customer.id})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -275,29 +363,46 @@ Sample Records:
                     value={endCustomer}
                     onChange={(e) => setEndCustomer(e.target.value)}
                     className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                    disabled={loadingCustomers}
                   >
-                    <option value="">Select Customer</option>
-                    <option value="MAHINDRA & MAHINDRA LTD.(873229037)">MAHINDRA & MAHINDRA LTD.(873229037)</option>
-                    <option value="ULTRATECH CEMENT LTD.(UNIT: DHAR CEMENT WORKS)(973743382)">ULTRATECH CEMENT LTD.(UNIT: DHAR CEMENT WORKS)(973743382)</option>
-                    <option value="TATA MOTORS">TATA MOTORS</option>
+                    <option value="">
+                      {loadingCustomers ? 'Loading customers...' : 'Select Customer'}
+                    </option>
+                    {customers.map((customer) => (
+                      <option 
+                        key={customer.id} 
+                        value={`${customer.customername}(${customer.id})`}
+                      >
+                        {customer.customername} ({customer.id})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex space-x-3 mt-6">
               <Button
                 onClick={handleSearch}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm"
+                disabled={loading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm disabled:opacity-50"
               >
-                Search
+                {loading ? 'Searching...' : 'Search'}
               </Button>
               <Button
                 onClick={handleExport}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm"
+                disabled={!showResults || registerData.length === 0}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm disabled:opacity-50"
               >
-                export
+                Export
               </Button>
             </div>
           </div>
@@ -325,7 +430,8 @@ Sample Records:
                 </div>
 
                 {/* Document Title Section */}
-                <div className="col-span-6 p-6 flex items-center justify-center border-l border-r border-gray-200">                  <div className="text-center">
+                <div className="col-span-6 p-6 flex items-center justify-center border-l border-r border-gray-200">
+                  <div className="text-center">
                     <h3 className="font-semibold text-gray-800 text-lg">
                       Sample /UUC Received Record and Department Sample Inward Register
                     </h3>
@@ -389,13 +495,50 @@ Sample Records:
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td colSpan="18" className="p-8 text-center text-gray-500">
-                        <div className="text-sm">
-                          Search results will appear here when you perform a search with valid parameters.
-                        </div>
-                      </td>
-                    </tr>
+                    {loading ? (
+                      <tr>
+                        <td colSpan="18" className="p-8 text-center text-gray-500">
+                          <div className="text-sm">Loading...</div>
+                        </td>
+                      </tr>
+                    ) : registerData.length === 0 ? (
+                      <tr>
+                        <td colSpan="18" className="p-8 text-center text-gray-500">
+                          <div className="text-sm">
+                            No records found for the selected criteria.
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      registerData.map((record, index) => (
+                        <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{index + 1}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{formatDateForDisplay(record.inwarddate)}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.bookingrefno}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.labreferenceno}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.id}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.customername}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.concernpersonname}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.instrumentlocation}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.id}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.department || '-'}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{formatDateForDisplay(record.deadline)}</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
+                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.remark || '-'}</td>
+                          <td className="px-3 py-2 text-xs">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              record.status === 4 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {record.status === 4 ? 'Completed' : 'In Progress'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

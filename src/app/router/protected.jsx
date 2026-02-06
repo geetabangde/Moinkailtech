@@ -35,7 +35,6 @@ const protectedRoutes = {
             {
               path: "material-list",
               children: [
-
                 {
                   path: ":labSlug", // This catches all slugs dynamically
                   children: [
@@ -133,7 +132,8 @@ const protectedRoutes = {
                           }),
                         },
                         {
-                          path: "edit-imc", lazy: async () => ({
+                          path: "edit-imc",
+                          lazy: async () => ({
                             Component: (
                               await import(
                                 "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/EditIntermediateCheck"
@@ -164,10 +164,12 @@ const protectedRoutes = {
                         {
                           path: "add-observation",
                           lazy: async () => ({
-                            Component: (await import(
-                              "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/AddObservation"
-                            )).default,
-                          }), 
+                            Component: (
+                              await import(
+                                "app/pages/dashboards/material-list/electro-technical/MaintenanceEquipmentHistory/AddObservation"
+                              )
+                            ).default,
+                          }),
                         },
                         {
                           path: "add-new-equipment-history",
@@ -560,11 +562,23 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                      path: "edit/:id",
+                      path: "edit-training/:id",
                       lazy: async () => ({
-                        Component: (await import(
-                          "app/pages/dashboards/master-data/MasterDocument/EditTrainingModule"
-                        )).default,
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/master-data/MasterDocument/EditTrainingModule"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "view-training-modules",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/master-data/MasterDocument/ViewTrainingModules"
+                          )
+                        ).default,
                       }),
                     }
                   ],
@@ -659,7 +673,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    
                   ],
                 },
 
@@ -799,7 +812,7 @@ const protectedRoutes = {
                 },
 
                 //  -------------------------------------------general-checklistst---------------------------------
-                
+
                 {
                   path: "general-checklists",
                   children: [
@@ -832,7 +845,7 @@ const protectedRoutes = {
                           )
                         ).default,
                       }),
-                    }
+                    },
                   ],
                 },
                 {
@@ -845,7 +858,6 @@ const protectedRoutes = {
                     ).default,
                   }),
                 },
-
               ],
             },
             {
@@ -1331,8 +1343,6 @@ const protectedRoutes = {
                     ).default,
                   }),
                 },
-
-                
               ],
             },
 
@@ -1539,12 +1549,11 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                  
                   ],
                 },
-                
-                //-------------------LRN Cancel Requests----------------------- 
-                  {
+
+                //-------------------LRN Cancel Requests-----------------------
+                {
                   path: "lrn-cancel-requests",
                   children: [
                     {
@@ -1557,7 +1566,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                  
                   ],
                 },
                 //--------------------Discipline------------------
@@ -1632,8 +1640,8 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                       path: "clone/:id",
-                       lazy: async () => ({
+                      path: "clone/:id",
+                      lazy: async () => ({
                         Component: (
                           await import(
                             "app/pages/dashboards/calibration-operations/instrument-list/Cloneinstrument"
@@ -1642,7 +1650,7 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                    path: "view-prices/:instrumentId",
+                      path: "view-prices/:instrumentId",
                       lazy: async () => ({
                         Component: (
                           await import(
@@ -1652,41 +1660,45 @@ const protectedRoutes = {
                       }),
                     },
                     {
-                      path: "view-matrix/:instrumentId/:priceId", 
+                      path: "view-matrix/:instrumentId/:priceId",
                       lazy: async () => ({
                         Component: (
                           await import(
-                              "app/pages/dashboards/calibration-operations/instrument-list/ViewMatrixPage"
+                            "app/pages/dashboards/calibration-operations/instrument-list/ViewMatrixPage"
                           )
                         ).default,
                       }),
                     },
                     {
-                      path: "view-calib-points/:priceId/:matrixId", lazy: async () => ({
+                      path: "view-calib-points/:priceId/:matrixId",
+                      lazy: async () => ({
                         Component: (
                           await import(
                             "app/pages/dashboards/calibration-operations/instrument-list/ViewCalibPointsPage"
                           )
                         ).default,
-                      }) ,
-                    },
-                    {
-                   path: "add-calib-point/:priceId/:matrixId",
-                      lazy: async () => ({
-                        Component: (await import(
-                          "app/pages/dashboards/calibration-operations/instrument-list/AddCalibPoint"
-                        )).default,
                       }),
                     },
                     {
-                       path: "edit-calib-point/:priceId/:matrixId/:calibPointId",                        lazy: async () => ({
-                          Component: (
-                            await import(
-                              "app/pages/dashboards/calibration-operations/instrument-list/EditCalibPoint"
-                            ) 
-                          ).default,
-                        }),
-                      }
+                      path: "add-calib-point/:priceId/:matrixId",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/calibration-operations/instrument-list/AddCalibPoint"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "edit-calib-point/:priceId/:matrixId/:calibPointId",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/calibration-operations/instrument-list/EditCalibPoint"
+                          )
+                        ).default,
+                      }),
+                    },
                   ],
                 },
               ],
