@@ -1,112 +1,216 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Select, Pagination, PaginationItems, PaginationNext, PaginationPrevious } from "components/ui";
+import axios from "utils/axios";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const Details = () => {
     const navigate = useNavigate();
+    const { id: customerId } = useParams();
+    
     const [searchTerm, setSearchTerm] = useState('');
     const [pageSize, setPageSize] = useState(25);
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-      const [printLoading, setPrintLoading] = useState(false);
+    const [printLoading, setPrintLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    
+    // State for API data
+    const [customerDetails, setCustomerDetails] = useState(null);
+    const [instrumentData, setInstrumentData] = useState([]);
 
-    // Sample data based on your screenshots
-    const [instrumentData] = useState([
-        {
-            id: 1,
-            inwardId: 2932,
-            lrn: '2409R1205230',
-            brn: 'KTRC/2409R001130',
-            instrumentName: 'Digital Multimeter',
-            make: 'Fluke',
-            model: '179',
-            serialNo: '49060466',
-            idNo: 'NA',
-            dueDate: '2025-10-01',
-            attachmentUrl: '/documents/digital-multimeter-2932.pdf' // Sample document URL
-        },
-        {
-            id: 2,
-            inwardId: 2997,
-            lrn: '2410R1213723',
-            brn: 'KTRC/2410R001923',
-            instrumentName: 'Vernier Caliper',
-            make: 'Mitutoyo',
-            model: 'NA',
-            serialNo: '13070131',
-            idNo: 'NA',
-            dueDate: '2025-10-28',
-            attachmentUrl: '/documents/vernier-caliper-2997-1.pdf'
-        },
-        {
-            id: 3,
-            inwardId: 2997,
-            lrn: '2410R1213823',
-            brn: 'KTRC/2410R002023',
-            instrumentName: 'Vernier Caliper',
-            make: 'Mitutoyo',
-            model: 'NA',
-            serialNo: '1713820',
-            idNo: 'NA',
-            dueDate: '2025-10-28',
-            attachmentUrl: '/documents/vernier-caliper-2997-2.pdf'
-        },
-        {
-            id: 4,
-            inwardId: 2997,
-            lrn: '2410R1213923',
-            brn: 'KTRC/2410R002123',
-            instrumentName: 'External Micrometer',
-            make: 'Mitutoyo',
-            model: '103-137',
-            serialNo: '64120937',
-            idNo: 'NA',
-            dueDate: '2025-10-28',
-            attachmentUrl: '/documents/external-micrometer-2997.pdf'
+    // ✅ useCallback to fix the dependency warning
+    const fetchCustomerDetails = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get(`/calibrationprocess/detail-leadManagement?id=${customerId}`);
+            
+            console.log("API response:", response.data);
+
+            if (response.data && response.data.status) {
+                const { customer, addresses, calibration_details } = response.data.data;
+                
+                // ✅ Set customer details - Fixed address handling
+                const primaryAddress = addresses && addresses.length > 0 ? addresses[0] : null;
+                
+                setCustomerDetails({
+                    customerName: customer.name || 'N/A',
+                    email: customer.email || 'N/A',
+                    mobile: customer.personal_mobile || 'N/A',
+                    personalName: customer.personal_name || 'N/A',
+                    personalMobile: customer.personal_mobile || 'N/A',
+                    reportingAddress: primaryAddress ? 
+                        `${primaryAddress.address}, ${primaryAddress.city}, ${primaryAddress.pincode}` : 'N/A',
+                    reportingBillingAddress: primaryAddress ? 
+                        `${primaryAddress.address}, ${primaryAddress.city}, ${primaryAddress.pincode}` : 'N/A',
+                    city: customer.city || 'N/A',
+                    state: customer.state || 'N/A',
+                    country: customer.country || 'N/A',
+                    gstNumber: customer.gstno || 'N/A',
+                    panNo: customer.pan || 'N/A'
+                });
+
+                // ✅ Fixed field mapping to match actual API response
+                if (calibration_details && Array.isArray(calibration_details)) {
+                    const mappedInstruments = calibration_details.map((item) => ({
+                        id: item.id, // ✅ calibration_details ki actual id
+                        inwardId: item.inwardid || 'N/A',
+                        lrn: item.lrn || 'N/A',
+                        brn: item.bookingrefno || 'N/A',
+                        instrumentName: item.name || 'N/A',
+                        make: item.make || 'N/A',
+                        model: item.model || 'N/A',
+                        serialNo: item.serialno || 'N/A',
+                        idNo: item.idno || 'N/A',
+                        dueDate: item.duedate || 'N/A',
+                    }));
+
+                    setInstrumentData(mappedInstruments);
+                } else {
+                    setInstrumentData([]);
+                }
+
+            } else {
+                console.warn("Unexpected response structure:", response.data);
+                setCustomerDetails(null);
+                setInstrumentData([]);
+            }
+
+        } catch (err) {
+            console.error("Error fetching customer details:", err);
+            setCustomerDetails(null);
+            setInstrumentData([]);
+        } finally {
+            setLoading(false);
         }
-    ]);
+    }, [customerId]); // ✅ Added customerId as dependency
 
-    // Customer details data
-    const customerDetails = {
-        customerName: 'APPALTO ELECTRONICS PVT LTD',
-        email: 'purchase@appalto.in',
-        mobile: '9755590789',
-        personalName: 'Mr. Sandeep Tripathi',
-        personalMobile: '9755590789',
-        reportingBillingAddress: '43B, -44 Electronic complex Industrial area, Indore, Indore (M.P.), 452010',
-        reportingAddress: 'Plot 24-25, IT Park, Sinhasa, Dhar Road, Indore, 452013',
-        city: 'Indore',
-        state: 'MADHYA PRADESH',
-        country: 'India',
-        gstNumber: '23AADCA6195L1ZG',
-        panNo: 'AADCA6195L'
-    };
+    // ✅ Fetch customer details from API
+    useEffect(() => {
+        if (customerId) {
+            fetchCustomerDetails();
+        }
+    }, [customerId, fetchCustomerDetails]); // ✅ Fixed dependency
+
+    const handleDownloadDispatchReport = (instrument) => {
+    setPrintLoading(true);
+    
+    try {
+        // Create new PDF document
+        const doc = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+        
+        // Add title
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Reminder for Periodic Calibration of your Equipment', 148, 20, { align: 'center' });
+        
+        // Add customer name section
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        
+        // Customer Name Header - ✅ Use autoTable directly
+        autoTable(doc, {
+            startY: 35,
+            head: [['Customer Name', customerDetails.customerName]],
+            headStyles: { 
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineWidth: 0.5,
+                lineColor: [0, 0, 0]
+            },
+            theme: 'grid',
+            styles: { 
+                fontSize: 11,
+                cellPadding: 3,
+                halign: 'center'
+            },
+            columnStyles: {
+                0: { cellWidth: 60, fontStyle: 'bold' },
+                1: { cellWidth: 237 }
+            }
+        });
+        
+        // Instrument details table
+        const tableData = [[
+            instrument.inwardId,
+            instrument.lrn,
+            instrument.brn,
+            instrument.instrumentName,
+            instrument.make,
+            instrument.model,
+            instrument.serialNo,
+            instrument.idNo,
+            instrument.dueDate
+        ]];
+        
+        // ✅ Use autoTable directly
+        autoTable(doc, {
+            startY: doc.lastAutoTable.finalY + 5,
+            head: [[
+                'Inward\nId',
+                'LRN',
+                'BRN',
+                'Instrument Name',
+                'Make',
+                'Model',
+                'Serail\nNo',
+                'ID No',
+                'Calibration Due\nDate'
+            ]],
+            body: tableData,
+            headStyles: { 
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                halign: 'center',
+                valign: 'middle',
+                lineWidth: 0.5,
+                lineColor: [0, 0, 0],
+                fontSize: 10
+            },
+            bodyStyles: {
+                halign: 'center',
+                valign: 'middle',
+                lineWidth: 0.5,
+                lineColor: [0, 0, 0],
+                fontSize: 10
+            },
+            theme: 'grid',
+            styles: { 
+                cellPadding: 3,
+                overflow: 'linebreak'
+            },
+            columnStyles: {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 35 },
+                2: { cellWidth: 40 },
+                3: { cellWidth: 35 },
+                4: { cellWidth: 25 },
+                5: { cellWidth: 25 },
+                6: { cellWidth: 25 },
+                7: { cellWidth: 35 },
+                8: { cellWidth: 35 }
+            }
+        });
+        
+        // Save the PDF
+        const fileName = `Dispatch_Report_${instrument.lrn}_${new Date().getTime()}.pdf`;
+        doc.save(fileName);
+        
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    } finally {
+        setPrintLoading(false);
+    }
+};
 
     // Handle back button click
     const handleBackClick = () => {
         navigate('/dashboards/calibration-process/lead-managements');
     };
-
-    // Handle download attachment
-    // const handleDownloadAttachment = (item) => {
-    //     try {
-    //         // Create a temporary link element
-    //         const link = document.createElement('a');
-    //         link.href = item.attachmentUrl;
-    //         link.download = `${item.instrumentName}_${item.serialNo}_${item.inwardId}.pdf`;
-    //         link.target = '_blank';
-            
-    //         // Append to body, click, and remove
-    //         document.body.appendChild(link);
-    //         link.click();
-    //         document.body.removeChild(link);
-            
-    //         console.log(`Downloading attachment for: ${item.instrumentName} (ID: ${item.inwardId})`);
-    //     } catch (error) {
-    //         console.error('Error downloading attachment:', error);
-    //         alert('Error downloading attachment. Please try again.');
-    //     }
-    // };
 
     // Sort function
     const handleSort = (key) => {
@@ -117,13 +221,6 @@ const Details = () => {
         setSortConfig({ key, direction });
     };
 
-     const handlePrint = () => {
-    setPrintLoading(true);
-    setTimeout(() => {
-      window.print();
-      setPrintLoading(false);
-    }, 500);
-  };
     // Filter and sort data
     const filteredData = instrumentData
         .filter(item =>
@@ -197,6 +294,45 @@ const Details = () => {
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm]);
+
+    // ✅ Loading UI
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-white">
+                <div className="flex h-[60vh] items-center justify-center text-gray-600">
+                    <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
+                    </svg>
+                    Loading Customer Details...
+                </div>
+            </div>
+        );
+    }
+
+    // ✅ Error UI - if no customer details
+    if (!customerDetails) {
+        return (
+            <div className="min-h-screen bg-white">
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-white shadow-sm border border-gray-200 rounded-lg mb-6">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h1 className="text-xl font-semibold text-gray-800">Customer Detail</h1>
+                            <Button 
+                                onClick={handleBackClick}
+                                className="bg-orange-400 hover:bg-orange-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                            >
+                                &lt;&lt; Back
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex h-[40vh] items-center justify-center text-gray-600">
+                        <p className="text-lg">No customer details found.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-white">
@@ -277,7 +413,9 @@ const Details = () => {
                     {/* Search and Info */}
                     <div className="p-4 border-b border-gray-200">
                         <div className="flex items-center justify-between mb-4">
-                            <span className="text-sm text-gray-600">Showing 1 to 4 of 4 entries</span>
+                            <span className="text-sm text-gray-600">
+                                Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + pageSize, filteredData.length)} of {filteredData.length} entries
+                            </span>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-600">Search:</span>
                                 <input
@@ -296,6 +434,7 @@ const Details = () => {
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-gray-100">
+                                    <th>Id</th>
                                     <th 
                                         className="text-left p-3 font-medium text-gray-700 border border-gray-300 cursor-pointer hover:bg-gray-200"
                                         onClick={() => handleSort('inwardId')}
@@ -386,6 +525,7 @@ const Details = () => {
                                 {displayedData.length > 0 ? (
                                     displayedData.map((item) => (
                                         <tr key={item.id} className="border-b border-gray-200 hover:bg-gray-50">
+                                            <td className="p-3 border border-gray-200">{item.id}</td>
                                             <td className="p-3 border border-gray-200">{item.inwardId}</td>
                                             <td className="p-3 border border-gray-200">{item.lrn}</td>
                                             <td className="p-3 border border-gray-200">{item.brn}</td>
@@ -396,27 +536,24 @@ const Details = () => {
                                             <td className="p-3 border border-gray-200">{item.idNo}</td>
                                             <td className="p-3 border border-gray-200">{item.dueDate}</td>
                                             <td className="p-3 border border-gray-200">
-                                                 <div className="flex justify-end mt-6 no-print space-x-4">
-          <Button onClick={handlePrint} color="success" disabled={printLoading}>
-            {printLoading ? (
-              <div className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
-                </svg>
-                Preparing...
-              </div>
-            ) : (
-              "Download Dispatch Report"
-            )}
-          </Button>
-          {/* <Button
-            onClick={() => setShowApproveModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
-          >
-            Approve
-          </Button> */}
-        </div>
+                                                <Button 
+                                                    onClick={() => handleDownloadDispatchReport(item)} 
+                                                    color="success" 
+                                                    disabled={printLoading}
+                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
+                                                >
+                                                    {printLoading ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
+                                                            </svg>
+                                                            Preparing...
+                                                        </div>
+                                                    ) : (
+                                                        "Download Dispatch Report"
+                                                    )}
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))
@@ -450,19 +587,21 @@ const Details = () => {
                             </div>
 
                             {/* Pagination component */}
-                            <div>
-                                <Pagination
-                                    total={totalPages}
-                                    value={currentPage}
-                                    onChange={handlePageChange}
-                                    siblings={2}
-                                    boundaries={1}
-                                >
-                                    <PaginationPrevious />
-                                    <PaginationItems />
-                                    <PaginationNext />
-                                </Pagination>
-                            </div>
+                            {totalPages > 0 && (
+                                <div>
+                                    <Pagination
+                                        total={totalPages}
+                                        value={currentPage}
+                                        onChange={handlePageChange}
+                                        siblings={2}
+                                        boundaries={1}
+                                    >
+                                        <PaginationPrevious />
+                                        <PaginationItems />
+                                        <PaginationNext />
+                                    </Pagination>
+                                </div>
+                            )}
 
                             {/* Entries info */}
                             <div className="truncate text-sm text-gray-600">

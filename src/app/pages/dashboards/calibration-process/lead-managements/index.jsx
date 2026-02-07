@@ -45,16 +45,35 @@ export default function OrdersDatatableV1() {
   }, []);
 
 
-  // Then update your fetchModes function
+  // ✅ Updated fetchModes function with proper field mapping
   const fetchModes = async () => {
     try {
       setLoading(true); // start loader
-      const response = await axios.get("/master/mode-list");
+      const response = await axios.get("/calibrationprocess/get-leadManagement");
 
-      // console.log("API response:", response.data); // debug
+      console.log("API response:", response.data); // debug
 
-      if (response.data.status && Array.isArray(response.data.data)) {
-        const dataWithStaticFields = addStaticDataToRecords(response.data.data);
+      // ✅ API returns { recordsTotal, recordsFiltered, data } directly (no status field)
+      if (response.data && Array.isArray(response.data.data)) {
+        // ✅ Map API fields (lowercase) to camelCase
+        const mappedData = response.data.data.map(item => ({
+          id: item.id,
+          inwardid: item.inwardid,
+          customerName: item.customername,
+          customerId: item.customerid,
+          addedOn: item.addedon,
+          lrn: item.lrn,
+          bookingRefNo: item.bookingrefno,
+          make: item.make,
+          model: item.model,
+          serialNo: item.serialno,
+          name: item.name,
+          idNo: item.idno,
+          dueDate: item.duedate,
+          invoice: item.invoice,
+        }));
+
+        const dataWithStaticFields = addStaticDataToRecords(mappedData);
         setOrders(dataWithStaticFields); // ✅ set data with static fields
       } else {
         console.warn("Unexpected response structure:", response.data);
@@ -63,13 +82,11 @@ export default function OrdersDatatableV1() {
 
     } catch (err) {
       console.error("Error fetching mode list:", err);
+      setOrders([]); // fallback on error
     } finally {
       setLoading(false); // stop loader
     }
   };
-
-
-
 
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
@@ -321,6 +338,3 @@ export default function OrdersDatatableV1() {
     </Page>
   );
 }
-
-
-

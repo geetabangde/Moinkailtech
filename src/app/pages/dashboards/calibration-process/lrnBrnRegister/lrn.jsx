@@ -6,29 +6,51 @@ import axios from "utils/axios";
 const LrnBrnRegister = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [startCustomer, setStartCustomer] = useState('');
-  const [endCustomer, setEndCustomer] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [selectedReportCustomer, setSelectedReportCustomer] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [showStartCalendar, setShowStartCalendar] = useState(false);
-  const [showEndCalendar, setShowEndCalendar] = useState(false);
   const [registerData, setRegisterData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Fetch customers on component mount
   useEffect(() => {
     const fetchCustomers = async () => {
       setLoadingCustomers(true);
+      setErrorMessage('');
       try {
-        const response = await axios.get('/people/get-all-customers');
-        if (response.data.success) {
-          setCustomers(response.data.data || []);
+        const token = localStorage.getItem('authToken');
+        
+        if (!token) {
+          throw new Error('Authentication token not found in local storage');
+        }
+
+        const response = await axios.get('/people/get-all-customers', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = response.data;
+        
+        console.log('Customers API Response:', data);
+        
+        if (data && Array.isArray(data)) {
+          setCustomers(data);
+        } else if (data && data.data && Array.isArray(data.data)) {
+          setCustomers(data.data);
+        } else if (data && data.customers && Array.isArray(data.customers)) {
+          setCustomers(data.customers);
+        } else {
+          throw new Error('Invalid API response format');
         }
       } catch (err) {
         console.error('Error fetching customers:', err);
+        setErrorMessage(err.message || 'Failed to load customers. Please try again.');
       } finally {
         setLoadingCustomers(false);
       }
@@ -37,70 +59,122 @@ const LrnBrnRegister = () => {
     fetchCustomers();
   }, []);
 
-  // Generate calendar days for current month
-  const generateCalendarDays = () => {
-    const days = [];
-    for (let i = 1; i <= 30; i++) {
-      days.push(i);
-    }
-    return days;
-  };
-
-  const handleDateSelect = (day, isStart = true) => {
-    const formattedDate = `${day.toString().padStart(2, '0')}/09/2025`;
-    if (isStart) {
-      setStartDate(formattedDate);
-      setShowStartCalendar(false);
-    } else {
-      setEndDate(formattedDate);
-      setShowEndCalendar(false);
-    }
-  };
-
-  // Convert DD/MM/YYYY to YYYY-MM-DD for API
+  // Format date from input (YYYY-MM-DD) for API
   const formatDateForAPI = (dateStr) => {
     if (!dateStr) return '';
-    const [day, month, year] = dateStr.split('/');
-    return `${year}-${month}-${day}`;
+    return dateStr;
   };
 
-  // Extract customer ID from customer string (e.g., "DILIP BUILDCON LIMITED(826729681)" -> "826729681")
-  const extractCustomerId = (customerStr) => {
-    if (!customerStr) return '';
-    const match = customerStr.match(/\((\d+)\)/);
-    return match ? match[1] : '';
+  // Format date for display (YYYY-MM-DD to DD/MM/YYYY)
+  // Format date for display
+const formatDateForDisplay = (dateStr) => {
+  if (!dateStr || dateStr === '0000-00-00') return '-';
+  try {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  } catch  {
+    return dateStr;
+  }
+};
+
+
+  // Calculate TAT (Turn Around Time) in days
+  const calculateTAT = (committedDate, reportingDate) => {
+    if (!committedDate || !reportingDate || committedDate === '0000-00-00' || reportingDate === '0000-00-00') {
+      return '-';
+    }
+    try {
+      const date1 = new Date(committedDate);
+      const date2 = new Date(reportingDate);
+      const diffTime = Math.abs(date2 - date1);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return `${diffDays} days`;
+    } catch  {
+      return '-';
+    }
+  };
+
+  // Function to get customer ID
+  const getCustomerId = (customer) => {
+    return customer.id || customer.customerId || customer._id;
+  };
+
+  // Function to format customer display name
+  const getCustomerDisplayName = (customer) => {
+    if (customer.name && customer.mobile) {
+      return `${customer.name} (${customer.mobile})`;
+    } else if (customer.name && customer.phone) {
+      return `${customer.name} (${customer.phone})`;
+    } else if (customer.companyName && customer.contactNumber) {
+      return `${customer.companyName} (${customer.contactNumber})`;
+    } else if (customer.customerName && customer.phone) {
+      return `${customer.customerName} (${customer.phone})`;
+    } else if (customer.fullName && customer.mobileNumber) {
+      return `${customer.fullName} (${customer.mobileNumber})`;
+    } else if (customer.name) {
+      return customer.name;
+    } else if (customer.companyName) {
+      return customer.companyName;
+    } else if (customer.customerName) {
+      return customer.customerName;
+    }
+    return 'Unknown Customer';
   };
 
   const handleSearch = async () => {
-    if (!startDate || !endDate || !startCustomer || !endCustomer) {
-      setError('Please fill in all search fields');
+    if (!startDate || !endDate || !selectedCustomer || !selectedReportCustomer) {
+      setErrorMessage('Please fill in all search fields');
+      alert('Please fill in all fields (Start Date, End Date, Customer, and Report Customer) before searching.');
+      return;
+    }
+
+    if (new Date(endDate) < new Date(startDate)) {
+      setErrorMessage('End date must be after start date.');
+      alert('End date must be after start date.');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setErrorMessage('');
+    setShowResults(false);
 
     try {
-      const params = {
-        startdate: formatDateForAPI(startDate),
-        enddate: formatDateForAPI(endDate),
-        customerid: extractCustomerId(startCustomer),
-        reportcustomerid: extractCustomerId(endCustomer)
-      };
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
 
-      const response = await axios.get('/api/calibrationprocess/search-lrn-brn-register', {
-        params
+      console.log('Searching with:', {
+        startDate: formatDateForAPI(startDate),
+        endDate: formatDateForAPI(endDate),
+        customerId: selectedCustomer,
+        reportCustomerId: selectedReportCustomer
       });
 
-      if (response.data.success) {
-        setRegisterData(response.data.data || []);
+      const response = await axios.get(
+        `/calibrationprocess/search-lrn-brn-register?startdate=${formatDateForAPI(startDate)}&enddate=${formatDateForAPI(endDate)}&customerid=${selectedCustomer}&reportcustomerid=${selectedReportCustomer}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      console.log('LRN BRN API Response:', response.data);
+
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        setRegisterData(response.data.data);
         setShowResults(true);
       } else {
-        setError('Failed to fetch data');
+        throw new Error('Invalid response format');
       }
     } catch (err) {
-      setError(err.message || 'An error occurred while fetching data');
+      const errMsg = err.message || 'An error occurred while fetching data';
+      setErrorMessage(errMsg);
       console.error('API Error:', err);
+      alert('Failed to fetch data. Please check your inputs and try again.');
     } finally {
       setLoading(false);
     }
@@ -109,16 +183,15 @@ const LrnBrnRegister = () => {
   const handleExport = () => {
     setShowExport(true);
     
-    // Create export content with actual data
     const exportContent = `
 LRN BRN Register Export
 ======================
 
 Search Parameters:
-- Start Date: ${startDate}
-- End Date: ${endDate}
-- Start Customer: ${startCustomer}
-- End Customer: ${endCustomer}
+- Start Date: ${formatDateForDisplay(startDate)}
+- End Date: ${formatDateForDisplay(endDate)}
+- Customer ID: ${selectedCustomer}
+- Report Customer ID: ${selectedReportCustomer}
 
 Total Records: ${registerData.length}
 
@@ -126,15 +199,14 @@ Records:
 ${registerData.map((record, index) => `
 Record ${index + 1}:
 - ID: ${record.id}
-- Inward Date: ${record.inwarddate}
+- Inward Date: ${formatDateForDisplay(record.inwarddate)}
 - BRN: ${record.bookingrefno}
 - LRN: ${record.labreferenceno}
 - Customer: ${record.customername}
-- Total Amount: ${record.total}
+- Total Amount: ${record.total || '-'}
 `).join('\n')}
 `;
     
-    // Create and download file
     const blob = new Blob([exportContent], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -144,13 +216,6 @@ Record ${index + 1}:
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-  };
-
-  // Format date for display (YYYY-MM-DD to DD/MM/YYYY)
-  const formatDateForDisplay = (dateStr) => {
-    if (!dateStr || dateStr === '0000-00-00') return '-';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
   };
 
   if (showExport) {
@@ -206,86 +271,33 @@ Record ${index + 1}:
             <div className="grid grid-cols-2 gap-8">
               {/* Left Column */}
               <div className="space-y-4">
-                <div className="relative">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      placeholder="DD/MM/YYYY"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm pr-8"
-                      onClick={() => setShowStartCalendar(!showStartCalendar)}
-                      readOnly
-                    />
-                    <button
-                      onClick={() => setShowStartCalendar(!showStartCalendar)}
-                      className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                    >
-                      📅
-                    </button>
-                  </div>
-                  
-                  {/* Calendar Dropdown */}
-                  {showStartCalendar && (
-                    <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80">
-                      <div className="flex justify-between items-center mb-4">
-                        <select className="text-sm border border-gray-300 rounded px-2 py-1">
-                          <option>Sep</option>
-                        </select>
-                        <select className="text-sm border border-gray-300 rounded px-2 py-1">
-                          <option>2025</option>
-                        </select>
-                        <button
-                          onClick={() => setShowStartCalendar(false)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-                        <div className="font-medium text-gray-600">Su</div>
-                        <div className="font-medium text-gray-600">Mo</div>
-                        <div className="font-medium text-gray-600">Tu</div>
-                        <div className="font-medium text-gray-600">We</div>
-                        <div className="font-medium text-gray-600">Th</div>
-                        <div className="font-medium text-gray-600">Fr</div>
-                        <div className="font-medium text-gray-600">Sa</div>
-                      </div>
-                      
-                      <div className="grid grid-cols-7 gap-1">
-                        {generateCalendarDays().map((day) => (
-                          <button
-                            key={day}
-                            onClick={() => handleDateSelect(day, true)}
-                            className="w-8 h-8 text-xs hover:bg-blue-100 rounded flex items-center justify-center"
-                          >
-                            {day}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Customer</label>
                   <select
-                    value={startCustomer}
-                    onChange={(e) => setStartCustomer(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                    value={selectedCustomer}
+                    onChange={(e) => setSelectedCustomer(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     disabled={loadingCustomers}
                   >
                     <option value="">
-                      {loadingCustomers ? 'Loading customers...' : 'Select Customer'}
+                      {loadingCustomers ? 'Loading customers...' : errorMessage ? 'Error loading customers' : 'Select Customer'}
                     </option>
                     {customers.map((customer) => (
                       <option 
-                        key={customer.id} 
-                        value={`${customer.customername}(${customer.id})`}
+                        key={getCustomerId(customer)} 
+                        value={getCustomerId(customer)}
                       >
-                        {customer.customername} ({customer.id})
+                        {getCustomerDisplayName(customer)}
                       </option>
                     ))}
                   </select>
@@ -294,86 +306,33 @@ Record ${index + 1}:
 
               {/* Right Column */}
               <div className="space-y-4">
-                <div className="relative">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      placeholder="DD/MM/YYYY"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm pr-8"
-                      onClick={() => setShowEndCalendar(!showEndCalendar)}
-                      readOnly
-                    />
-                    <button
-                      onClick={() => setShowEndCalendar(!showEndCalendar)}
-                      className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                    >
-                      📅
-                    </button>
-                  </div>
-                  
-                  {/* Calendar Dropdown */}
-                  {showEndCalendar && (
-                    <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80">
-                      <div className="flex justify-between items-center mb-4">
-                        <select className="text-sm border border-gray-300 rounded px-2 py-1">
-                          <option>Sep</option>
-                        </select>
-                        <select className="text-sm border border-gray-300 rounded px-2 py-1">
-                          <option>2025</option>
-                        </select>
-                        <button
-                          onClick={() => setShowEndCalendar(false)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-                        <div className="font-medium text-gray-600">Su</div>
-                        <div className="font-medium text-gray-600">Mo</div>
-                        <div className="font-medium text-gray-600">Tu</div>
-                        <div className="font-medium text-gray-600">We</div>
-                        <div className="font-medium text-gray-600">Th</div>
-                        <div className="font-medium text-gray-600">Fr</div>
-                        <div className="font-medium text-gray-600">Sa</div>
-                      </div>
-                      
-                      <div className="grid grid-cols-7 gap-1">
-                        {generateCalendarDays().map((day) => (
-                          <button
-                            key={day}
-                            onClick={() => handleDateSelect(day, false)}
-                            className="w-8 h-8 text-xs hover:bg-blue-100 rounded flex items-center justify-center"
-                          >
-                            {day}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Customer</label>
                   <select
-                    value={endCustomer}
-                    onChange={(e) => setEndCustomer(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                    value={selectedReportCustomer}
+                    onChange={(e) => setSelectedReportCustomer(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     disabled={loadingCustomers}
                   >
                     <option value="">
-                      {loadingCustomers ? 'Loading customers...' : 'Select Customer'}
+                      {loadingCustomers ? 'Loading customers...' : errorMessage ? 'Error loading customers' : 'Select Customer'}
                     </option>
                     {customers.map((customer) => (
                       <option 
-                        key={customer.id} 
-                        value={`${customer.customername}(${customer.id})`}
+                        key={getCustomerId(customer)} 
+                        value={getCustomerId(customer)}
                       >
-                        {customer.customername} ({customer.id})
+                        {getCustomerDisplayName(customer)}
                       </option>
                     ))}
                   </select>
@@ -382,9 +341,9 @@ Record ${index + 1}:
             </div>
 
             {/* Error Message */}
-            {error && (
+            {errorMessage && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-                {error}
+                {errorMessage}
               </div>
             )}
 
@@ -392,7 +351,7 @@ Record ${index + 1}:
             <div className="flex space-x-3 mt-6">
               <Button
                 onClick={handleSearch}
-                disabled={loading}
+                disabled={loading || loadingCustomers}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm disabled:opacity-50"
               >
                 {loading ? 'Searching...' : 'Search'}
@@ -420,10 +379,10 @@ Record ${index + 1}:
                       alt="App Logo" 
                       className="h-16 w-auto mx-auto mb-2 bg-white p-2 rounded"
                     />
-                    <div className="text-white text-xs">
+                    <div className="text-gray-800 text-xs font-medium">
                       Quality through Research
                     </div>
-                    <div className="text-white text-xs">
+                    <div className="text-gray-700 text-xs">
                       Kaltech Test And Research Centre Pvt. Ltd.
                     </div>
                   </div>
@@ -471,27 +430,27 @@ Record ${index + 1}:
 
               {/* Horizontal Scrollable Table */}
               <div className="overflow-x-auto">
-                <table className="w-full min-w-max">
+                <table className="w-full min-w-max border-collapse">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Sr no</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Date</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">BRN</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">LRN</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Inward No</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Party name</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Contact Person</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Sample Details</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Id no</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Serial no</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Quantity</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Department</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Parameters</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Committed Date</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Reporting Date</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">TAT</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap">Remarks</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 whitespace-nowrap">Status</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Sr no</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Date</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">BRN</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">LRN</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Inward No</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Party name</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Contact Person</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Sample Details</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Id no</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Serial no</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Quantity</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Department</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Parameters</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Committed Date</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Reporting Date</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">TAT</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Remarks</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 border border-gray-300 whitespace-nowrap">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -511,25 +470,25 @@ Record ${index + 1}:
                       </tr>
                     ) : (
                       registerData.map((record, index) => (
-                        <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{index + 1}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{formatDateForDisplay(record.inwarddate)}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.bookingrefno}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.labreferenceno}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.id}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.customername}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.concernpersonname}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.instrumentlocation}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.id}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.department || '-'}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{formatDateForDisplay(record.deadline)}</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">-</td>
-                          <td className="px-3 py-2 text-xs border-r border-gray-200">{record.remark || '-'}</td>
-                          <td className="px-3 py-2 text-xs">
+                        <tr key={record.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-xs border border-gray-300">{index + 1}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{formatDateForDisplay(record.inwarddate)}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.bookingrefno || 'N.A'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.labreferenceno || 'N.A'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.id}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.customername || '-'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.concernpersonname || '-'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.instrumentlocation || '-'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">N.A</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">N.A</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">1</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.department || 'SITE CALIBRATION'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">-</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{formatDateForDisplay(record.deadline)}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{formatDateForDisplay(record.updated_on?.split(' ')[0]) || '-'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{calculateTAT(record.deadline, record.updated_on?.split(' ')[0])}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">{record.remark || '-'}</td>
+                          <td className="px-3 py-2 text-xs border border-gray-300">
                             <span className={`px-2 py-1 rounded text-xs ${
                               record.status === 4 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                             }`}>
@@ -541,6 +500,13 @@ Record ${index + 1}:
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Footer with total records */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  Total Records: <span className="font-medium">{registerData.length}</span>
+                </div>
               </div>
             </div>
           )}
