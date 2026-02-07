@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Select, Pagination, PaginationItems, PaginationNext, PaginationPrevious } from "components/ui";
 import axios from "utils/axios";
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable from 'jspdf-autotable'; // ✅ CORRECT IMPORT
 
 const Details = () => {
     const navigate = useNavigate();
@@ -31,7 +31,6 @@ const Details = () => {
             if (response.data && response.data.status) {
                 const { customer, addresses, calibration_details } = response.data.data;
                 
-                // ✅ Set customer details - Fixed address handling
                 const primaryAddress = addresses && addresses.length > 0 ? addresses[0] : null;
                 
                 setCustomerDetails({
@@ -51,10 +50,9 @@ const Details = () => {
                     panNo: customer.pan || 'N/A'
                 });
 
-                // ✅ Fixed field mapping to match actual API response
                 if (calibration_details && Array.isArray(calibration_details)) {
                     const mappedInstruments = calibration_details.map((item) => ({
-                        id: item.id, // ✅ calibration_details ki actual id
+                        id: item.id,
                         inwardId: item.inwardid || 'N/A',
                         lrn: item.lrn || 'N/A',
                         brn: item.bookingrefno || 'N/A',
@@ -84,124 +82,145 @@ const Details = () => {
         } finally {
             setLoading(false);
         }
-    }, [customerId]); // ✅ Added customerId as dependency
+    }, [customerId]);
 
-    // ✅ Fetch customer details from API
     useEffect(() => {
         if (customerId) {
             fetchCustomerDetails();
         }
-    }, [customerId, fetchCustomerDetails]); // ✅ Fixed dependency
+    }, [customerId, fetchCustomerDetails]);
 
-    const handleDownloadDispatchReport = (instrument) => {
+    const handleDownloadDispatchReport = async (instrument) => {
     setPrintLoading(true);
-    
+
     try {
-        // Create new PDF document
-        const doc = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+        // ✅ Fetch JSON data
+        const response = await axios.get(
+            `/calibrationprocess/get-attachment-data?id=${instrument.id}`
+        );
+
+        if (!response.data.status) {
+            alert('Failed to fetch dispatch data');
+            setPrintLoading(false);
+            return;
+        }
+
+        const data = response.data;
+
+        // ✅ Create PDF
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        let yPosition = 20;
         
-        // Add title
+        // ✅ Try to add footer image (optional, won't break if fails)
+        if (data.letterhead_footer) {
+            try {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                
+                await new Promise((resolve) => {  // ✅ Removed unused 'reject'
+                    img.onload = () => {
+                        try {
+                            doc.addImage(img, 'PNG', 10, 260, 190, 30);
+                        } catch (err) {
+                            console.warn('Image add failed:', err);
+                        }
+                        resolve();
+                    };
+                    img.onerror = () => resolve(); // Don't reject, just continue
+                    img.src = data.letterhead_footer;
+                    
+                    // Timeout after 3 seconds
+                    setTimeout(resolve, 3000);
+                });
+            } catch (err) {
+                console.warn('Could not load letterhead image:', err);
+            }
+        }
+
+        // ✅ Add company name
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        doc.text('Reminder for Periodic Calibration of your Equipment', 148, 20, { align: 'center' });
+        doc.setTextColor(0, 0, 128); // Navy blue
+        doc.text('Kailtech Test And Research Centre Pvt. Ltd.', 105, yPosition, { align: 'center' });
         
-        // Add customer name section
-        doc.setFontSize(12);
+        yPosition += 15;
+
+        // ✅ Add title
+        doc.setFontSize(14);
         doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Reminder for Periodic Calibration of your Equipment', 105, yPosition, { align: 'center' });
         
-        // Customer Name Header - ✅ Use autoTable directly
+        yPosition += 15;
+
+        // ✅ Add customer info
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Customer Name`, 15, yPosition);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${data.customer.name}`, 70, yPosition);
+        
+        yPosition += 10;
+
+        // ✅ Add table using autoTable - CORRECTED SYNTAX
         autoTable(doc, {
-            startY: 35,
-            head: [['Customer Name', customerDetails.customerName]],
-            headStyles: { 
+            startY: yPosition,
+            head: [['Inward\nId', 'LRN', 'BRN', 'Instrument\nName', 'Make', 'Model', 'Serial\nNo', 'ID No', 'Calibration\nDue Date']],
+            body: [[
+                data.instrument.inward_id || '',
+                data.instrument.lrn || '',
+                data.instrument.brn || '',
+                data.instrument.name || '',
+                data.instrument.make || '',
+                data.instrument.model || '',
+                data.instrument.serial_no || '',
+                data.instrument.id_no || '',
+                data.calibration.due_date || ''
+            ]],
+            styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                halign: 'center',
+                valign: 'middle'
+            },
+            headStyles: {
                 fillColor: [255, 255, 255],
                 textColor: [0, 0, 0],
                 fontStyle: 'bold',
+                lineWidth: 0.5,
+                lineColor: [0, 0, 0],
+                halign: 'center'
+            },
+            bodyStyles: {
                 lineWidth: 0.5,
                 lineColor: [0, 0, 0]
             },
-            theme: 'grid',
-            styles: { 
-                fontSize: 11,
-                cellPadding: 3,
-                halign: 'center'
-            },
             columnStyles: {
-                0: { cellWidth: 60, fontStyle: 'bold' },
-                1: { cellWidth: 237 }
-            }
+                0: { cellWidth: 15 },
+                1: { cellWidth: 25 },
+                2: { cellWidth: 28 },
+                3: { cellWidth: 25 },
+                4: { cellWidth: 20 },
+                5: { cellWidth: 20 },
+                6: { cellWidth: 20 },
+                7: { cellWidth: 22 },
+                8: { cellWidth: 20 }
+            },
+            margin: { left: 10, right: 10 },
+            theme: 'grid'
         });
-        
-        // Instrument details table
-        const tableData = [[
-            instrument.inwardId,
-            instrument.lrn,
-            instrument.brn,
-            instrument.instrumentName,
-            instrument.make,
-            instrument.model,
-            instrument.serialNo,
-            instrument.idNo,
-            instrument.dueDate
-        ]];
-        
-        // ✅ Use autoTable directly
-        autoTable(doc, {
-            startY: doc.lastAutoTable.finalY + 5,
-            head: [[
-                'Inward\nId',
-                'LRN',
-                'BRN',
-                'Instrument Name',
-                'Make',
-                'Model',
-                'Serail\nNo',
-                'ID No',
-                'Calibration Due\nDate'
-            ]],
-            body: tableData,
-            headStyles: { 
-                fillColor: [255, 255, 255],
-                textColor: [0, 0, 0],
-                fontStyle: 'bold',
-                halign: 'center',
-                valign: 'middle',
-                lineWidth: 0.5,
-                lineColor: [0, 0, 0],
-                fontSize: 10
-            },
-            bodyStyles: {
-                halign: 'center',
-                valign: 'middle',
-                lineWidth: 0.5,
-                lineColor: [0, 0, 0],
-                fontSize: 10
-            },
-            theme: 'grid',
-            styles: { 
-                cellPadding: 3,
-                overflow: 'linebreak'
-            },
-            columnStyles: {
-                0: { cellWidth: 20 },
-                1: { cellWidth: 35 },
-                2: { cellWidth: 40 },
-                3: { cellWidth: 35 },
-                4: { cellWidth: 25 },
-                5: { cellWidth: 25 },
-                6: { cellWidth: 25 },
-                7: { cellWidth: 35 },
-                8: { cellWidth: 35 }
-            }
-        });
-        
-        // Save the PDF
-        const fileName = `Dispatch_Report_${instrument.lrn}_${new Date().getTime()}.pdf`;
-        doc.save(fileName);
-        
+
+        // ✅ Save PDF
+        doc.save(`Calibration_Reminder_${data.instrument.lrn}.pdf`);
+
     } catch (error) {
-        console.error('Error generating PDF:', error);
-        alert('Error generating PDF. Please try again.');
+        console.error('Download failed:', error);
+        alert('Failed to generate dispatch report. Please try again.');
     } finally {
         setPrintLoading(false);
     }
@@ -295,7 +314,7 @@ const Details = () => {
         setCurrentPage(1);
     }, [searchTerm]);
 
-    // ✅ Loading UI
+    // Loading UI
     if (loading) {
         return (
             <div className="min-h-screen bg-white">
@@ -310,7 +329,7 @@ const Details = () => {
         );
     }
 
-    // ✅ Error UI - if no customer details
+    // Error UI
     if (!customerDetails) {
         return (
             <div className="min-h-screen bg-white">
@@ -350,7 +369,7 @@ const Details = () => {
                     </div>
                 </div>
 
-                {/* Customer Details Section - Single Column Layout */}
+                {/* Customer Details Section */}
                 <div className="bg-white shadow-sm border border-gray-200 rounded-lg mb-6">
                     <div className="overflow-hidden">
                         <table className="w-full text-sm">
@@ -410,7 +429,6 @@ const Details = () => {
 
                 {/* Instruments Table Section */}
                 <div className="bg-white shadow-sm border border-gray-200 rounded-lg">
-                    {/* Search and Info */}
                     <div className="p-4 border-b border-gray-200">
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-sm text-gray-600">
@@ -429,12 +447,11 @@ const Details = () => {
                         </div>
                     </div>
 
-                    {/* Table */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-gray-100">
-                                    <th>Id</th>
+                                    <th className="text-left p-3 font-medium text-gray-700 border border-gray-300">Id</th>
                                     <th 
                                         className="text-left p-3 font-medium text-gray-700 border border-gray-300 cursor-pointer hover:bg-gray-200"
                                         onClick={() => handleSort('inwardId')}
@@ -559,7 +576,7 @@ const Details = () => {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan="10" className="p-4 text-center text-gray-500">
+                                        <td colSpan="11" className="p-4 text-center text-gray-500">
                                             No instruments found
                                         </td>
                                     </tr>
@@ -568,10 +585,8 @@ const Details = () => {
                         </table>
                     </div>
 
-                    {/* Pagination Section */}
                     <div className="p-4 border-t border-gray-200">
                         <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
-                            {/* Show entries section */}
                             <div className="flex items-center space-x-2 text-sm text-gray-600">
                                 <span>Show</span>
                                 <Select
@@ -586,7 +601,6 @@ const Details = () => {
                                 <span>entries</span>
                             </div>
 
-                            {/* Pagination component */}
                             {totalPages > 0 && (
                                 <div>
                                     <Pagination
@@ -603,7 +617,6 @@ const Details = () => {
                                 </div>
                             )}
 
-                            {/* Entries info */}
                             <div className="truncate text-sm text-gray-600">
                                 {filteredData.length > 0 ? (
                                     `${startIndex + 1} - ${Math.min(startIndex + pageSize, filteredData.length)} of ${filteredData.length} entries`

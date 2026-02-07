@@ -1325,14 +1325,6 @@ const protectedRoutes = {
                     ).default,
                   }),
                 },
-                // {
-                //   path: "ulr-details",
-                //   lazy: async () => ({
-                //     Component: (
-                //       await import("app/pages/dashboards/calibration-process/ulr-list/UlrDetail")
-                //     ).default,
-                //   }),
-                // },
                 {
                   path: "lrn-Brn-Register",
                   lazy: async () => ({
@@ -1702,6 +1694,82 @@ const protectedRoutes = {
                   ],
                 },
               ],
+            },
+            // ==========================Testing==========================
+            {
+             path: "testing",
+             children: [
+                 {
+                  path: "products",
+                  children: [
+                    {
+                      path: "",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/products"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "create",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/products/AddProduct"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "edit/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/products/EditProduct"
+                          )
+                        ).default,
+                      }),
+                    },
+                  ],
+                },
+                  {
+                  path: "product-grades",
+                  children: [
+                    {
+                      path: "",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/product-grades"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "create",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/product-grades/AddProductGrade"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "edit/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/product-grades/EditProductGrade"
+                          )
+                        ).default,
+                      }),
+                    },
+                  ],
+                },
+             ],
             },
             {
               path: "people",
