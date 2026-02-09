@@ -45,7 +45,7 @@ export default function ProductsDatatableV1() {
   const fetchProducts = async () => {
   try {
     setLoading(true);
-    const response = await axios.get("/testing/get-prodcut-list");
+    const response = await axios.get("/testing/get-grades");
     
     console.log("API response:", response.data);
 

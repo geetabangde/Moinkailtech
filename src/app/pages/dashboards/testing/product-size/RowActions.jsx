@@ -39,7 +39,7 @@ export function RowActions({ row, table }) {
   
   const handleEdit = () => {
     const id = row.original.id;
-    navigate(`/dashboards/testing/product-grades/edit/${id}`);
+    navigate(`/dashboards/testing/product-size/edit/${id}`);
   };
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -63,7 +63,7 @@ export function RowActions({ row, table }) {
 
     try {
       // ✅ Use query parameter instead of path parameter
-      await axios.delete(`/testing/delete-grade?id=${id}`);
+      await axios.delete(`/testing/delete-size?id=${id}`);
       
       // Remove row from UI
       table.options.meta?.deleteRow(row);

@@ -62,34 +62,34 @@ export default function AddModes() {
       form.append("name", formData.name);
       form.append("description", formData.description);
 
-      await axios.post("/testing/add-grades", form); // token attached via interceptor
+      await axios.post("/testing/add-standards", form); 
 
-      toast.success("Grade created successfully ✅", {
+      toast.success("Standard created successfully ✅", {
         duration: 1000,
         icon: "✅",
       });
 
-      navigate("/dashboards/testing/product-grades");
+      navigate("/dashboards/testing/standards");
     } catch (err) {
-      console.error("Error creating grade:", err);
-      toast.error(err?.response?.data?.message || "Failed to create grade ❌");
+      console.error("Error creating standard:", err);
+      toast.error(err?.response?.data?.message || "Failed to create standard ❌");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Page title="Add Grades">
+    <Page title="Add Standards">
       <div className="p-6">
         {/* ✅ Header + Back Button */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Add Grades
+            Add Standards
           </h2>
           <Button
             variant="outline"
             className="text-white bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/dashboards/testing/product-grades")}
+            onClick={() => navigate("/dashboards/testing/standards")}
           >
             Back to List
           </Button>

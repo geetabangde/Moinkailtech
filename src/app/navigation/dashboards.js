@@ -390,11 +390,11 @@ export const generateDashboardsConfig = (labs = []) => {
           transKey: "nav.dashboards.product-grades",
         },
         {
-          id: "dashboards.product-sizes",
+          id: "dashboards.product-size",
           type: NAV_TYPE_ITEM,
-          path: path(ROOT_DASHBOARDS, "/testing/product-sizes"),
+          path: path(ROOT_DASHBOARDS, "/testing/product-size"),
           title: "Product Sizes",
-          transKey: "nav.dashboards.product-sizes",
+          transKey: "nav.dashboards.product-size",
         },
         {
           id: "dashboards.measurements",

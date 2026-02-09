@@ -27,10 +27,10 @@ import { useNavigate } from "react-router";
 const confirmMessages = {
   pending: {
     description:
-      "Are you sure you want to delete this product? Once deleted, it cannot be restored.",
+      "Are you sure you want to delete this test parameter? Once deleted, it cannot be restored.",
   },
   success: {
-    title: "Product Deleted",
+    title: "Test Parameter Deleted",
   },
 };
 
@@ -39,7 +39,7 @@ export function RowActions({ row, table }) {
   
   const handleEdit = () => {
     const id = row.original.id;
-    navigate(`/dashboards/testing/product-grades/edit/${id}`);
+    navigate(`/dashboards/testing/test-parameters/edit/${id}`);
   };
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -63,13 +63,13 @@ export function RowActions({ row, table }) {
 
     try {
       // ✅ Use query parameter instead of path parameter
-      await axios.delete(`/testing/delete-grade?id=${id}`);
+      await axios.delete(`/testing/delete-clauses?id=${id}`);
       
       // Remove row from UI
       table.options.meta?.deleteRow(row);
       
       setDeleteSuccess(true);
-      toast.success("Grade deleted successfully ✅", {
+      toast.success("Test Method deleted successfully ✅", {
         duration: 1000,
         icon: "🗑️",
       });

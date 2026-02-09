@@ -45,7 +45,7 @@ export default function ProductsDatatableV1() {
   const fetchProducts = async () => {
   try {
     setLoading(true);
-    const response = await axios.get("/testing/get-prodcut-list");
+    const response = await axios.get("/testing/get-perameter-list");
     
     console.log("API response:", response.data);
 
@@ -128,7 +128,7 @@ export default function ProductsDatatableV1() {
         setProducts((old) => old.filter((row) => !rowIds.includes(row.id)));
       },
       setTableSettings,
-      refreshData: fetchProducts, 
+      refreshData: fetchProducts, // ✅ Add refresh function
     },
     filterFns: {
       fuzzy: fuzzyFilter,

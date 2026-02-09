@@ -18,7 +18,7 @@ export default function EditModes() {
     const fetchModes = async () => {
       try {
         setFetchLoading(true);
-        const response = await axios.get(`/testing/get-grade-byid/${id}`);
+        const response = await axios.get(`/testing/get-methods-byid/${id}`);
         const result = response.data;
 
         if (result.status === "true" && result.data) {
@@ -59,7 +59,7 @@ export default function EditModes() {
     const newErrors = {};
     
     if (!mode.modeName.trim()) {
-      newErrors.modeName = "Grade name is required";
+      newErrors.modeName = "Standard name is required";
     }
     
     if (!mode.description.trim()) {
@@ -88,22 +88,22 @@ export default function EditModes() {
       };
 
       const response = await axios.post(
-        "/testing/update-grade",
+        "/testing/update-methods",
         payload
       );
 
       const result = response.data;
 
       if (result.status === "true") {
-        toast.success(result.message || "Grade updated successfully ✅", {
+        toast.success(result.message || "Standard updated successfully ✅", {
           duration: 1000,
         });
 
         setTimeout(() => {
-          navigate("/dashboards/testing/product-grades");
+          navigate("/dashboards/testing/test-methods");
         }, 1000);
       } else {
-        toast.error(result.message || "Failed to update grade ❌");
+        toast.error(result.message || "Failed to update test method ❌");
       }
     } catch (err) {
       console.error("Update error:", err);
@@ -119,14 +119,14 @@ export default function EditModes() {
 
   if (fetchLoading) {
     return (
-      <Page title="Edit Mode">
+      <Page title="Edit Standard">
         <div className="p-6 flex items-center justify-center">
           <div className="text-center">
             <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
             </svg>
-            <p className="text-gray-600">Loading grade data...</p>
+            <p className="text-gray-600">Loading standard data...</p>
           </div>
         </div>
       </Page>
@@ -134,18 +134,18 @@ export default function EditModes() {
   }
 
   return (
-    <Page title="Edit Mode">
+    <Page title="Edit Standard">
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Edit Grades
+            Edit Test Method
           </h2>
           <Button
             variant="outline"
             className="text-white bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/dashboards/testing/product-grades")}
+            onClick={() => navigate("/dashboards/testing/test-methods")}
           >
-            Back to Grades
+            Back to Test Methods
           </Button>
         </div>
 
@@ -195,7 +195,7 @@ export default function EditModes() {
                 Updating...
               </div>
             ) : (
-              "Update Grade"
+              "Update "
             )}
           </Button>
         </form>

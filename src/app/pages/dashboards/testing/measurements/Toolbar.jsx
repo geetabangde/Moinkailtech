@@ -33,18 +33,18 @@ export function Toolbar({ table }) {
           {/* Heading */}
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-wide text-gray-800 dark:text-dark-50">
-              Grades List
+               Measurement List
             </h2>
           </div>
 
           {/* Button */}
           <div>
             <Button
-              onClick={() => navigate("/dashboards/testing/product-grades/create")}
+              onClick={() => navigate("/dashboards/testing/measurements/create")}
               className="h-9 rounded-md px-4 text-sm font-medium"
               color="primary"
             >
-              + Add New Grade
+              + Add New Measurement
             </Button>
           </div>
         </div>

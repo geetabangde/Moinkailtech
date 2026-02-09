@@ -9,7 +9,7 @@ import {
 import {
   EllipsisHorizontalIcon,
   PencilIcon,
-  TrashIcon,
+  
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { Fragment, useCallback, useState } from "react";
@@ -39,7 +39,7 @@ export function RowActions({ row, table }) {
   
   const handleEdit = () => {
     const id = row.original.id;
-    navigate(`/dashboards/testing/product-grades/edit/${id}`);
+    navigate(`/dashboards/testing/test-permissible-values/edit/${id}`);
   };
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -51,11 +51,11 @@ export function RowActions({ row, table }) {
     setDeleteModalOpen(false);
   };
 
-  const openModal = () => {
-    setDeleteModalOpen(true);
-    setDeleteError(false);
-    setDeleteSuccess(false);
-  };
+  // const openModal = () => {
+  //   setDeleteModalOpen(true);
+  //   setDeleteError(false);
+  //   setDeleteSuccess(false);
+  // };
 
   const handleDeleteRows = useCallback(async () => {
     const id = row.original.id;
@@ -63,7 +63,7 @@ export function RowActions({ row, table }) {
 
     try {
       // ✅ Use query parameter instead of path parameter
-      await axios.delete(`/testing/delete-grade?id=${id}`);
+      await axios.delete(`/testing/delete-size?id=${id}`);
       
       // Remove row from UI
       table.options.meta?.deleteRow(row);
@@ -133,7 +133,7 @@ export function RowActions({ row, table }) {
                   </button>
                 )}
               </MenuItem>
-              <MenuItem>
+              {/* <MenuItem>
                 {({ focus }) => (
                   <button
                     onClick={openModal}
@@ -146,7 +146,7 @@ export function RowActions({ row, table }) {
                     <span>Delete</span>
                   </button>
                 )}
-              </MenuItem>
+              </MenuItem> */}
             </MenuItems>
           </Transition>
         </Menu>

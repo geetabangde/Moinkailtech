@@ -62,34 +62,34 @@ export default function AddModes() {
       form.append("name", formData.name);
       form.append("description", formData.description);
 
-      await axios.post("/testing/add-grades", form); // token attached via interceptor
+      await axios.post("/testing/add-methods", form); 
 
-      toast.success("Grade created successfully ✅", {
+      toast.success("Test method created successfully ✅", {
         duration: 1000,
         icon: "✅",
       });
 
-      navigate("/dashboards/testing/product-grades");
+      navigate("/dashboards/testing/test-methods");
     } catch (err) {
-      console.error("Error creating grade:", err);
-      toast.error(err?.response?.data?.message || "Failed to create grade ❌");
+      console.error("Error creating test method:", err);
+      toast.error(err?.response?.data?.message || "Failed to create test method ❌");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Page title="Add Grades">
+    <Page title="Add Test Methods">
       <div className="p-6">
         {/* ✅ Header + Back Button */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Add Grades
+            Add Test Methods
           </h2>
           <Button
             variant="outline"
             className="text-white bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/dashboards/testing/product-grades")}
+            onClick={() => navigate("/dashboards/testing/test-methods")}
           >
             Back to List
           </Button>

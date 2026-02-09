@@ -18,7 +18,7 @@ export default function EditModes() {
     const fetchModes = async () => {
       try {
         setFetchLoading(true);
-        const response = await axios.get(`/testing/get-grade-byid/${id}`);
+        const response = await axios.get(`/testing/get-size-byid/${id}`);
         const result = response.data;
 
         if (result.status === "true" && result.data) {
@@ -27,9 +27,9 @@ export default function EditModes() {
             description: result.data.description || "",
           });
         } else {
-          toast.error(result.message || "Failed to load mode data.");
+          toast.error(result.message || "Failed to load size data.");
           // Optionally navigate back if data doesn't exist
-          // navigate("/dashboards/testing/product-grades");
+          // navigate("/dashboards/testing/product-size");
         }
       } catch (err) {
         console.error("Fetch error:", err);
@@ -59,7 +59,7 @@ export default function EditModes() {
     const newErrors = {};
     
     if (!mode.modeName.trim()) {
-      newErrors.modeName = "Grade name is required";
+      newErrors.modeName = "Size name is required";
     }
     
     if (!mode.description.trim()) {
@@ -88,22 +88,22 @@ export default function EditModes() {
       };
 
       const response = await axios.post(
-        "/testing/update-grade",
+        "/testing/update-size",
         payload
       );
 
       const result = response.data;
 
       if (result.status === "true") {
-        toast.success(result.message || "Grade updated successfully ✅", {
+        toast.success(result.message || "Size updated successfully ✅", {
           duration: 1000,
         });
 
         setTimeout(() => {
-          navigate("/dashboards/testing/product-grades");
+          navigate("/dashboards/testing/product-size");
         }, 1000);
       } else {
-        toast.error(result.message || "Failed to update grade ❌");
+        toast.error(result.message || "Failed to update size ❌");
       }
     } catch (err) {
       console.error("Update error:", err);
@@ -134,16 +134,16 @@ export default function EditModes() {
   }
 
   return (
-    <Page title="Edit Mode">
+    <Page title="Edit Size">
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Edit Grades
+            Edit Sizes
           </h2>
           <Button
             variant="outline"
             className="text-white bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/dashboards/testing/product-grades")}
+            onClick={() => navigate("/dashboards/testing/product-size")}
           >
             Back to Grades
           </Button>
