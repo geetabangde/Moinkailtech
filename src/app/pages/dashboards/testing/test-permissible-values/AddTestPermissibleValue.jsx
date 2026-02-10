@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
-import { Button, Input, Select } from "components/ui";
+import { useState, useEffect, useCallback } from "react";
+import { Button, Input } from "components/ui";
 import { Page } from "components/shared/Page";
 import axios from "utils/axios";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ export default function AddTestPermissibleValue() {
     updated_by: 31
   });
 
-  // Dropdown data states - initialize as empty arrays
+  // Dropdown data states
   const [products, setProducts] = useState([]);
   const [grades, setGrades] = useState([]);
   const [sizes, setSizes] = useState([]);
@@ -51,61 +51,188 @@ export default function AddTestPermissibleValue() {
   // Error states
   const [errors, setErrors] = useState({});
 
-  // Helper function to extract array from API response
+  // ✅ IMPROVED: Better response extraction matching PHP logic
   const extractArrayFromResponse = (responseData) => {
-    console.log("Raw response data:", responseData);
+    console.log("🔍 Raw API Response:", responseData);
     
-    // First check if response has the standard {status, message, data} structure
+    // Handle different response structures
     if (responseData && typeof responseData === 'object') {
-      // Check for data property first (your API structure)
-      if (responseData.data && Array.isArray(responseData.data)) {
-        console.log("Extracted from .data:", responseData.data);
-        return responseData.data;
+      // Check for data property (most common)
+      if (responseData.data) {
+        if (Array.isArray(responseData.data)) {
+          console.log("✅ Found array in .data:", responseData.data.length, "items");
+          // Log first item structure for debugging
+          if (responseData.data.length > 0) {
+            console.log("   First item structure:", Object.keys(responseData.data[0]));
+          }
+          return responseData.data;
+        }
+        // Sometimes data is wrapped again
+        if (responseData.data.data && Array.isArray(responseData.data.data)) {
+          console.log("✅ Found array in .data.data:", responseData.data.data.length, "items");
+          if (responseData.data.data.length > 0) {
+            console.log("   First item structure:", Object.keys(responseData.data.data[0]));
+          }
+          return responseData.data.data;
+        }
       }
       
       // Check for items property
       if (Array.isArray(responseData.items)) {
-        console.log("Extracted from .items:", responseData.items);
+        console.log("✅ Found array in .items:", responseData.items.length, "items");
+        if (responseData.items.length > 0) {
+          console.log("   First item structure:", Object.keys(responseData.items[0]));
+        }
         return responseData.items;
       }
       
       // Check for results property
       if (Array.isArray(responseData.results)) {
-        console.log("Extracted from .results:", responseData.results);
+        console.log("✅ Found array in .results:", responseData.results.length, "items");
+        if (responseData.results.length > 0) {
+          console.log("   First item structure:", Object.keys(responseData.results[0]));
+        }
         return responseData.results;
       }
     }
     
-    // If responseData is already an array, return it
+    // If already an array
     if (Array.isArray(responseData)) {
-      console.log("Already an array:", responseData);
+      console.log("✅ Already an array:", responseData.length, "items");
+      if (responseData.length > 0) {
+        console.log("   First item structure:", Object.keys(responseData[0]));
+      }
       return responseData;
     }
     
-    // Return empty array if no valid data found
-    console.warn("Could not extract array from response:", responseData);
+    console.warn("⚠️ Could not extract array, returning empty array");
     return [];
   };
 
-  // Fetch all dropdown data on component mount
-  useEffect(() => {
-    fetchDropdownData();
-  }, []);
+  // ✅ FIXED: Generate options matching PHP logic (status=1 filter)
+  const generateOptions = (dataArray, fieldName = 'unknown') => {
+    console.log(`📋 Generating options for ${fieldName}:`, dataArray?.length || 0, "items");
+    
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+      console.warn(`⚠️ ${fieldName}: No data available`);
+      return [];
+    }
+    
+    // PHP uses: status=1 filter
+    // Filter only active items (status === 1 or status === "1")
+    const options = dataArray
+      .filter(item => {
+        // Skip if no item
+        if (!item || typeof item !== 'object') return false;
+        
+        // If no status field, include the item (default behavior)
+        if (!Object.prototype.hasOwnProperty.call(item, 'status')) {
+          return true;
+        }
+        
+        // ✅ FIXED: Match PHP logic - status=1 for active
+        const status = item.status;
+        const isActive = status === 1 || 
+                        status === '1' || 
+                        status === true ||
+                        status === 'true' ||
+                        status === 99 ||  // Keep this as fallback
+                        status === '99';
+        
+        if (!isActive) {
+          console.log(`⏭️ Skipping inactive (status=${status}):`, item.name || item.id);
+        }
+        
+        return isActive;
+      })
+      .map(item => {
+        // ✅ FIXED: Match PHP structure for value/label extraction with multiple fallbacks
+        // PHP shows: name(description) for products, sizes, parameters
+        // PHP shows: just name for others
+        
+        const id = item.id || item.ID || item.Id || item.value;
+        
+        // 🔧 CRITICAL FIX: Multiple fallbacks for name field
+        // Try different possible field names in order of priority
+        let name = item.name || 
+                   item.Name || 
+                   item.method_name ||  // Fallback for methods
+                   item.parameter_name ||  // Fallback for parameters
+                   item.grade_name ||  // Fallback for grades
+                   item.label || 
+                   item.title ||
+                   item.text ||
+                   '';
+        
+        // If still empty, try using description as name
+        if (!name && item.description) {
+          name = item.description;
+        }
+        
+        // If still empty, use the ID as fallback (better than empty)
+        if (!name && id) {
+          name = `Item ${id}`;
+          console.warn(`⚠️ No name found for ${fieldName} item ${id}, using ID as fallback`);
+        }
+        
+        // Add description in parentheses if available (like PHP does)
+        // But only if name and description are different
+        if (item.description && 
+            item.description.trim() !== '' && 
+            item.description !== name &&  // Don't duplicate if description was used as name
+            fieldName !== 'grades' && 
+            fieldName !== 'standards' && 
+            fieldName !== 'methods' && 
+            fieldName !== 'clauses') {
+          name = `${name} (${item.description})`;
+        }
+        
+        // Ensure we return proper string values
+        const value = id !== undefined && id !== null ? String(id) : '';
+        const label = name ? String(name).trim() : '';
+        
+        // Log problematic items for debugging
+        if (!label && value) {
+          console.warn(`⚠️ Item with ID ${value} in ${fieldName} has no label. Raw item:`, item);
+        }
+        
+        return { value, label };
+      })
+      .filter(option => {
+        // Remove invalid options with better validation
+        const hasValidValue = option.value && 
+                             option.value !== '' &&
+                             option.value !== 'undefined' && 
+                             option.value !== 'null';
+        
+        const hasValidLabel = option.label && 
+                             option.label !== '' &&
+                             option.label !== 'undefined' &&
+                             option.label !== 'null';
+        
+        const isValid = hasValidValue && hasValidLabel;
+        
+        if (!isValid) {
+          console.warn(`⚠️ Filtering invalid option for ${fieldName}:`, 
+            JSON.stringify({ value: option.value, label: option.label }));
+        }
+        
+        return isValid;
+      });
+    
+    console.log(`✅ Generated ${options.length} valid options for ${fieldName}`);
+    if (options.length > 0) {
+      console.log(`   First option:`, options[0]);
+      console.log(`   Sample options (first 3):`, options.slice(0, 3));
+    }
+    
+    return options;
+  };
 
-  // Debug: Log dropdown data when it changes
-  useEffect(() => {
-    console.log("Dropdown Data Status:", {
-      products: products.length,
-      grades: grades.length,
-      sizes: sizes.length,
-      standards: standards.length,
-      parameters: parameters.length,
-      methods: methods.length,
-      clauses: clauses.length
-    });
-  }, [products, grades, sizes, standards, parameters, methods, clauses]);
-
-  const fetchDropdownData = async () => {
+  // ✅ IMPROVED: Fetch dropdown data with better error handling
+  const fetchDropdownData = useCallback(async () => {
+    console.log("🔄 Starting to fetch all dropdown data...");
+    
     try {
       // Fetch all data in parallel
       const [
@@ -126,28 +253,27 @@ export default function AddTestPermissibleValue() {
         axios.get("/testing/get-clauses")
       ]);
 
-      // Process each response with error handling
+      // Process each response
       const processResponse = (response, setter, name) => {
         setDropdownLoading(prev => ({ ...prev, [name.toLowerCase()]: true }));
         
         if (response.status === 'fulfilled') {
-          console.log(`${name} raw response:`, response.value);
-          console.log(`${name} response data:`, response.value.data);
+          console.log(`\n📦 ${name} Response:`, response.value);
           
-          const data = extractArrayFromResponse(response.value.data);
-          console.log(`${name} extracted data (${data.length} items):`, data);
+          const extractedData = extractArrayFromResponse(response.value.data);
+          console.log(`   Extracted ${extractedData.length} items`);
           
-          // Only set data if it's a valid array with items
-          if (Array.isArray(data) && data.length > 0) {
-            setter(data);
-            console.log(`${name} set successfully with ${data.length} items`);
+          if (extractedData.length > 0) {
+            setter(extractedData);
+            console.log(`✅ ${name} loaded successfully`);
           } else {
-            console.warn(`${name} has no valid data`);
+            console.warn(`⚠️ ${name}: No data found in response`);
             setter([]);
           }
         } else {
-          console.error(`${name} API Error:`, response.reason);
+          console.error(`❌ ${name} failed:`, response.reason);
           setter([]);
+          toast.error(`Failed to load ${name}`);
         }
         
         setDropdownLoading(prev => ({ ...prev, [name.toLowerCase()]: false }));
@@ -161,11 +287,13 @@ export default function AddTestPermissibleValue() {
       processResponse(methodsRes, setMethods, 'Methods');
       processResponse(clausesRes, setClauses, 'Clauses');
 
+      console.log("\n✅ All dropdown data fetch completed");
+
     } catch (error) {
-      console.error("Error fetching dropdown data:", error);
+      console.error("❌ Critical error fetching dropdown data:", error);
       toast.error("Failed to load form data");
       
-      // Reset all to empty arrays on error
+      // Reset all to empty arrays
       setProducts([]);
       setGrades([]);
       setSizes([]);
@@ -174,7 +302,7 @@ export default function AddTestPermissibleValue() {
       setMethods([]);
       setClauses([]);
       
-      // Set all loading states to false
+      // Set all loading to false
       setDropdownLoading({
         products: false,
         grades: false,
@@ -185,105 +313,51 @@ export default function AddTestPermissibleValue() {
         clauses: false
       });
     }
-  };
+  }, []);
 
-  // Safe options generation function
-  const generateOptions = (dataArray, fieldName = 'unknown') => {
-    console.log(`Generating options for ${fieldName}:`, dataArray);
-    
-    if (!Array.isArray(dataArray)) {
-      console.error(`${fieldName} data is not an array:`, dataArray);
-      return [];
-    }
-    
-    if (dataArray.length === 0) {
-      console.warn(`${fieldName} array is empty`);
-      return [];
-    }
-    
-    // Filter only active items (status = 1) and create options
-    const options = dataArray
-      .filter(item => {
-        // Check if item has status field and it's 1
-        const isActive = item.status === 1 || item.status === '1';
-        if (!isActive) {
-          console.log(`Filtering out inactive item:`, item);
-        }
-        return isActive;
-      })
-      .map(item => {
-        // Handle different response structures
-        const value = item.id || item.value || item.ID || item.Id;
-        const label = item.name || item.label || item.Name || item.text || String(value);
-        
-        return { 
-          value: String(value), // Convert to string for consistency
-          label: String(label).trim() // Trim whitespace
-        };
-      })
-      .filter(option => {
-        // Filter out invalid options
-        const isValid = option.value && 
-                       option.label && 
-                       option.value !== 'undefined' && 
-                       option.label !== 'undefined';
-        if (!isValid) {
-          console.warn(`Filtering out invalid option:`, option);
-        }
-        return isValid;
-      });
-    
-    console.log(`Generated ${options.length} options for ${fieldName}:`, options.slice(0, 5)); // Log first 5
-    return options;
-  };
+  // Fetch on mount
+  useEffect(() => {
+    fetchDropdownData();
+  }, [fetchDropdownData]);
+
+  // Debug log
+  useEffect(() => {
+    console.log("\n📊 Current Dropdown Status:", {
+      products: `${products.length} items`,
+      grades: `${grades.length} items`,
+      sizes: `${sizes.length} items`,
+      standards: `${standards.length} items`,
+      parameters: `${parameters.length} items`,
+      methods: `${methods.length} items`,
+      clauses: `${clauses.length} items`
+    });
+  }, [products, grades, sizes, standards, parameters, methods, clauses]);
 
   // Handle form field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    console.log(`Field changed: ${name} = ${value}`);
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // Clear error when user starts typing
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ""
-      }));
+      setErrors(prev => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Handle array field changes (parameters, methods, clauses)
+  // Handle array field changes
   const handleArrayChange = (index, field, value) => {
-    console.log(`Array field changed: ${field}[${index}] = ${value}`);
-    
     setFormData(prev => {
       const updatedArray = [...prev[field]];
       updatedArray[index] = value;
-      
-      return {
-        ...prev,
-        [field]: updatedArray
-      };
+      return { ...prev, [field]: updatedArray };
     });
   };
 
   // Handle min/max value changes
   const handleParameterValueChange = (index, type, value) => {
     const field = type === 'min' ? 'pvaluemin' : 'pvaluemax';
-    
     setFormData(prev => {
       const updatedArray = [...prev[field]];
       updatedArray[index] = value;
-      
-      return {
-        ...prev,
-        [field]: updatedArray
-      };
+      return { ...prev, [field]: updatedArray };
     });
   };
 
@@ -292,20 +366,15 @@ export default function AddTestPermissibleValue() {
     setFormData(prev => {
       const updatedArray = [...prev.specification];
       updatedArray[index] = value;
-      
-      return {
-        ...prev,
-        specification: updatedArray
-      };
+      return { ...prev, specification: updatedArray };
     });
   };
 
-  // Add new parameter row
+  // Add parameter row
   const addParameterRow = () => {
     const newId = parameterInputs.length + 1;
     setParameterInputs(prev => [...prev, { id: newId }]);
     
-    // Initialize arrays with empty values for new row
     setFormData(prev => ({
       ...prev,
       parameter: [...prev.parameter, ""],
@@ -326,7 +395,6 @@ export default function AddTestPermissibleValue() {
 
     setParameterInputs(prev => prev.filter((_, i) => i !== index));
     
-    // Remove corresponding data from all arrays
     setFormData(prev => {
       const newFormData = { ...prev };
       ['parameter', 'method', 'clause', 'pvaluemin', 'pvaluemax', 'specification'].forEach(key => {
@@ -340,7 +408,6 @@ export default function AddTestPermissibleValue() {
   const validateForm = () => {
     const newErrors = {};
     
-    // Required single fields
     const requiredFields = ['product', 'grade', 'size', 'standard'];
     requiredFields.forEach(field => {
       if (!formData[field]) {
@@ -348,7 +415,6 @@ export default function AddTestPermissibleValue() {
       }
     });
 
-    // Validate parameter arrays
     formData.parameter.forEach((param, index) => {
       if (!param) {
         newErrors[`parameter_${index}`] = "Parameter is required";
@@ -361,7 +427,6 @@ export default function AddTestPermissibleValue() {
       }
     });
 
-    // Validate min/max values
     formData.pvaluemin.forEach((min, index) => {
       const max = formData.pvaluemax[index];
       if (min && max && parseFloat(min) > parseFloat(max)) {
@@ -385,13 +450,10 @@ export default function AddTestPermissibleValue() {
     setLoading(true);
 
     try {
-      // Prepare data as FormData (similar to PHP's $_POST)
       const formDataToSend = new FormData();
       
-      // Append all fields
       Object.keys(formData).forEach(key => {
         if (Array.isArray(formData[key])) {
-          // For arrays, append each value with same key (PHP will receive as array)
           formData[key].forEach(value => {
             formDataToSend.append(`${key}[]`, value);
           });
@@ -406,7 +468,6 @@ export default function AddTestPermissibleValue() {
         duration: 2000,
       });
 
-      // Navigate back after success
       setTimeout(() => {
         navigate("/dashboards/testing/test-permissible-values");
       }, 1500);
@@ -425,7 +486,7 @@ export default function AddTestPermissibleValue() {
   return (
     <Page title="Add Test Permissible Value">
       <div className="p-6">
-        {/* Header + Back Button */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             Add Test Permissible Value
@@ -441,97 +502,149 @@ export default function AddTestPermissibleValue() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          {/* Basic Information Section */}
+          {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Product */}
             <div>
-              <Select
-                label="Product"
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Product <span className="text-red-500">*</span>
+              </label>
+              <select
                 name="product"
                 value={formData.product}
                 onChange={handleChange}
-                options={generateOptions(products, 'products')}
-                placeholder={dropdownLoading.products ? "Loading..." : "Select Product"}
                 disabled={dropdownLoading.products}
-                required
-              />
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-blue-500
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {dropdownLoading.products ? "Loading..." : "Select Product"}
+                </option>
+                {generateOptions(products, 'products').map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               {errors.product && (
                 <p className="text-red-500 text-sm mt-1">{errors.product}</p>
               )}
-              {!dropdownLoading.products && products.length === 0 && (
-                <p className="text-yellow-500 text-sm mt-1">No products available</p>
-              )}
-              {!dropdownLoading.products && products.length > 0 && (
-                <p className="text-green-500 text-sm mt-1">{products.length} products loaded</p>
+              {!dropdownLoading.products && (
+                <p className={`text-xs mt-1 ${products.length > 0 ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {products.length > 0 
+                    ? `${generateOptions(products, 'products').length} products available ✓` 
+                    : 'No products available'}
+                </p>
               )}
             </div>
 
             {/* Grade */}
             <div>
-              <Select
-                label="Grade"
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Grade <span className="text-red-500">*</span>
+              </label>
+              <select
                 name="grade"
                 value={formData.grade}
                 onChange={handleChange}
-                options={generateOptions(grades, 'grades')}
-                placeholder={dropdownLoading.grades ? "Loading..." : "Select Grade"}
                 disabled={dropdownLoading.grades}
-                required
-              />
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-blue-500
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {dropdownLoading.grades ? "Loading..." : "Select Grade"}
+                </option>
+                {generateOptions(grades, 'grades').map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               {errors.grade && (
                 <p className="text-red-500 text-sm mt-1">{errors.grade}</p>
               )}
-              {!dropdownLoading.grades && grades.length === 0 && (
-                <p className="text-yellow-500 text-sm mt-1">No grades available</p>
-              )}
-              {!dropdownLoading.grades && grades.length > 0 && (
-                <p className="text-green-500 text-sm mt-1">{grades.length} grades loaded</p>
+              {!dropdownLoading.grades && (
+                <p className={`text-xs mt-1 ${grades.length > 0 ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {grades.length > 0 
+                    ? `${generateOptions(grades, 'grades').length} grades available ✓` 
+                    : 'No grades available'}
+                </p>
               )}
             </div>
 
             {/* Size */}
             <div>
-              <Select
-                label="Size"
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Size <span className="text-red-500">*</span>
+              </label>
+              <select
                 name="size"
                 value={formData.size}
                 onChange={handleChange}
-                options={generateOptions(sizes, 'sizes')}
-                placeholder={dropdownLoading.sizes ? "Loading..." : "Select Size"}
                 disabled={dropdownLoading.sizes}
-                required
-              />
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-blue-500
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {dropdownLoading.sizes ? "Loading..." : "Select Size"}
+                </option>
+                {generateOptions(sizes, 'sizes').map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               {errors.size && (
                 <p className="text-red-500 text-sm mt-1">{errors.size}</p>
               )}
-              {!dropdownLoading.sizes && sizes.length === 0 && (
-                <p className="text-yellow-500 text-sm mt-1">No sizes available</p>
-              )}
-              {!dropdownLoading.sizes && sizes.length > 0 && (
-                <p className="text-green-500 text-sm mt-1">{sizes.length} sizes loaded</p>
+              {!dropdownLoading.sizes && (
+                <p className={`text-xs mt-1 ${sizes.length > 0 ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {sizes.length > 0 
+                    ? `${generateOptions(sizes, 'sizes').length} sizes available ✓` 
+                    : 'No sizes available'}
+                </p>
               )}
             </div>
 
             {/* Standard */}
             <div>
-              <Select
-                label="Standard"
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Standard <span className="text-red-500">*</span>
+              </label>
+              <select
                 name="standard"
                 value={formData.standard}
                 onChange={handleChange}
-                options={generateOptions(standards, 'standards')}
-                placeholder={dropdownLoading.standards ? "Loading..." : "Select Standard"}
                 disabled={dropdownLoading.standards}
-                required
-              />
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-blue-500
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {dropdownLoading.standards ? "Loading..." : "Select Standard"}
+                </option>
+                {generateOptions(standards, 'standards').map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               {errors.standard && (
                 <p className="text-red-500 text-sm mt-1">{errors.standard}</p>
               )}
-              {!dropdownLoading.standards && standards.length === 0 && (
-                <p className="text-yellow-500 text-sm mt-1">No standards available</p>
-              )}
-              {!dropdownLoading.standards && standards.length > 0 && (
-                <p className="text-green-500 text-sm mt-1">{standards.length} standards loaded</p>
+              {!dropdownLoading.standards && (
+                <p className={`text-xs mt-1 ${standards.length > 0 ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {standards.length > 0 
+                    ? `${generateOptions(standards, 'standards').length} standards available ✓` 
+                    : 'No standards available'}
+                </p>
               )}
             </div>
           </div>
@@ -575,44 +688,83 @@ export default function AddTestPermissibleValue() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Parameter */}
                   <div>
-                    <Select
-                      label="Parameter"
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Parameter <span className="text-red-500">*</span>
+                    </label>
+                    <select
                       value={formData.parameter[index] || ""}
                       onChange={(e) => handleArrayChange(index, 'parameter', e.target.value)}
-                      options={generateOptions(parameters, 'parameters')}
-                      placeholder={dropdownLoading.parameters ? "Loading..." : "Select Parameter"}
                       disabled={dropdownLoading.parameters}
-                    />
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                               focus:outline-none focus:ring-2 focus:ring-blue-500
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {dropdownLoading.parameters ? "Loading..." : "Select Parameter"}
+                      </option>
+                      {generateOptions(parameters, 'parameters').map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                     {errors[`parameter_${index}`] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[`parameter_${index}`]}</p>
+                      <p className="text-red-500 text-xs mt-1">{errors[`parameter_${index}`]}</p>
                     )}
                   </div>
 
                   {/* Method */}
                   <div>
-                    <Select
-                      label="Method"
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Method <span className="text-red-500">*</span>
+                    </label>
+                    <select
                       value={formData.method[index] || ""}
                       onChange={(e) => handleArrayChange(index, 'method', e.target.value)}
-                      options={generateOptions(methods, 'methods')}
-                      placeholder={dropdownLoading.methods ? "Loading..." : "Select Method"}
                       disabled={dropdownLoading.methods}
-                    />
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                               focus:outline-none focus:ring-2 focus:ring-blue-500
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {dropdownLoading.methods ? "Loading..." : "Select Method"}
+                      </option>
+                      {generateOptions(methods, 'methods').map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                     {errors[`method_${index}`] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[`method_${index}`]}</p>
+                      <p className="text-red-500 text-xs mt-1">{errors[`method_${index}`]}</p>
                     )}
                   </div>
 
                   {/* Clause */}
                   <div>
-                    <Select
-                      label="Clause"
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Clause
+                    </label>
+                    <select
                       value={formData.clause[index] || ""}
                       onChange={(e) => handleArrayChange(index, 'clause', e.target.value)}
-                      options={generateOptions(clauses, 'clauses')}
-                      placeholder={dropdownLoading.clauses ? "Loading..." : "Select Clause"}
                       disabled={dropdownLoading.clauses}
-                    />
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 
+                               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                               focus:outline-none focus:ring-2 focus:ring-blue-500
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {dropdownLoading.clauses ? "Loading..." : "Select Clause"}
+                      </option>
+                      {generateOptions(clauses, 'clauses').map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Min Value */}
@@ -657,7 +809,7 @@ export default function AddTestPermissibleValue() {
             ))}
           </div>
 
-          {/* Submit Button */}
+          {/* Submit Buttons */}
           <div className="flex justify-end gap-4 pt-4 border-t">
             <Button
               type="button"
@@ -675,23 +827,9 @@ export default function AddTestPermissibleValue() {
             >
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4 text-white"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
-                    ></path>
+                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
                   </svg>
                   Saving...
                 </div>

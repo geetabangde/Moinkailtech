@@ -2014,7 +2014,42 @@ const protectedRoutes = {
                     },
                   ],
                 },
+                {
+                  path: "trfs-starts-jobs",
+                  children: [
+                    {
+                      path: "",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "create",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/AddTrfStartJob"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "edit/:id",
 
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/EditTrfStartJob"
+                          )
+                        ).default,
+                      }),
+                    },
+                  ],
+                },
              ],
             },
             {

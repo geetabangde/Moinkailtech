@@ -439,11 +439,11 @@ export const generateDashboardsConfig = (labs = []) => {
           transKey: "nav.dashboards.test-permissible-values",
         },
         {
-          id: "dashboards.trf-start-job",
+          id: "dashboards.trfs-starts-jobs",
           type: NAV_TYPE_ITEM,
-          path: path(ROOT_DASHBOARDS, "/testing/trf-start-job"),
+          path: path(ROOT_DASHBOARDS, "/testing/trfs-starts-jobs"),
           title: "TRF - Inward/ Start a Job",
-          transKey: "nav.dashboards.trf-start-job",
+          transKey: "nav.dashboards.trfs-starts-jobs",
         },
         {
           id: "dashboards.lrn-cancel-requests-testing",

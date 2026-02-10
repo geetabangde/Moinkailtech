@@ -9,7 +9,7 @@ import {
 import {
   EllipsisHorizontalIcon,
   PencilIcon,
-  
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { Fragment, useCallback, useState } from "react";
@@ -27,16 +27,16 @@ import { useNavigate } from "react-router";
 const confirmMessages = {
   pending: {
     description:
-      "Are you sure you want to delete this product? Once deleted, it cannot be restored.",
+      "Are you sure you want to delete this permissible value? Once deleted, it cannot be restored.",
   },
   success: {
-    title: "Product Deleted",
+    title: "Permissible Value Deleted",
   },
 };
 
 export function RowActions({ row, table }) {
   const navigate = useNavigate();
-  
+
   const handleEdit = () => {
     const id = row.original.id;
     navigate(`/dashboards/testing/test-permissible-values/edit/${id}`);
@@ -51,43 +51,41 @@ export function RowActions({ row, table }) {
     setDeleteModalOpen(false);
   };
 
-  // const openModal = () => {
-  //   setDeleteModalOpen(true);
-  //   setDeleteError(false);
-  //   setDeleteSuccess(false);
-  // };
+  const openModal = () => {
+    setDeleteModalOpen(true);
+    setDeleteError(false);
+    setDeleteSuccess(false);
+  };
 
   const handleDeleteRows = useCallback(async () => {
     const id = row.original.id;
     setConfirmDeleteLoading(true);
 
     try {
-      // ✅ Use query parameter instead of path parameter
-      await axios.delete(`/testing/delete-size?id=${id}`);
-      
+      await axios.delete(`/testing/delete-permissible-value?id=${id}`);
+
       // Remove row from UI
       table.options.meta?.deleteRow(row);
-      
+
       setDeleteSuccess(true);
-      toast.success("Grade deleted successfully ✅", {
+      toast.success("Permissible Value deleted successfully ✅", {
         duration: 1000,
         icon: "🗑️",
       });
-      
+
       // Close modal after success
       setTimeout(() => {
         setDeleteModalOpen(false);
       }, 1000);
-      
     } catch (error) {
       console.error("Delete failed:", error);
       setDeleteError(true);
-      
-      // Show specific error message if available
-      const errorMessage = error.response?.data?.message 
-        || error.response?.data?.error 
-        || "Failed to delete product";
-      
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to delete permissible value";
+
       toast.error(`${errorMessage} ❌`, {
         duration: 2000,
       });
@@ -123,7 +121,7 @@ export function RowActions({ row, table }) {
                   <button
                     onClick={handleEdit}
                     className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors ",
+                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
                       focus &&
                         "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
                     )}
@@ -133,7 +131,7 @@ export function RowActions({ row, table }) {
                   </button>
                 )}
               </MenuItem>
-              {/* <MenuItem>
+              <MenuItem>
                 {({ focus }) => (
                   <button
                     onClick={openModal}
@@ -146,7 +144,7 @@ export function RowActions({ row, table }) {
                     <span>Delete</span>
                   </button>
                 )}
-              </MenuItem> */}
+              </MenuItem>
             </MenuItems>
           </Transition>
         </Menu>
