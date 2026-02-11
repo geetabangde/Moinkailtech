@@ -122,7 +122,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/edit/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/edit/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -141,7 +141,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/details/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/details/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -160,7 +160,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/edit-bill-person/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/edit-bill-person/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -179,7 +179,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/add-sample/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/add-sample/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -198,7 +198,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/assign-chemist/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/assign-chemist/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -217,7 +217,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/perform-testing/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/perform-testing/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -236,7 +236,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/edit-work-order/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/edit-work-order/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -255,7 +255,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/edit-billing/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/edit-billing/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
@@ -275,7 +275,7 @@ export function RowActions({ row, table }) {
                   <button
                     onClick={() =>
                       navigate(
-                        `/dashboards/testing/trf/edit-customer-responsible/${trfId}`
+                        `/dashboards/testing/trfs-starts-jobs/edit-customer-responsible/${trfId}`
                       )
                     }
                     className={clsx(
@@ -295,7 +295,7 @@ export function RowActions({ row, table }) {
                 {({ focus }) => (
                   <button
                     onClick={() =>
-                      navigate(`/dashboards/testing/trf/feedback/${trfId}`)
+                      navigate(`/dashboards/testing/trfs-starts-jobs/feedback/${trfId}`)
                     }
                     className={clsx(
                       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
