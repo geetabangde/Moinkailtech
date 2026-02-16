@@ -129,7 +129,7 @@ export default function AddTrfStartJob() {
   const [billingAddresses, setBillingAddresses] = useState([]);
   const [concernPersons, setConcernPersons]     = useState([]);
   const [quotations, setQuotations]             = useState([]);
-  const [selectedQuotationLink, setSelectedQuotationLink] = useState("");
+
 
   // ── Customer credit info ────────────────────────────────────────────────────
   const [customerCredit, setCustomerCredit] = useState(null);
@@ -257,12 +257,18 @@ export default function AddTrfStartJob() {
   };
 
   // ── Fetch customer-dependent data ───────────────────────────────────────────
+  // FIX: Matches PHP fetchcustomerdetails.php logic:
+  //   - Loads addresses for the MAIN selected customer (custid) immediately
+  //   - Pre-fills gstno and modeofpayment from customer record
+  //   - reportname / billingname are separate selects (any customer), but
+  //     addresses start pre-loaded from the main customer
   const fetchCustomerDependentData = async (customerId) => {
     if (!customerId) return;
     setLoadingCustomer(true);
     try {
       const [creditRes, addressRes, concernPersonsRes, quotationsRes] = await Promise.all([
         axios.get(`/people/get-all-customers?id=${customerId}`),
+        // PHP: customer-address where customer=$custid — pre-load for both report & billing
         axios.get(`/people/get-customers-address/${customerId}`),
         axios.get(`/get-concern-person/${customerId}`),
         axios.get(`/get-quotaion/${customerId}`),
@@ -270,13 +276,34 @@ export default function AddTrfStartJob() {
 
       if (creditRes.data?.data) {
         const c = creditRes.data.data;
-        setCustomerCredit({ creditdays: c.creditdays, creditamount: c.creditamount, leftamount: c.leftamount });
+        setCustomerCredit({
+          creditdays:   c.creditdays,
+          creditamount: c.creditamount,
+          leftamount:   c.leftamount,
+        });
         setCustomerEmail(c.email || "");
-        setFormData((prev) => ({ ...prev, gstno: c.gstno || "", customername: c.name || "", customeraddress: "nothing" }));
+
+        // FIX: Also pre-select customer's default modeofpayment (PHP fetchpaymentmode.php logic)
+        setFormData((prev) => ({
+          ...prev,
+          gstno:          c.gstno          || "",
+          customername:   c.name           || "",
+          customeraddress: "nothing",
+          // Pre-select customer's saved default payment mode
+          modeofpayment:  c.modeofpayment  ? String(c.modeofpayment) : prev.modeofpayment,
+        }));
       }
-      if (addressRes.data?.data) { setReportAddresses(addressRes.data.data); setBillingAddresses(addressRes.data.data); }
+
+      if (addressRes.data?.data) {
+        // FIX: PHP pre-loads addresses for the main customer into BOTH report and billing
+        // address dropdowns — do NOT wait for reportname / billingname selection
+        setReportAddresses(addressRes.data.data);
+        setBillingAddresses(addressRes.data.data);
+      }
+
       if (concernPersonsRes.data?.data) setConcernPersons(concernPersonsRes.data.data);
       if (quotationsRes.data?.data)     setQuotations(quotationsRes.data.data);
+
       setShowCustomerDetails(true);
     } catch (error) {
       console.error("Error fetching customer details:", error);
@@ -306,6 +333,8 @@ export default function AddTrfStartJob() {
     }
   };
 
+  // FIX: fetchAddresses — called when reportname or billingname is CHANGED by user
+  // (matches PHP onchange="search(this.id, 'readd', 'fetchreportdetails.php', ...)")
   const fetchAddresses = async (customerId, type) => {
     try {
       const res = await axios.get(`/people/get-customers-address/${customerId}`);
@@ -319,7 +348,11 @@ export default function AddTrfStartJob() {
   // ── Same as Reporting ────────────────────────────────────────────────────────
   const handleSameAsReporting = () => {
     setBillingAddresses(reportAddresses);
-    setFormData((prev) => ({ ...prev, billingname: prev.reportname, billingaddress: prev.reportaddress }));
+    setFormData((prev) => ({
+      ...prev,
+      billingname:    prev.reportname,
+      billingaddress: prev.reportaddress,
+    }));
   };
 
   // ── Date handling ────────────────────────────────────────────────────────────
@@ -363,28 +396,51 @@ export default function AddTrfStartJob() {
       concernpersonname: "", concernpersondesignation: "",
       concernpersonemail: "", concernpersonmobile: "",
       quotationid: "0",
+      modeofpayment: "",  // reset payment mode; will be re-filled by fetchCustomerDependentData
     }));
-    setReportAddresses([]); setBillingAddresses([]);
-    setConcernPersons([]); setQuotations([]);
-    setCustomerCredit(null); setCustomerEmail("");
-    setSelectedQuotationLink(""); setShowCustomerDetails(false);
+    setReportAddresses([]);
+    setBillingAddresses([]);
+    setConcernPersons([]);
+    setQuotations([]);
+    setCustomerCredit(null);
+    setCustomerEmail("");
+    setShowCustomerDetails(false);
     if (value) await fetchCustomerDependentData(value);
   };
 
+  // FIX: handleReportNameChange — when user picks a DIFFERENT customer for reporting
+  // fetches that customer's addresses (PHP: onchange fetchreportdetails.php)
   const handleReportNameChange = async (e) => {
     const value = e.target.value;
     clearError("reportname");
+    // Reset address selection when customer name changes
     setFormData((prev) => ({ ...prev, reportname: value, reportaddress: "" }));
-    if (value) await fetchAddresses(value, "report");
-    else setReportAddresses([]);
+    if (value) {
+      await fetchAddresses(value, "report");
+    } else {
+      // If cleared, reload from main customer's addresses
+      if (formData.customerid) {
+        await fetchAddresses(formData.customerid, "report");
+      } else {
+        setReportAddresses([]);
+      }
+    }
   };
 
+  // FIX: handleBillingNameChange — same logic as report
   const handleBillingNameChange = async (e) => {
     const value = e.target.value;
     clearError("billingname");
     setFormData((prev) => ({ ...prev, billingname: value, billingaddress: "" }));
-    if (value) await fetchAddresses(value, "billing");
-    else setBillingAddresses([]);
+    if (value) {
+      await fetchAddresses(value, "billing");
+    } else {
+      if (formData.customerid) {
+        await fetchAddresses(formData.customerid, "billing");
+      } else {
+        setBillingAddresses([]);
+      }
+    }
   };
 
   const handleConcernPersonChange = async (e) => {
@@ -393,7 +449,9 @@ export default function AddTrfStartJob() {
     setFormData((prev) => ({
       ...prev,
       concernpersonname: value,
-      concernpersondesignation: "", concernpersonemail: "", concernpersonmobile: "",
+      concernpersondesignation: "",
+      concernpersonemail: "",
+      concernpersonmobile: "",
     }));
     if (value) await fetchConcernPersonDetails(value);
   };
@@ -401,7 +459,6 @@ export default function AddTrfStartJob() {
   const handleQuotationChange = (e) => {
     const value = e.target.value;
     setFormData((prev) => ({ ...prev, quotationid: value }));
-    setSelectedQuotationLink(value && value !== "0" ? `/dashboards/testing/view-quotation/${value}` : "");
   };
 
   const handlePriorityChange = (e) => {
@@ -662,6 +719,10 @@ export default function AddTrfStartJob() {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
+                    {/*
+                      FIX: reportname shows ALL customers (PHP: selectextrawhere customers status=1).
+                      Changing it triggers fetchreportdetails.php equivalent.
+                    */}
                     <div ref={reportnameRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name <span className="text-red-500">*</span></label>
                       <FormSelect name="reportname" value={formData.reportname} onChange={handleReportNameChange} className="w-full">
@@ -671,11 +732,26 @@ export default function AddTrfStartJob() {
                       <ErrMsg field="reportname" />
                     </div>
 
+                    {/*
+                      FIX: reportaddress is NOT disabled while addresses are available.
+                      PHP pre-loads addresses from the main customer ($custid) immediately —
+                      user does not need to pick a reportname first to see addresses.
+                    */}
                     <div ref={reportaddressRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Address <span className="text-red-500">*</span></label>
-                      <FormSelect name="reportaddress" value={formData.reportaddress} onChange={handleInputChange} className="w-full" disabled={!formData.reportname}>
-                        <option value="">{formData.reportname ? "Select Address" : "Select Customer first"}</option>
-                        {reportAddresses.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.address})</option>)}
+                      <FormSelect
+                        name="reportaddress"
+                        value={formData.reportaddress}
+                        onChange={handleInputChange}
+                        className="w-full"
+                        disabled={reportAddresses.length === 0}
+                      >
+                        <option value="">
+                          {reportAddresses.length === 0 ? "No addresses found" : "Select Address"}
+                        </option>
+                        {reportAddresses.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name} ({a.address})</option>
+                        ))}
                       </FormSelect>
                       <ErrMsg field="reportaddress" />
                     </div>
@@ -705,6 +781,10 @@ export default function AddTrfStartJob() {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
+                    {/*
+                      FIX: billingname shows ALL customers (PHP: selectextrawhere customers status=1).
+                      Changing it triggers fetchbillingdetails.php equivalent.
+                    */}
                     <div ref={billingnameRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name <span className="text-red-500">*</span></label>
                       <FormSelect name="billingname" value={formData.billingname} onChange={handleBillingNameChange} className="w-full">
@@ -714,18 +794,41 @@ export default function AddTrfStartJob() {
                       <ErrMsg field="billingname" />
                     </div>
 
+                    {/*
+                      FIX: billingaddress is NOT disabled while addresses are available.
+                      PHP pre-loads addresses from the main customer ($custid) immediately.
+                    */}
                     <div ref={billingaddressRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Address <span className="text-red-500">*</span></label>
-                      <FormSelect name="billingaddress" value={formData.billingaddress} onChange={handleInputChange} className="w-full" disabled={!formData.billingname}>
-                        <option value="">{formData.billingname ? "Select Address" : "Select Customer first"}</option>
-                        {billingAddresses.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.address})</option>)}
+                      <FormSelect
+                        name="billingaddress"
+                        value={formData.billingaddress}
+                        onChange={handleInputChange}
+                        className="w-full"
+                        disabled={billingAddresses.length === 0}
+                      >
+                        <option value="">
+                          {billingAddresses.length === 0 ? "No addresses found" : "Select Address"}
+                        </option>
+                        {billingAddresses.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name} ({a.address})</option>
+                        ))}
                       </FormSelect>
                       <ErrMsg field="billingaddress" />
                     </div>
 
+                    {/* GST — pre-filled from customer record (PHP: value="<?php echo $row['gstno']; ?>") */}
                     <div className="md:col-span-2" ref={gstnoRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">GST Number <span className="text-red-500">*</span></label>
-                      <Input type="text" name="gstno" value={formData.gstno} onChange={handleInputChange} className="w-full" placeholder="Enter GST number" maxLength={15} />
+                      <Input
+                        type="text"
+                        name="gstno"
+                        value={formData.gstno}
+                        onChange={handleInputChange}
+                        className="w-full"
+                        placeholder="Enter GST number"
+                        maxLength={15}
+                      />
                       <ErrMsg field="gstno" />
                     </div>
                   </div>
@@ -773,26 +876,14 @@ export default function AddTrfStartJob() {
                     <span className="w-2 h-2 rounded-full bg-yellow-500 inline-block"></span>
                     Quotation
                   </h4>
-                  <div className="flex items-end gap-4">
-                    <div className="flex-1 max-w-sm">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Quotation No.</label>
-                      <FormSelect name="quotationid" value={formData.quotationid} onChange={handleQuotationChange} className="w-full">
-                        <option value="0">Select Quotation</option>
-                        {quotations.map((q) => (
-                          <option key={q.id} value={q.id}>{String(q.id).padStart(5, "0")} — {q.added_on}</option>
-                        ))}
-                      </FormSelect>
-                    </div>
-                    {selectedQuotationLink && (
-                      <a href={selectedQuotationLink} target="_blank" rel="noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-800 border border-blue-300 rounded px-3 py-2 flex items-center gap-1.5 transition-colors whitespace-nowrap"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        View Quotation
-                      </a>
-                    )}
+                  <div className="max-w-sm">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quotation No.</label>
+                    <FormSelect name="quotationid" value={formData.quotationid} onChange={handleQuotationChange} className="w-full">
+                      <option value="0">Select Quotation</option>
+                      {quotations.map((q) => (
+                        <option key={q.id} value={q.id}>{String(q.id).padStart(5, "0")} — {q.added_on}</option>
+                      ))}
+                    </FormSelect>
                   </div>
                 </div>
 
@@ -961,6 +1052,10 @@ export default function AddTrfStartJob() {
 
               {showPaymentDetails && (
                 <>
+                  {/*
+                    FIX: modeofpayment is pre-selected from the customer's saved default
+                    (PHP fetchpaymentmode.php: selectfieldwhere customers modeofpayment id=$cid)
+                  */}
                   <div ref={modeofpaymentRef}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Mode Of Payment <span className="text-red-500">*</span></label>
                     <FormSelect name="modeofpayment" value={formData.modeofpayment} onChange={handleInputChange} className="w-full">

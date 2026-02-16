@@ -7,7 +7,8 @@ import { useNavigate } from "react-router";
 
 export default function EditBdPerson() {
   const navigate = useNavigate();
-  // ✅ Get ID manually from URL path
+
+  // Get ID from URL path
   const pathParts = window.location.pathname.split("/");
   const id = pathParts[pathParts.length - 1];
 
@@ -16,63 +17,47 @@ export default function EditBdPerson() {
   const [selectedBd, setSelectedBd] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ Get query params manually
-  const searchParams = new URLSearchParams(window.location.search);
-  const caliblocationParam = searchParams.get("caliblocation");
-  const calibaccParam = searchParams.get("calibacc");
-  const caliblocation =
-    !caliblocationParam || caliblocationParam === "undefined"
-      ? "Lab"
-      : caliblocationParam;
-  const calibacc =
-    !calibaccParam || calibaccParam === "undefined"
-      ? "Nabl"
-      : calibaccParam;
+  useEffect(() => {
+    const fetchBdList = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`/testing/get-trf-bd/${id}`);
+        const result = res.data;
+        console.log("API response:", result);
 
- useEffect(() => {
-  const fetchBdList = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(
-        `/calibrationprocess/edit-bdPerson?inward_id=${id}&caliblocation=${caliblocation}&calibacc=${calibacc}`
-      );
-      const result = res.data;
-      console.log("API response:", result);
+        // status is boolean true
+        if (result.status === true && result.data) {
+          // BD dropdown list lives in result.data.list
+          setBdList(result.data.list || []);
 
-      if (result.status === "true" && result.reviewers) {
-        setBdList(result.reviewers || []);
+          // Customer name lives in result.data.customer
+          if (result.data.customer && result.data.customer.length > 0) {
+            setCustomerName(result.data.customer[0].name || "");
+          } else {
+            setCustomerName("");
+          }
 
-        // ✅ Set customer name
-        if (result.customer && result.customer.length > 0) {
-          setCustomerName(result.customer[0].name || "");
+          // Currently selected BD lives in result.data.trf.bd
+          const currentBd = result.data.trf?.bd;
+          if (currentBd !== null && currentBd !== "" && typeof currentBd !== "undefined") {
+            setSelectedBd(currentBd.toString());
+          } else {
+            setSelectedBd("");
+          }
+
         } else {
-          setCustomerName("");
+          toast.error(result.message || "Failed to load BD Person list.");
         }
-
-        // ✅ Set selected BD ONLY if exists
-        if (
-          result.bd !== null &&
-          result.bd !== "" &&
-          typeof result.bd !== "undefined"
-        ) {
-          setSelectedBd(result.bd.toString());
-        } else {
-          setSelectedBd("");
-        }
-
-      } else {
-        toast.error(result.message || "Failed to load BD Person list.");
+      } catch (err) {
+        console.error("Fetch BD error:", err);
+        toast.error("Something went wrong while loading BD Person list.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Fetch BD error:", err);
-      toast.error("Something went wrong while loading BD Person list.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  fetchBdList();
-}, [id, caliblocation, calibacc]);
+    fetchBdList();
+  }, [id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,30 +69,21 @@ export default function EditBdPerson() {
     setLoading(true);
     try {
       const payload = {
-        inward_id: id,
-        bd: selectedBd,
-        caliblocation: caliblocation,
-        calibacc: calibacc,
+        id: Number(id),
+        bd: Number(selectedBd),
       };
 
       console.log("Sending JSON:", payload);
 
-      const res = await axios.post(`/calibrationprocess/update-bd`, payload);
+      const res = await axios.post(`/testing/trf-bd-link`, payload);
       const result = res.data;
 
-      if (result.status === "true") {
+      if (result.status === true) {
         toast.success("BD person updated successfully ✅");
         setTimeout(() => {
-          navigate(
-            `/dashboards/calibration-process/inward-entry-lab?caliblocation=${encodeURIComponent(
-              caliblocationParam
-            )}&calibacc=${encodeURIComponent(calibaccParam)}`
-          );
+          navigate("/dashboards/testing/trfs-starts-jobs");
         }, 1000);
-
-       
-      } 
-    else {
+      } else {
         toast.error(result.message || "Failed to update BD Person ❌");
       }
     } catch (err) {
@@ -121,7 +97,7 @@ export default function EditBdPerson() {
   return (
     <Page title="Edit BD Person">
       <div className="p-6">
-        {/* ✅ Header with back button */}
+        {/* Header with back button */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
             Link BD Person
@@ -129,15 +105,9 @@ export default function EditBdPerson() {
           <Button
             variant="outline"
             className="text-white bg-blue-600 hover:bg-blue-700"
-            onClick={() =>
-              navigate(
-                `/dashboards/calibration-process/inward-entry-lab?caliblocation=${encodeURIComponent(
-                  caliblocationParam
-                )}&calibacc=${encodeURIComponent(calibaccParam)}`
-              )
-            }
+            onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs`)}
           >
-            Back to Inward Entry List
+            Back List
           </Button>
         </div>
 
@@ -162,7 +132,7 @@ export default function EditBdPerson() {
               <option value="">Select BD Person</option>
               {bdList.map((bd) => (
                 <option key={bd.id} value={bd.id}>
-                  {bd.firstname} {bd.lastname}
+                  {bd.firstname} {bd.middlename} {bd.lastname}
                 </option>
               ))}
             </select>

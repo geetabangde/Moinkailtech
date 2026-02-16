@@ -2048,6 +2048,16 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
+                    {
+                      path: "edit_bd_person/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/EditTrfStartJobBdPerson"
+                          )
+                        ).default,
+                      }),
+                    },
                   ],
                 },
              ],

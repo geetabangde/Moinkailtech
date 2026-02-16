@@ -154,6 +154,29 @@ export function RowActions({ row, table }) {
                   </button>
                 )}
               </MenuItem>
+              {/* edit_bd_person */}
+              
+
+
+              {/* Edit Bill Person */}
+              <MenuItem>
+                {({ focus }) => (
+                  <button
+                    onClick={() =>
+                      navigate(`/dashboards/testing/trfs-starts-jobs/edit_bd_person/${trfId}`)
+                    }
+                    className={clsx(
+                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
+                      focus &&
+                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
+                    )}
+                  >
+                    <PencilIcon className="size-4.5 stroke-1" />
+                    <span>Edit BD Person</span>
+                  </button>
+                )}
+              </MenuItem>
+
 
               {/* Edit Bill Person */}
               <MenuItem>
