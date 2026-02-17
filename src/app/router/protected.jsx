@@ -2058,6 +2058,16 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
+                    {
+                      path: "trfitems/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/AddTrfStartJobTrfItem"
+                          )
+                        ).default,
+                      }),
+                    },
                   ],
                 },
              ],

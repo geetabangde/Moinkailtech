@@ -9,6 +9,7 @@ import {
 import {
   EllipsisHorizontalIcon,
   PencilIcon,
+  FolderOpenIcon,
   TrashIcon,
   UserIcon,
   BeakerIcon,
@@ -132,6 +133,27 @@ export function RowActions({ row, table }) {
                   >
                     <PencilIcon className="size-4.5 stroke-1" />
                     <span>Edit TRF</span>
+                  </button>
+                )}
+              </MenuItem>
+              {/* trfitems */}
+              
+
+              {/* View Details */}
+              <MenuItem>
+                {({ focus }) => (
+                  <button
+                    onClick={() =>
+                      navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)
+                    }
+                    className={clsx(
+                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
+                      focus &&
+                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
+                    )}
+                  >
+                    <FolderOpenIcon className="size-4.5 stroke-1" />
+                    <span>Add Items</span>
                   </button>
                 )}
               </MenuItem>
