@@ -472,6 +472,7 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
           >
             <option value={1}>NABL</option>
             <option value={0}>Non-NABL</option>
+            <option value={3}>QAI</option>
           </select>
         </Field>
         <Field label="Grades" required error={errors.grade} flex="1 1 200px">
