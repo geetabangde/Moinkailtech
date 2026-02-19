@@ -9,33 +9,69 @@ const SEALED_OPTIONS = [
   { value: 3, label: "NA" },
 ];
 
+// testprices.nabl: 1=NABL, 3=QAI, 2=NO
+const PACKAGE_TYPE_OPTIONS = [
+  { value: "",  label: "Select Type" },
+  { value: "1", label: "NABL" },
+  { value: "3", label: "QAI" },
+  { value: "2", label: "NO" },
+];
+
 const INITIAL_FORM = {
-  product: "",
-  brand: "",
-  qrcode: "",
-  testrequest: "",
-  grade: "",
-  size: "",
-  package: "",
-  package_type: 1,
-  isok: "",
-  sealed: 0,
-  disposable: "",
-  condition: "",
+  product:       "",
+  brand:         "",
+  qrcode:        "",
+  testrequest:   "",
+  grade:         "",
+  size:          "",
+  package:       "",
+  package_type:  "",
+  isok:          "",
+  sealed:        0,
+  disposable:    "",
+  condition:     "",
   specification: "",
-  conformity: "",
-  unitcost: 0,
-  total: 0,
+  conformity:    "",
+  unitcost:      0,
+  total:         0,
 };
 
-// ─── Helper: extract array from any API response shape ───────────────────────
-const extractArray = (res, ...keys) => {
-  const d = res.data;
-  for (const k of keys) if (Array.isArray(d?.[k])) return d[k];
-  if (Array.isArray(d?.data)) return d.data;
-  if (Array.isArray(d)) return d;
+// ─── Shared class strings (matching AddModes Input style) ─────────────────────
+const inputCls =
+  "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm " +
+  "text-gray-800 dark:text-white bg-white dark:bg-gray-800 outline-none " +
+  "focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 transition placeholder-gray-400";
+
+const inputErrCls =
+  "w-full border border-red-400 dark:border-red-500 rounded-lg px-3 py-2.5 text-sm " +
+  "text-gray-800 dark:text-white bg-white dark:bg-gray-800 outline-none " +
+  "focus:border-red-500 focus:ring-2 focus:ring-red-100 transition placeholder-gray-400";
+
+const selectCls =
+  "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm " +
+  "text-gray-800 dark:text-white bg-white dark:bg-gray-800 outline-none " +
+  "focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 transition cursor-pointer";
+
+const selectErrCls =
+  "w-full border border-red-400 dark:border-red-500 rounded-lg px-3 py-2.5 text-sm " +
+  "text-gray-800 dark:text-white bg-white dark:bg-gray-800 outline-none " +
+  "focus:border-red-500 focus:ring-2 focus:ring-red-100 transition cursor-pointer";
+
+const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5";
+const errCls   = "text-red-500 text-xs mt-1";
+
+const iCls  = (err) => (err ? inputErrCls  : inputCls);
+const sCls  = (err) => (err ? selectErrCls : selectCls);
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+function toArray(responseData, ...keys) {
+  for (const k of keys) {
+    if (Array.isArray(responseData?.[k])) return responseData[k];
+  }
+  if (Array.isArray(responseData?.data)) return responseData.data;
+  if (Array.isArray(responseData))       return responseData;
   return [];
-};
+}
 
 /**
  * Props:
@@ -48,57 +84,55 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
   const isNew = !itemId;
 
   // ─── Static dropdowns ────────────────────────────────────────────────────
-  const [products, setProducts] = useState([]);
-  const [grades, setGrades] = useState([]);
-  const [sizes, setSizes] = useState([]);
-  const [choices, setChoices] = useState([]);
+  const [products,    setProducts]    = useState([]);
+  const [choices,     setChoices]     = useState([]);
   const [disposables, setDisposables] = useState([]);
-  const [conditions, setConditions] = useState([]);
-
-  // ─── Dynamic: packages depend on selected product ────────────────────────
-  const [packages, setPackages] = useState([]);
-  const [loadingPkgList, setLoadingPkgList] = useState(false);
-
-  // ─── Dynamic: quantities/price/params depend on selected package ─────────
-  // quantities[] = packagequantity rows: { id, name, quantity, unit }
-  // received[]   = parallel user-input values (index-matched)
-  // parameters[] = packageparameters rows: { id, name, description }
-  //                NOTE: id = packageparameters.id  (NOT parameters.id)
-  //                PHP: name="parameters[]" value="<?= $irow['id'] ?>"
-  const [quantities, setQuantities] = useState([]);
-  const [received, setReceived] = useState([]);
-  const [parameters, setParameters] = useState([]);
-  const [selectedParams, setSelectedParams] = useState([]); // packageparameters.id list
-  const [isSpecial, setIsSpecial] = useState(false);
-  const [loadingPkgDetails, setLoadingPkgDetails] = useState(false);
-
-  // ─── Form state ──────────────────────────────────────────────────────────
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
+  const [conditions,  setConditions]  = useState([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
-  // ── 1. Load static dropdowns ─────────────────────────────────────────────
+  // ─── Product-specific ────────────────────────────────────────────────────
+  const [grades,           setGrades]           = useState([]);
+  const [sizes,            setSizes]            = useState([]);
+  const [loadingGradeSize, setLoadingGradeSize] = useState(false);
+
+  // ─── Package list ─────────────────────────────────────────────────────────
+  const [packages,        setPackages]        = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
+
+  // ─── Package details ──────────────────────────────────────────────────────
+  const [quantities,        setQuantities]        = useState([]);
+  const [received,          setReceived]          = useState([]);
+  const [parameters,        setParameters]        = useState([]);
+  const [selectedParams,    setSelectedParams]    = useState([]);
+  const [isSpecial,         setIsSpecial]         = useState(false);
+  const [loadingPkgDetails, setLoadingPkgDetails] = useState(false);
+
+  // ─── Form state ───────────────────────────────────────────────────────────
+  const [form,        setForm]        = useState(INITIAL_FORM);
+  const [errors,      setErrors]      = useState({});
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  const clearPkgDetails = () => {
+    setQuantities([]); setReceived([]);
+    setParameters([]); setSelectedParams([]);
+    setIsSpecial(false);
+  };
+
+  // ── 1. Static dropdowns ───────────────────────────────────────────────────
   const fetchDropdowns = useCallback(async () => {
     setLoadingDropdowns(true);
     try {
-      const [prodRes, gradeRes, sizeRes, choiceRes, dispRes, condRes] =
-        await Promise.all([
-          axios.get("/testing/get-prodcut-list"),
-          axios.get("/testing/get-grades"),
-          axios.get("/testing/get-sizes"),
-          axios.get("/get-choices"),
-          axios.get("/testing/get-disposables-list"),
-          axios.get("/testing/get-conditions-list"),
-        ]);
-
-      setProducts(extractArray(prodRes, "products", "data"));
-      setGrades(extractArray(gradeRes, "grades", "data"));
-      setSizes(extractArray(sizeRes, "sizes", "data"));
-      setChoices(extractArray(choiceRes, "choices", "data"));
-      setDisposables(extractArray(dispRes, "disposables", "data"));
-      setConditions(extractArray(condRes, "conditions", "data"));
+      const [prodRes, choiceRes, dispRes, condRes] = await Promise.all([
+        axios.get("/testing/get-prodcut-list"),
+        axios.get("/get-choices"),
+        axios.get("/testing/get-disposables-list"),
+        axios.get("/testing/get-conditions-list"),
+      ]);
+      setProducts(   toArray(prodRes.data,   "products"));
+      setChoices(    toArray(choiceRes.data,  "choices"));
+      setDisposables(toArray(dispRes.data,    "disposables"));
+      setConditions( toArray(condRes.data,    "conditions"));
     } catch {
       setSubmitError("Failed to load form options. Please refresh.");
     } finally {
@@ -106,285 +140,201 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
     }
   }, []);
 
-  // ── 2. Load existing item for edit ───────────────────────────────────────
+  // ── 2. Load existing item for edit ────────────────────────────────────────
   const fetchItem = useCallback(async () => {
     if (isNew) return;
     try {
-      const res = await axios.get(`testing/get-trf-item/${itemId}`);
+      const res  = await axios.get(`/testing/get-trf-item/${itemId}`);
       const item = res.data?.item ?? res.data?.data ?? res.data ?? {};
       setForm({
-        product: item.product ?? "",
-        brand: item.brand ?? "",
-        qrcode: item.qrcode ?? "",
-        testrequest: item.testrequest ?? "",
-        grade: item.grade ?? "",
-        size: item.size ?? "",
-        package: item.package ?? "",
-        package_type: item.package_type ?? 1,
-        isok: item.isok ?? "",
-        sealed: item.sealed ?? 0,
-        disposable: item.disposable ?? "",
-        condition: item.condition ?? "",
-        specification: item.specification ?? "",
-        conformity: item.conformity ?? "",
-        unitcost: item.unitcost ?? 0,
-        total: item.total ?? 0,
+        product:       String(item.product       ?? ""),
+        brand:         item.brand                ?? "",
+        qrcode:        item.qrcode               ?? "",
+        testrequest:   item.testrequest          ?? "",
+        grade:         String(item.grade         ?? ""),
+        size:          String(item.size          ?? ""),
+        package:       String(item.package       ?? ""),
+        package_type:  String(item.package_type  ?? ""),
+        isok:          String(item.isok          ?? ""),
+        sealed:        item.sealed               ?? 0,
+        disposable:    String(item.disposable    ?? ""),
+        condition:     String(item.condition     ?? ""),
+        specification: String(item.specification ?? ""),
+        conformity:    String(item.conformity    ?? ""),
+        unitcost:      item.unitcost             ?? 0,
+        total:         item.total                ?? 0,
       });
     } catch {
       setSubmitError("Failed to load item details.");
     }
   }, [isNew, itemId]);
 
-  useEffect(() => {
-    fetchDropdowns();
-    fetchItem();
-  }, [fetchDropdowns, fetchItem]);
+  useEffect(() => { fetchDropdowns(); fetchItem(); }, [fetchDropdowns, fetchItem]);
 
-  // ── 3. Set first-option defaults once dropdowns load ─────────────────────
+  // ── 3. Default first options ──────────────────────────────────────────────
   useEffect(() => {
     if (!loadingDropdowns && isNew) {
       setForm((prev) => ({
         ...prev,
-        isok: prev.isok || (choices[0]?.id ?? ""),
-        disposable: prev.disposable || (disposables[0]?.id ?? ""),
-        condition: prev.condition || (conditions[0]?.id ?? ""),
-        specification: prev.specification || (choices[0]?.id ?? ""),
-        conformity: prev.conformity || (choices[0]?.id ?? ""),
-        grade: prev.grade || (grades[0]?.id ?? ""),
-        size: prev.size || (sizes[0]?.id ?? ""),
+        isok:          prev.isok          || String(choices[0]?.id     ?? ""),
+        disposable:    prev.disposable    || String(disposables[0]?.id ?? ""),
+        condition:     prev.condition     || String(conditions[0]?.id  ?? ""),
+        specification: prev.specification || String(choices[0]?.id     ?? ""),
+        conformity:    prev.conformity    || String(choices[0]?.id     ?? ""),
       }));
     }
-  }, [loadingDropdowns, isNew, choices, disposables, conditions, grades, sizes]);
+  }, [loadingDropdowns, isNew, choices, disposables, conditions]);
 
-  // ── 4. Product change → fetch package list ───────────────────────────────
-  // GET /testing/get-package-list?pid={productId}
-  // Response: { status, data: [{id, package, rate, nabl, type}] }
+  // ── 4. Product → grades + sizes ───────────────────────────────────────────
   const prevProduct = useRef(null);
   useEffect(() => {
     const pid = form.product;
     if (!pid || pid === prevProduct.current) return;
     prevProduct.current = pid;
-
-    setPackages([]);
-    setForm((prev) => ({ ...prev, package: "", unitcost: 0, total: 0, package_type: 1 }));
-    setQuantities([]);
-    setReceived([]);
-    setParameters([]);
-    setSelectedParams([]);
-    setIsSpecial(false);
-
-    const loadPackages = async () => {
-      setLoadingPkgList(true);
+    setGrades([]); setSizes([]); setPackages([]);
+    setForm((prev) => ({ ...prev, grade: "", size: "", package: "", package_type: "", unitcost: 0, total: 0 }));
+    clearPkgDetails();
+    const load = async () => {
+      setLoadingGradeSize(true);
       try {
-        const res = await axios.get(`testing/get-package-list?pid=${pid}`);
-        const list = extractArray(res, "data");
-        setPackages(list);
-      } catch {
-        /* silent */
-      } finally {
-        setLoadingPkgList(false);
-      }
+        // ✅ Single API call for both grades and sizes
+        const res = await axios.get(`/testing/get-grade-and-size?pid=${pid}`);
+        setGrades(toArray(res.data, "grades"));
+        setSizes( toArray(res.data, "sizes"));
+      } catch { /* silent */ }
+      finally { setLoadingGradeSize(false); }
     };
+    load();
+  }, [form.product]);
 
-    loadPackages();
-  }, [form.product, isNew]);
+  // ── 5. Product + type → package list ─────────────────────────────────────
+  const prevProductForPkg = useRef(null);
+  const prevPkgType       = useRef(null);
+  useEffect(() => {
+    const pid  = form.product;
+    const type = form.package_type;
+    if (!pid || !type) {
+      if (prevPkgType.current && !type) {
+        setPackages([]);
+        setForm((prev) => ({ ...prev, package: "", unitcost: 0, total: 0 }));
+        clearPkgDetails();
+      }
+      prevPkgType.current = type;
+      return;
+    }
+    if (pid === prevProductForPkg.current && type === prevPkgType.current) return;
+    prevProductForPkg.current = pid;
+    prevPkgType.current       = type;
+    setForm((prev) => ({ ...prev, package: "", unitcost: 0, total: 0 }));
+    clearPkgDetails();
+    const load = async () => {
+      setLoadingPackages(true);
+      try {
+        const res = await axios.get(`/testing/get-package-list?pid=${pid}&type=${type}`);
+        setPackages(toArray(res.data, "data"));
+      } catch { /* silent */ }
+      finally { setLoadingPackages(false); }
+    };
+    load();
+  }, [form.product, form.package_type]);
 
-  // ── 5. Package change → fetch quantities, price (with special price), parameters
-  // PHP fetchquantities.php  → packagequantity table → quantities[] + received[]
-  // PHP fetchpprice.php      → testprices + specialprices → unitcost / total
-  // PHP fetchparameters.php  → packageparameters table → parameters[] (id = packageparameters.id)
+  // ── 6. Package → quantities, price, parameters ───────────────────────────
   const prevPkg = useRef(null);
   useEffect(() => {
     const pkgId = form.package;
     if (!pkgId || pkgId === prevPkg.current) return;
     prevPkg.current = pkgId;
-
-    // Pre-fill unitcost from package list rate (will be overridden by API)
-    const selectedPkg = packages.find((p) => String(p.id) === String(pkgId));
-    if (selectedPkg?.rate !== undefined) {
-      setForm((prev) => ({ ...prev, unitcost: selectedPkg.rate, total: selectedPkg.rate }));
-    }
-
-    const loadPkgDetails = async () => {
+    const cached = packages.find((p) => String(p.id) === String(pkgId));
+    if (cached?.rate !== undefined)
+      setForm((prev) => ({ ...prev, unitcost: cached.rate, total: cached.rate }));
+    const load = async () => {
       setLoadingPkgDetails(true);
       try {
         const [qtyRes, priceRes, paramRes] = await Promise.all([
-          // fetchquantities.php logic: packagequantity where package=$pid
-          axios.get(`testing/get-package-quantities/${pkgId}`),
-          // fetchpprice.php logic: checks specialprices first, then testprices.rate
-          // trfId needed so backend can look up customer for special price
-          axios.get(`testing/get-package-price/${pkgId}/${trfId}`),
-          // fetchparameters.php logic: packageparameters where package=$pid
-          // Returns: { special: 0|1, data: [{id: packageparameters.id, name, description}] }
-          axios.get(`testing/get-package-parameters/${pkgId}`),
+          axios.get(`/testing/get-package-quantities?id=${pkgId}`),
+          axios.get(`/testing/get-package-price?package_id=${pkgId}&trfid=${trfId}`),
+          axios.get(`/testing/package-parameters/${pkgId}`),
         ]);
-
-        // ── DEBUG: Remove after confirming keys ──────────────────
-        console.log("QTY raw response:", qtyRes.data);
-        console.log("PRICE raw response:", priceRes.data);
-        console.log("PARAM raw response:", paramRes.data);
-        // ─────────────────────────────────────────────────────────
-
-        // Quantities — from packagequantity table
-        // Trying all possible key names the API might return
-        const qtys = extractArray(
-          qtyRes,
-          "quantities", "packagequantity", "packageQuantity",
-          "qty", "items", "list", "data"
-        );
-
-        // Price
-        const price =
-          priceRes.data?.unitcost ??
-          priceRes.data?.rate ??
-          priceRes.data?.price ??
-          priceRes.data?.data?.unitcost ??
-          priceRes.data?.data?.rate ??
-          selectedPkg?.rate ??
-          0;
-
-        // Package type
-        const pkgType =
-          priceRes.data?.package_type ??
-          priceRes.data?.type ??
-          priceRes.data?.packageType ??
-          priceRes.data?.data?.package_type ??
-          1;
-
-        // Parameters — fetchparameters.php:
-        // special=1 → show checkboxes with name="parameters[]" value=packageparameters.id
-        // special=0 → no checkboxes shown, all parameters auto-included
-        const params = extractArray(
-          paramRes,
-          "parameters", "packageparameters", "packageParameters",
-          "params", "items", "list", "data"
-        );
-        const special =
-          paramRes.data?.special ??
-          paramRes.data?.is_special ??
-          paramRes.data?.isSpecial ??
-          paramRes.data?.data?.special ??
-          false;
-
+        const qtys      = toArray(qtyRes.data, "data");
+        const priceData = priceRes.data?.data ?? {};
+        const price     = priceData.unitcost ?? cached?.rate ?? 0;
+        const total     = priceData.total    ?? price;
+        const params    = toArray(paramRes.data, "parameters");
+        const special   = paramRes.data?.special ?? false;
         setQuantities(qtys);
         setReceived(qtys.map(() => ""));
-        setForm((prev) => ({ ...prev, unitcost: price, total: price, package_type: pkgType }));
+        setForm((prev) => ({ ...prev, unitcost: price, total }));
         setParameters(params);
         setIsSpecial(!!special);
-
-        // PHP default: all checkboxes pre-checked (checked='checked')
-        // So selectedParams = all packageparameters.id by default when special
         setSelectedParams(special ? params.map((p) => p.id) : []);
-      } catch {
-        /* silent */
-      } finally {
-        setLoadingPkgDetails(false);
-      }
+      } catch { /* silent */ }
+      finally { setLoadingPkgDetails(false); }
     };
-
-    loadPkgDetails();
+    load();
   }, [form.package, packages, trfId]);
 
-  // ── 6. Recalculate total when received qty changes ────────────────────────
-  // PHP: totalaqty() → sum all .receivedquantities → totalqty
-  // total = sum(received) * unitcost
+  // ── 7. Recalculate total ──────────────────────────────────────────────────
   useEffect(() => {
     const totalQty = received.reduce((sum, v) => sum + (Number(v) || 0), 0);
-    if (totalQty > 0) {
-      setForm((prev) => ({
-        ...prev,
-        total: totalQty * (Number(prev.unitcost) || 0),
-      }));
-    }
+    if (totalQty > 0)
+      setForm((prev) => ({ ...prev, total: totalQty * (Number(prev.unitcost) || 0) }));
   }, [received]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
-
-  const handleReceivedChange = (index, value) => {
-    setReceived((prev) => {
-      const n = [...prev];
-      n[index] = value;
-      return n;
-    });
-  };
-
-  // PHP: checkall('selectall','parametercheck') → toggle all
-  const handleSelectAllParams = (checked) => {
+  const handleReceivedChange = (index, value) =>
+    setReceived((prev) => { const n = [...prev]; n[index] = value; return n; });
+  const handleSelectAllParams = (checked) =>
     setSelectedParams(checked ? parameters.map((p) => p.id) : []);
-  };
-
-  // PHP: name="parameters[]" value="<?= $irow['id'] ?>" → packageparameters.id
-  const handleParamToggle = (paramId) => {
+  const handleParamToggle = (paramId) =>
     setSelectedParams((prev) =>
-      prev.includes(paramId) ? prev.filter((p) => p !== paramId) : [...prev, paramId]
+      prev.includes(paramId) ? prev.filter((id) => id !== paramId) : [...prev, paramId]
     );
-  };
 
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = () => {
-    const required = [
-      "product", "brand", "qrcode", "testrequest",
-      "grade", "size", "package",
-      "isok", "disposable", "condition", "specification", "conformity",
-    ];
+    const required = ["product","brand","qrcode","testrequest","grade","size","package","isok","disposable","condition","specification","conformity"];
     const errs = {};
-    required.forEach((f) => {
-      if (form[f] === "" || form[f] === null || form[f] === undefined)
-        errs[f] = "Required";
-    });
+    required.forEach((f) => { if (!form[f] && form[f] !== 0) errs[f] = "This is a required field"; });
     return errs;
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  // Matches inserttrfitem.php POST structure exactly:
-  // quantities[]  = packagequantity.id array
-  // received[]    = user-entered values (index-matched)
-  // parameters[]  = packageparameters.id array (only when special=1)
-  // id / hakuna   = trfId
+  // POST /testing/add-trf-item
+  // Response: { status, message, trf_id, trf_product_id, bookingrefno }
   const handleSubmit = async () => {
     const validationErrors = validate();
-    if (Object.keys(validationErrors).length) {
-      setErrors(validationErrors);
-      return;
-    }
-    setSubmitting(true);
-    setSubmitError(null);
+    if (Object.keys(validationErrors).length) { setErrors(validationErrors); return; }
+    setSubmitting(true); setSubmitError(null);
     try {
-      const payload = {
-        product: Number(form.product),
-        brand: form.brand,
-        qrcode: form.qrcode,
-        testrequest: form.testrequest,
-        package_type: Number(form.package_type), // PHP unsets this before DB insert
-        grade: Number(form.grade),
-        size: Number(form.size),
-        package: Number(form.package),
-        isok: Number(form.isok),
-        sealed: Number(form.sealed),
-        disposable: Number(form.disposable),
-        condition: Number(form.condition),
+      const res = await axios.post("/testing/add-trf-item", {
+        product:       Number(form.product),
+        brand:         form.brand,
+        qrcode:        form.qrcode,
+        testrequest:   form.testrequest,
+        package_type:  Number(form.package_type),
+        grade:         Number(form.grade),
+        size:          Number(form.size),
+        package:       Number(form.package),
+        isok:          Number(form.isok),
+        sealed:        Number(form.sealed),
+        disposable:    Number(form.disposable),
+        condition:     Number(form.condition),
         specification: Number(form.specification),
-        conformity: Number(form.conformity),
-        unitcost: Number(form.unitcost),
-        total: Number(form.total),
-        // PHP: foreach ($quantities as $quantity) with $received[$hakuna]
-        quantities: quantities.map((q) => q.id),
-        received: received.map((r) => Number(r) || 0),
-        // PHP: $_POST['hakuna'] = trfId
-        id: Number(trfId),
-        // PHP: if (!empty($parameter) && $special) → in_array($pararow['id'], $parameter)
-        // Only send when special=1 AND at least one selected
-        ...(isSpecial && selectedParams.length
-          ? { parameters: selectedParams }
-          : {}),
-      };
-      await axios.post("testing/add-trf-item", payload);
-      onSuccess?.();
+        conformity:    Number(form.conformity),
+        unitcost:      Number(form.unitcost),
+        total:         Number(form.total),
+        quantities:    quantities.map((q) => q.id),
+        received:      received.map((r) => Number(r) || 0),
+        id:            Number(trfId),
+        ...(isSpecial && selectedParams.length ? { parameters: selectedParams } : {}),
+      });
+      // Pass { bookingrefno, trf_product_id, message } to parent for toast
+      onSuccess?.(res.data);
     } catch (err) {
       setSubmitError(err?.response?.data?.message ?? "Failed to save item.");
     } finally {
@@ -392,372 +342,340 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (loadingDropdowns) {
-    return <div style={s.loadingWrap}>Loading form options…</div>;
+    return (
+      <div className="flex items-center justify-center py-10">
+        <div className="text-center">
+          <svg className="animate-spin h-7 w-7 text-blue-600 mx-auto mb-2" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+          </svg>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading form...</p>
+        </div>
+      </div>
+    );
   }
 
-  const allParamsSelected =
-    parameters.length > 0 && selectedParams.length === parameters.length;
+  const allParamsSelected = parameters.length > 0 && selectedParams.length === parameters.length;
 
   return (
-    <div style={s.wrapper}>
-      <div style={s.formTitle}>
+    <div className="space-y-5 text-sm">
+
+      {/* Title */}
+      <h3 className="text-base font-semibold text-gray-800 dark:text-white">
         {isNew ? "Add New Item" : `Edit Item #${itemId}`}
-      </div>
+      </h3>
 
-      {submitError && <div style={s.errorBanner}>{submitError}</div>}
-
-      {/* ════ SECTION 1 — Product ════ */}
-      <div style={s.row}>
-        <Field label="Product" required error={errors.product} flex="1 1 100%">
-          <select
-            name="product"
-            style={inp(errors.product)}
-            value={form.product}
-            onChange={handleChange}
-          >
-            <option value="">Select Product</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {p.description ? `(${p.description})` : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <div style={s.row}>
-        <Field label="Brand/Source" required error={errors.brand}>
-          <input
-            name="brand"
-            style={inp(errors.brand)}
-            value={form.brand}
-            onChange={handleChange}
-            placeholder="Brand/Source"
-          />
-        </Field>
-        <Field label="QR Code" required error={errors.qrcode}>
-          <input
-            name="qrcode"
-            style={inp(errors.qrcode)}
-            value={form.qrcode}
-            onChange={handleChange}
-            placeholder="Qr Code"
-          />
-        </Field>
-        <Field label="Test Request" required error={errors.testrequest}>
-          <input
-            name="testrequest"
-            style={inp(errors.testrequest)}
-            value={form.testrequest}
-            onChange={handleChange}
-            placeholder="Test Request"
-          />
-        </Field>
-      </div>
-
-      <div style={s.divider} />
-
-      {/* ════ SECTION 2 — Package Type, Grade, Size ════ */}
-      <div style={s.row}>
-        {/* Package Type — from testprices.type via fetchpprice.php */}
-        <Field label="Packages Type" flex="1 1 200px">
-          <select
-            name="package_type"
-            style={s.inputBase}
-            value={form.package_type}
-            onChange={handleChange}
-          >
-            <option value={1}>NABL</option>
-            <option value={0}>Non-NABL</option>
-            <option value={3}>QAI</option>
-          </select>
-        </Field>
-        <Field label="Grades" required error={errors.grade} flex="1 1 200px">
-          <select
-            name="grade"
-            style={inp(errors.grade)}
-            value={form.grade}
-            onChange={handleChange}
-          >
-            <option value="">Select Grade</option>
-            {grades.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-                {g.description ? ` — ${g.description}` : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <div style={s.row}>
-        <Field label="Sizes" required error={errors.size}>
-          <select
-            name="size"
-            style={inp(errors.size)}
-            value={form.size}
-            onChange={handleChange}
-          >
-            <option value="">Select Size</option>
-            {sizes.map((sz) => (
-              <option key={sz.id} value={sz.id}>
-                {sz.name}
-                {sz.description ? ` — ${sz.description}` : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* Package — depends on selected product */}
-      <div style={s.row}>
-        <Field label="Packages" required error={errors.package} flex="1 1 100%">
-          {loadingPkgList ? (
-            <div style={s.pkgLoading}>Loading packages…</div>
-          ) : (
-            <select
-              name="package"
-              style={inp(errors.package)}
-              value={form.package}
-              onChange={handleChange}
-              disabled={!form.product}
-            >
-              <option value="">
-                {form.product ? "Select Package" : "Select a Product first"}
-              </option>
-              {packages.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.package}
-                  {p.nabl ? " (NABL)" : ""}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
-      </div>
-
-      {/* ════ SECTION 3 — isOk, Sealed, Disposable ════ */}
-      <div style={s.row}>
-        <Field label="isOk" required error={errors.isok}>
-          <select
-            name="isok"
-            style={inp(errors.isok)}
-            value={form.isok}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            {choices.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Sealed?">
-          <select
-            name="sealed"
-            style={s.inputBase}
-            value={form.sealed}
-            onChange={handleChange}
-          >
-            {SEALED_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Disposable" required error={errors.disposable}>
-          <select
-            name="disposable"
-            style={inp(errors.disposable)}
-            value={form.disposable}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            {disposables.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <div style={s.divider} />
-
-      {/* ════ SECTION 4 — Condition, Specification, Conformity ════ */}
-      <div style={s.row}>
-        <Field label="Condition" required error={errors.condition}>
-          <select
-            name="condition"
-            style={inp(errors.condition)}
-            value={form.condition}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            {conditions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Specification" required error={errors.specification}>
-          <select
-            name="specification"
-            style={inp(errors.specification)}
-            value={form.specification}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            {choices.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Conformity" required error={errors.conformity}>
-          <select
-            name="conformity"
-            style={inp(errors.conformity)}
-            value={form.conformity}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            {choices.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* ════ SECTION 5 — Price (fetchpprice.php) ════ */}
-      {/* PHP: echo "<input type='hidden' name='unitcost' value='$price'/> ₹ $price" */}
-      {!loadingPkgDetails && form.package && (
-        <div style={s.priceRow}>
-          <span style={s.priceLabel}>₹ {Number(form.unitcost).toLocaleString("en-IN")}</span>
-          <input type="hidden" name="unitcost" value={form.unitcost} />
-          <input type="hidden" name="total" value={form.total} />
-          {form.total !== form.unitcost && (
-            <span style={s.totalLabel}>
-              Total: ₹ {Number(form.total).toLocaleString("en-IN")}
-            </span>
-          )}
+      {/* Error banner */}
+      {submitError && (
+        <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 rounded-lg px-3 py-2.5 text-sm">
+          <span className="mt-0.5">⚠️</span>
+          <span>{submitError}</span>
         </div>
       )}
 
-      {/* ════ SECTION 6 — Quantities (fetchquantities.php) ════ */}
-      {/* PHP layout: Required Quantity (left col) | Received Quantity (right col) */}
-      {loadingPkgDetails && (
-        <div style={s.pkgLoading}>Loading package details…</div>
+      {/* ════ SECTION 1 — Product ════ */}
+      <div>
+        <label className={labelCls}>Product <span className="text-red-500">*</span></label>
+        <select name="product" className={sCls(errors.product)} value={form.product} onChange={handleChange}>
+          <option value="">Select Product</option>
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}{p.description ? ` (${p.description})` : ""}
+            </option>
+          ))}
+        </select>
+        {errors.product && <p className={errCls}>{errors.product}</p>}
+      </div>
+
+      {/* Brand / QR / Test Request */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className={labelCls}>Brand/Source <span className="text-red-500">*</span></label>
+          <input name="brand" className={iCls(errors.brand)} value={form.brand} onChange={handleChange} placeholder="Brand/Source" />
+          {errors.brand && <p className={errCls}>{errors.brand}</p>}
+        </div>
+        <div>
+          <label className={labelCls}>QR Code <span className="text-red-500">*</span></label>
+          <input name="qrcode" className={iCls(errors.qrcode)} value={form.qrcode} onChange={handleChange} placeholder="QR Code" />
+          {errors.qrcode && <p className={errCls}>{errors.qrcode}</p>}
+        </div>
+        <div>
+          <label className={labelCls}>Test Request <span className="text-red-500">*</span></label>
+          <input name="testrequest" className={iCls(errors.testrequest)} value={form.testrequest} onChange={handleChange} placeholder="Test Request" />
+          {errors.testrequest && <p className={errCls}>{errors.testrequest}</p>}
+        </div>
+      </div>
+
+      <hr className="border-dashed border-gray-200 dark:border-gray-700" />
+
+      {/* ════ SECTION 2 — Package Type → Grades/Sizes → Packages ════ */}
+      {loadingGradeSize && (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+          </svg>
+          Loading grades and sizes…
+        </div>
       )}
 
-      {!loadingPkgDetails && quantities.length > 0 && (
-        <div style={s.qtyBox}>
-          {/* Header row */}
-          <div style={s.qtyHeaderRow}>
-            <div style={{ ...s.qtyCol, fontWeight: 700, color: "#475569" }}>
-              Required Quantity
+      {!loadingGradeSize && form.product && (
+        <>
+          {/* Package Type */}
+          <div>
+            <label className={labelCls}>Packages Type <span className="text-red-500">*</span></label>
+            <select name="package_type" className={sCls(errors.package_type)} value={form.package_type} onChange={handleChange}>
+              {PACKAGE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {errors.package_type && <p className={errCls}>{errors.package_type}</p>}
+          </div>
+
+          {/* Grades + Sizes */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Grades <span className="text-red-500">*</span></label>
+              <select name="grade" className={sCls(errors.grade)} value={form.grade} onChange={handleChange}>
+                <option value="">Select Grade</option>
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}{g.description ? ` — ${g.description}` : ""}</option>
+                ))}
+              </select>
+              {errors.grade && <p className={errCls}>{errors.grade}</p>}
             </div>
-            <div style={{ ...s.qtyCol, fontWeight: 700, color: "#475569" }}>
-              Received Quantity
+            <div>
+              <label className={labelCls}>Sizes <span className="text-red-500">*</span></label>
+              <select name="size" className={sCls(errors.size)} value={form.size} onChange={handleChange}>
+                <option value="">Select Size</option>
+                {sizes.map((sz) => (
+                  <option key={sz.id} value={sz.id}>{sz.name}{sz.description ? ` — ${sz.description}` : ""}</option>
+                ))}
+              </select>
+              {errors.size && <p className={errCls}>{errors.size}</p>}
             </div>
           </div>
 
-          {/* PHP: while($irow) → name/quantity/unit | input received[] */}
+          {/* Packages */}
+          <div>
+            <label className={labelCls}>Packages <span className="text-red-500">*</span></label>
+            {loadingPackages ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+                </svg>
+                Loading packages…
+              </div>
+            ) : (
+              <select
+                name="package"
+                className={sCls(errors.package)}
+                value={form.package}
+                onChange={handleChange}
+                disabled={!form.package_type}
+              >
+                <option value="">
+                  {!form.package_type
+                    ? "Select a Package Type first"
+                    : packages.length === 0
+                    ? "No packages available for this type"
+                    : "Select Package"}
+                </option>
+                {packages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nabl == 1 ? "(NABL) " : p.nabl == 3 ? "(QAI) " : p.nabl == 2 ? "(NO) " : ""}
+                    {p.package}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.package && <p className={errCls}>{errors.package}</p>}
+          </div>
+        </>
+      )}
+
+      <hr className="border-dashed border-gray-200 dark:border-gray-700" />
+
+      {/* ════ SECTION 3 — isOk, Sealed, Disposable ════ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className={labelCls}>isOk <span className="text-red-500">*</span></label>
+          <select name="isok" className={sCls(errors.isok)} value={form.isok} onChange={handleChange}>
+            <option value="">Select</option>
+            {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.isok && <p className={errCls}>{errors.isok}</p>}
+        </div>
+        <div>
+          <label className={labelCls}>Sealed?</label>
+          <select name="sealed" className={selectCls} value={form.sealed} onChange={handleChange}>
+            {SEALED_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Disposable <span className="text-red-500">*</span></label>
+          <select name="disposable" className={sCls(errors.disposable)} value={form.disposable} onChange={handleChange}>
+            <option value="">Select</option>
+            {disposables.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          {errors.disposable && <p className={errCls}>{errors.disposable}</p>}
+        </div>
+      </div>
+
+      <hr className="border-dashed border-gray-200 dark:border-gray-700" />
+
+      {/* ════ SECTION 4 — Condition, Specification, Conformity ════ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className={labelCls}>Condition <span className="text-red-500">*</span></label>
+          <select name="condition" className={sCls(errors.condition)} value={form.condition} onChange={handleChange}>
+            <option value="">Select</option>
+            {conditions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.condition && <p className={errCls}>{errors.condition}</p>}
+        </div>
+        <div>
+          <label className={labelCls}>Specification <span className="text-red-500">*</span></label>
+          <select name="specification" className={sCls(errors.specification)} value={form.specification} onChange={handleChange}>
+            <option value="">Select</option>
+            {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.specification && <p className={errCls}>{errors.specification}</p>}
+        </div>
+        <div>
+          <label className={labelCls}>Conformity <span className="text-red-500">*</span></label>
+          <select name="conformity" className={sCls(errors.conformity)} value={form.conformity} onChange={handleChange}>
+            <option value="">Select</option>
+            {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.conformity && <p className={errCls}>{errors.conformity}</p>}
+        </div>
+      </div>
+
+      {/* ════ SECTION 5 — Price ════ */}
+      {!loadingPkgDetails && form.package && (
+        <div className="flex items-center gap-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3">
+          <div>
+            <p className="text-xs text-green-600 dark:text-green-400 font-medium uppercase tracking-wide mb-0.5">Unit Cost</p>
+            <p className="text-xl font-bold text-green-700 dark:text-green-300">
+              ₹ {Number(form.unitcost).toLocaleString("en-IN")}
+            </p>
+          </div>
+          {form.total !== form.unitcost && (
+            <>
+              <div className="w-px h-8 bg-green-200 dark:bg-green-700" />
+              <div>
+                <p className="text-xs text-green-600 dark:text-green-400 font-medium uppercase tracking-wide mb-0.5">Total</p>
+                <p className="text-xl font-bold text-green-700 dark:text-green-300">
+                  ₹ {Number(form.total).toLocaleString("en-IN")}
+                </p>
+              </div>
+            </>
+          )}
+          <input type="hidden" name="unitcost" value={form.unitcost} />
+          <input type="hidden" name="total"    value={form.total} />
+        </div>
+      )}
+
+      {/* ════ SECTION 6 — Quantities ════ */}
+      {loadingPkgDetails && (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+          </svg>
+          Loading package details…
+        </div>
+      )}
+
+      {!loadingPkgDetails && quantities.length > 0 && (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          {/* Header */}
+          <div className="grid grid-cols-2 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Required Quantity</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Received Quantity</span>
+          </div>
+
+          {/* Rows */}
           {quantities.map((qty, idx) => (
-            <div key={qty.id} style={s.qtyRow}>
-              {/* Left: label — PHP: $irow['name']." ".$irow['quantity']." ".$uname */}
-              <div style={s.qtyCol}>
+            <div key={qty.id} className="grid grid-cols-2 items-center px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+              <div>
                 <input type="hidden" name="quantities[]" value={qty.id} />
-                <span style={s.qtyLabel}>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
                   {qty.name}
-                  {qty.quantity ? ` ${qty.quantity}` : ""}
-                  {qty.unit_name ? ` ${qty.unit_name}` : qty.unit ? ` (${qty.unit})` : ""}
+                  {qty.quantity  ? ` ${qty.quantity}` : ""}
+                  {qty.unit_name ? ` ${qty.unit_name}` : ""}
                 </span>
               </div>
-              {/* Right: PHP → class="receivedquantities" onkeyup="totalaqty()" */}
-              <div style={s.qtyCol}>
+              <div>
                 <input
                   type="number"
                   min="0"
-                  className="receivedquantities"
-                  style={s.inputBase}
+                  className={`receivedquantities ${inputCls}`}
                   value={received[idx] ?? ""}
                   onChange={(e) => handleReceivedChange(idx, e.target.value)}
-                  placeholder={`enter value in ${qty.unit_name || qty.unit || "No"}`}
+                  placeholder={`enter value in ${qty.unit_name || "units"}`}
                 />
               </div>
             </div>
           ))}
 
-          {/* Total Quantity row — PHP: id="totalqty" readonly */}
-          <div style={s.qtyRow}>
-            <div style={s.qtyCol}>
-              <span style={s.qtyLabel}>Total Quantity</span>
-            </div>
-            <div style={s.qtyCol}>
-              <input
-                type="number"
-                id="totalqty"
-                readOnly
-                style={{ ...s.inputBase, background: "#f1f5f9", color: "#64748b" }}
-                value={received.reduce((sum, v) => sum + (Number(v) || 0), 0)}
-              />
-            </div>
+          {/* Total row */}
+          <div className="grid grid-cols-2 items-center px-4 py-2.5 bg-gray-50 dark:bg-gray-800">
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Total Quantity</span>
+            <input
+              type="number"
+              id="totalqty"
+              readOnly
+              className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 outline-none cursor-default"
+              value={received.reduce((sum, v) => sum + (Number(v) || 0), 0)}
+            />
           </div>
         </div>
       )}
 
-      {/* ════ SECTION 7 — Parameters (fetchparameters.php) ════ */}
-      {/* PHP: if($special) → show checkboxes, else just show names */}
+      {/* ════ SECTION 7 — Parameters ════ */}
       {!loadingPkgDetails && parameters.length > 0 && (
-        <div style={s.paramBox}>
-          <div style={s.paramTitle}>Parameters Of Package</div>
+        <div className="border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-2.5 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800">
+            <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-400">Parameters Of Package</h4>
+          </div>
 
-          {isSpecial && (
-            /* PHP: <input type="checkbox" onclick="checkall('selectall','parametercheck')" /> Select/Deselect All */
-            <label style={s.paramSelectAll}>
-              <input
-                type="checkbox"
-                checked={allParamsSelected}
-                onChange={(e) => handleSelectAllParams(e.target.checked)}
-                style={{ marginRight: 6, accentColor: "#3b82f6" }}
-              />
-              <strong>Select/Deselect All</strong>
-            </label>
-          )}
+          <div className="px-4 py-3 space-y-1">
+            {isSpecial && (
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 pb-2 mb-1 border-b border-gray-100 dark:border-gray-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allParamsSelected}
+                  onChange={(e) => handleSelectAllParams(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600 rounded"
+                />
+                Select / Deselect All
+              </label>
+            )}
 
-          <div style={s.paramList}>
             {parameters.map((param) => (
-              <div key={param.id} style={s.paramItem}>
+              <div key={param.id}>
                 {isSpecial ? (
-                  /* PHP: <input type="checkbox" name="parameters[]" value="<?= $irow['id'] ?>" />
-                     $irow['id'] = packageparameters.id  */
-                  <label style={s.paramLabel}>
+                  <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer py-0.5 hover:text-blue-600 dark:hover:text-blue-400 transition">
                     <input
                       type="checkbox"
-                      className="parametercheck"
+                      className="parametercheck w-4 h-4 mt-0.5 accent-blue-600 rounded flex-shrink-0"
                       checked={selectedParams.includes(param.id)}
                       onChange={() => handleParamToggle(param.id)}
-                      style={{ marginRight: 6, accentColor: "#3b82f6" }}
                     />
-                    {param.name}
-                    {param.description ? `(${param.description})` : ""}
+                    <span>
+                      {param.name}
+                      {param.description ? <span className="text-gray-400 dark:text-gray-500"> ({param.description})</span> : ""}
+                    </span>
                   </label>
                 ) : (
-                  /* PHP: no checkbox, just show name */
-                  <span style={s.paramLabelReadonly}>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 py-0.5">
                     {param.name}
-                    {param.description ? `(${param.description})` : ""}
-                  </span>
+                    {param.description ? <span className="text-gray-400 dark:text-gray-500"> ({param.description})</span> : ""}
+                  </p>
                 )}
               </div>
             ))}
@@ -766,123 +684,30 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
       )}
 
       {/* ── Footer ── */}
-      <div style={s.footerRow}>
-        <button style={s.cancelBtn} onClick={onCancel} disabled={submitting}>
+      <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <button
+          className="px-5 py-2.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+          onClick={onCancel}
+          disabled={submitting}
+        >
           Cancel
         </button>
         <button
-          style={{ ...s.submitBtn, ...(submitting ? s.submitDisabled : {}) }}
+          className={`flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm transition ${submitting ? "opacity-60 cursor-not-allowed" : ""}`}
           onClick={handleSubmit}
           disabled={submitting}
         >
-          {submitting ? "Saving…" : isNew ? "Add Item" : "Save Changes"}
+          {submitting ? (
+            <>
+              <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+              </svg>
+              Saving…
+            </>
+          ) : isNew ? "Add Item" : "Save Changes"}
         </button>
       </div>
     </div>
   );
 }
-
-// ─── Field wrapper ────────────────────────────────────────────────────────────
-function Field({ label, required, error, children, flex }) {
-  return (
-    <div style={{ ...s.fieldGroup, ...(flex ? { flex } : {}) }}>
-      <label style={s.fieldLabel}>
-        {label}
-        {required && <span style={s.star}> *</span>}
-      </label>
-      {children}
-      {error && <span style={s.fieldErr}>{error}</span>}
-    </div>
-  );
-}
-
-const inp = (err) => ({ ...s.inputBase, ...(err ? s.inputErr : {}) });
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const s = {
-  wrapper: { fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 13, color: "#333" },
-  loadingWrap: { padding: "12px 0", color: "#777", fontSize: 13 },
-  formTitle: { fontSize: 15, fontWeight: 700, color: "#1e40af", marginBottom: 16 },
-  errorBanner: {
-    background: "#fdecea", border: "1px solid #e74c3c", color: "#c0392b",
-    borderRadius: 5, padding: "8px 12px", marginBottom: 12, fontSize: 13,
-  },
-  divider: { borderTop: "1px dashed #cbd5e1", margin: "14px 0" },
-  row: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10 },
-  fieldGroup: { display: "flex", flexDirection: "column", gap: 3, flex: "1 1 180px", minWidth: 0 },
-  fieldLabel: { fontSize: 12, fontWeight: 600, color: "#475569" },
-  star: { color: "#ef4444" },
-  inputBase: {
-    border: "1px solid #cbd5e1", borderRadius: 4,
-    padding: "6px 9px", fontSize: 13, outline: "none",
-    background: "#fff", color: "#333",
-    width: "100%", boxSizing: "border-box",
-  },
-  inputErr: { borderColor: "#ef4444", background: "#fff5f5" },
-  fieldErr: { fontSize: 11, color: "#ef4444" },
-  pkgLoading: { fontSize: 12, color: "#94a3b8", padding: "6px 0" },
-
-  // Price row — PHP: "₹ 25000" display
-  priceRow: {
-    display: "flex", alignItems: "center", gap: 16,
-    margin: "8px 0 12px", padding: "8px 12px",
-    background: "#f0fdf4", border: "1px solid #bbf7d0",
-    borderRadius: 5,
-  },
-  priceLabel: { fontSize: 16, fontWeight: 700, color: "#166534" },
-  totalLabel: { fontSize: 13, color: "#475569" },
-
-  // Quantities — PHP two-column layout
-  qtyBox: {
-    border: "1px solid #cbd5e1", borderRadius: 5,
-    marginBottom: 12, overflow: "hidden",
-  },
-  qtyHeaderRow: {
-    display: "flex", background: "#f8fafc",
-    padding: "8px 12px", borderBottom: "1px solid #e2e8f0",
-  },
-  qtyRow: {
-    display: "flex", padding: "6px 12px",
-    borderBottom: "1px solid #f1f5f9", alignItems: "center",
-  },
-  qtyCol: { flex: 1, paddingRight: 8 },
-  qtyLabel: { fontSize: 13, color: "#334155" },
-
-  // Parameters — PHP: "Parameters Of Package"
-  paramBox: {
-    border: "1px solid #bae6fd", borderRadius: 5,
-    padding: "12px", marginBottom: 12,
-    background: "#f0f9ff",
-  },
-  paramTitle: {
-    fontSize: 13, fontWeight: 700, color: "#0369a1",
-    marginBottom: 10,
-  },
-  paramSelectAll: {
-    display: "flex", alignItems: "center",
-    fontSize: 13, cursor: "pointer",
-    marginBottom: 8, color: "#1e40af",
-  },
-  paramList: { display: "flex", flexDirection: "column", gap: 4 },
-  paramItem: { fontSize: 13 },
-  paramLabel: { display: "flex", alignItems: "center", cursor: "pointer", color: "#334155" },
-  paramLabelReadonly: { color: "#334155" },
-
-  footerRow: {
-    display: "flex", justifyContent: "flex-end",
-    gap: 8, marginTop: 16, paddingTop: 12,
-    borderTop: "1px solid #e2e8f0",
-  },
-  cancelBtn: {
-    padding: "7px 20px", background: "#fff", color: "#555",
-    border: "1px solid #ccc", borderRadius: 5,
-    cursor: "pointer", fontSize: 13, fontWeight: 500,
-  },
-  submitBtn: {
-    padding: "7px 24px", background: "#3b82f6", color: "#fff",
-    border: "none", borderRadius: 5, cursor: "pointer",
-    fontSize: 13, fontWeight: 600,
-    boxShadow: "0 2px 5px rgba(37,99,235,0.3)",
-  },
-  submitDisabled: { opacity: 0.6, cursor: "default" },
-};

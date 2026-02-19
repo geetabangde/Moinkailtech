@@ -17,6 +17,8 @@ import {
   ClipboardDocumentCheckIcon,
   BanknotesIcon,
   ChatBubbleBottomCenterTextIcon,
+  PrinterIcon,
+  DocumentMagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { Fragment, useCallback, useState } from "react";
@@ -43,18 +45,20 @@ const confirmMessages = {
 
 export function RowActions({ row, table }) {
   const navigate = useNavigate();
-  const trfId = row.original.id;
 
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  // ── Fields from actual API response ──────────────────────────────────────
+  const trfId      = row.original.id;
+  const status     = Number(row.original.status);
+  const hasProducts = Array.isArray(row.original.products) && row.original.products.length > 0;
+
+  // ── Delete modal state ────────────────────────────────────────────────────
+  const [deleteModalOpen,      setDeleteModalOpen]      = useState(false);
   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
-  const [deleteSuccess, setDeleteSuccess] = useState(false);
-  const [deleteError, setDeleteError] = useState(false);
+  const [deleteSuccess,        setDeleteSuccess]        = useState(false);
+  const [deleteError,          setDeleteError]          = useState(false);
 
-  const closeModal = () => {
-    setDeleteModalOpen(false);
-  };
-
-  const openModal = () => {
+  const closeModal = () => setDeleteModalOpen(false);
+  const openModal  = () => {
     setDeleteModalOpen(true);
     setDeleteError(false);
     setDeleteSuccess(false);
@@ -62,41 +66,35 @@ export function RowActions({ row, table }) {
 
   const handleDeleteTrf = useCallback(async () => {
     setConfirmDeleteLoading(true);
-
     try {
       await axios.delete(`/testing/delete-trf?id=${trfId}`);
-
-      // Remove row from UI
       table.options.meta?.deleteRow(row);
-
       setDeleteSuccess(true);
-      toast.success("TRF entry deleted successfully ✅", {
-        duration: 1000,
-        icon: "🗑️",
-      });
-
-      // Close modal after success
-      setTimeout(() => {
-        setDeleteModalOpen(false);
-      }, 1000);
+      toast.success("TRF entry deleted successfully ✅", { duration: 1000, icon: "🗑️" });
+      setTimeout(() => setDeleteModalOpen(false), 1000);
     } catch (error) {
       console.error("Delete failed:", error);
       setDeleteError(true);
-
       const errorMessage =
         error.response?.data?.message ||
         error.response?.data?.error ||
         "Failed to delete TRF entry";
-
-      toast.error(`${errorMessage} ❌`, {
-        duration: 2000,
-      });
+      toast.error(`${errorMessage} ❌`, { duration: 2000 });
     } finally {
       setConfirmDeleteLoading(false);
     }
   }, [row, table, trfId]);
 
   const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
+
+  // ── Button class helper ───────────────────────────────────────────────────
+  const btnCls = (focus, danger = false) =>
+    clsx(
+      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
+      danger
+        ? clsx("text-red-600 dark:text-red-400", focus && "bg-red-50 dark:bg-red-900/20")
+        : clsx(focus && "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100")
+    );
 
   return (
     <>
@@ -118,236 +116,217 @@ export function RowActions({ row, table }) {
               anchor={{ to: "bottom end", gap: 12 }}
               className="absolute z-100 w-[14rem] max-h-[400px] overflow-y-auto rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-750 dark:shadow-none ltr:right-0 rtl:left-0"
             >
-              {/* Edit TRF */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/edit/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <PencilIcon className="size-4.5 stroke-1" />
-                    <span>Edit TRF</span>
-                  </button>
-                )}
-              </MenuItem>
-              {/* trfitems */}
-              
 
-              {/* View Details */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <FolderOpenIcon className="size-4.5 stroke-1" />
-                    <span>Add Items</span>
-                  </button>
-                )}
-              </MenuItem>
+              {/* ── Add Items — status 0 or 98 ── */}
+              {(status === 0 || status === 98) && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                      <FolderOpenIcon className="size-4.5 stroke-1" />
+                      <span>Add Items</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
 
-              {/* View Details */}
+              {/* ── Sample Review — status 1 & has products ── */}
+              {status === 1 && hasProducts && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/sample-review/${trfId}`)} className={btnCls(focus)}>
+                      <DocumentMagnifyingGlassIcon className="size-4.5 stroke-1" />
+                      <span>Sample Review</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Technical Acceptance — status 2, has products ── */}
+              {status === 2 && hasProducts && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
+                      <span>Technical Acceptance</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Allot Sample — status 3, has products ── */}
+              {status === 3 && hasProducts && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                      <BeakerIcon className="size-4.5 stroke-1" />
+                      <span>Allot Sample</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Assign Chemist — status 3 or 4, has products ── */}
+              {(status === 3 || status === 4) && hasProducts && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/assign-chemist/${trfId}`)} className={btnCls(focus)}>
+                      <UserIcon className="size-4.5 stroke-1" />
+                      <span>Assign Chemist</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Details — always ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/details/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
+                  <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
                     <DocumentTextIcon className="size-4.5 stroke-1" />
                     <span>Details</span>
                   </button>
                 )}
               </MenuItem>
-              {/* edit_bd_person */}
-              
 
+              {/* ── Perform Testing — status 5 ── */}
+              {status === 5 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/perform-testing/${trfId}`)} className={btnCls(focus)}>
+                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
+                      <span>Perform Testing</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
 
-              {/* Edit Bill Person */}
+              {/* ── View Draft Report — status 6 ── */}
+              {status === 6 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/draft-report/${trfId}`)} className={btnCls(focus)}>
+                      <DocumentTextIcon className="size-4.5 stroke-1" />
+                      <span>View Draft Report</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── HOD Review — status 7 ── */}
+              {status === 7 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/hod-review/${trfId}`)} className={btnCls(focus)}>
+                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
+                      <span>HOD Review</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── QA Review — status 8 ── */}
+              {status === 8 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/qa-review/${trfId}`)} className={btnCls(focus)}>
+                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
+                      <span>QA Review</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Generate ULR — status 9 ── */}
+              {status === 9 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/generate-ulr/${trfId}`)} className={btnCls(focus)}>
+                      <DocumentTextIcon className="size-4.5 stroke-1" />
+                      <span>Generate ULR</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── View Reports — status 10 ── */}
+              {status === 10 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/reports/${trfId}`)} className={btnCls(focus)}>
+                      <FolderOpenIcon className="size-4.5 stroke-1" />
+                      <span>View Reports</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Print Slip — status > 3 ── */}
+              {status > 3 && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/print-slip/${trfId}`)} className={btnCls(focus)}>
+                      <PrinterIcon className="size-4.5 stroke-1" />
+                      <span>Print Slip</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Edit TRF — status < 10 or 98 ── */}
+              {(status < 10 || status === 98) && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit/${trfId}`)} className={btnCls(focus)}>
+                      <PencilIcon className="size-4.5 stroke-1" />
+                      <span>Edit TRF</span>
+                    </button>
+                  )}
+                </MenuItem>
+              )}
+
+              {/* ── Edit Work Order / Billing / Customer — status < 10 or 98 ── */}
+              {(status < 10 || status === 98) && (
+                <>
+                  <MenuItem>
+                    {({ focus }) => (
+                      <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit-work-order/${trfId}`)} className={btnCls(focus)}>
+                        <DocumentTextIcon className="size-4.5 stroke-1" />
+                        <span>Edit Work Order</span>
+                      </button>
+                    )}
+                  </MenuItem>
+                  <MenuItem>
+                    {({ focus }) => (
+                      <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit-billing/${trfId}`)} className={btnCls(focus)}>
+                        <BanknotesIcon className="size-4.5 stroke-1" />
+                        <span>Edit Billing Detail</span>
+                      </button>
+                    )}
+                  </MenuItem>
+                  <MenuItem>
+                    {({ focus }) => (
+                      <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit-customer-responsible/${trfId}`)} className={btnCls(focus)}>
+                        <UserIcon className="size-4.5 stroke-1" />
+                        <span>Edit Customer Responsible</span>
+                      </button>
+                    )}
+                  </MenuItem>
+                </>
+              )}
+
+              {/* ── Edit BD Person — always ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/edit_bd_person/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
+                  <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit_bd_person/${trfId}`)} className={btnCls(focus)}>
                     <PencilIcon className="size-4.5 stroke-1" />
                     <span>Edit BD Person</span>
                   </button>
                 )}
               </MenuItem>
 
-
-              {/* Edit Bill Person */}
+              {/* ── Fill Feedback Form — always ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/edit-bill-person/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <UserIcon className="size-4.5 stroke-1" />
-                    <span>Edit Bill Person</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Add Sample */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/add-sample/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <BeakerIcon className="size-4.5 stroke-1" />
-                    <span>Add Sample</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Assign Chemist */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/assign-chemist/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <UserIcon className="size-4.5 stroke-1" />
-                    <span>Assign Chemist</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Perform Testing */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/perform-testing/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
-                    <span>Perform Testing</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Edit Work Order Detail */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/edit-work-order/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <DocumentTextIcon className="size-4.5 stroke-1" />
-                    <span>Edit Work Order</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Edit Billing Detail */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/edit-billing/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <BanknotesIcon className="size-4.5 stroke-1" />
-                    <span>Edit Billing Detail</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Edit Customer Responsible */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/dashboards/testing/trfs-starts-jobs/edit-customer-responsible/${trfId}`
-                      )
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
-                    <UserIcon className="size-4.5 stroke-1" />
-                    <span>Edit Customer Responsible</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Fill Feedback Form */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(`/dashboards/testing/trfs-starts-jobs/feedback/${trfId}`)
-                    }
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100"
-                    )}
-                  >
+                  <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/feedback/${trfId}`)} className={btnCls(focus)}>
                     <ChatBubbleBottomCenterTextIcon className="size-4.5 stroke-1" />
                     <span>Fill Feedback Form</span>
                   </button>
@@ -357,21 +336,16 @@ export function RowActions({ row, table }) {
               {/* Divider */}
               <div className="my-1 h-px bg-gray-200 dark:bg-dark-500" />
 
-              {/* Delete */}
+              {/* ── Delete ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button
-                    onClick={openModal}
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide text-red-600 outline-hidden transition-colors dark:text-red-400",
-                      focus && "bg-red-50 dark:bg-red-900/20"
-                    )}
-                  >
+                  <button onClick={openModal} className={btnCls(focus, true)}>
                     <TrashIcon className="size-4.5 stroke-1" />
                     <span>Delete</span>
                   </button>
                 )}
               </MenuItem>
+
             </MenuItems>
           </Transition>
         </Menu>

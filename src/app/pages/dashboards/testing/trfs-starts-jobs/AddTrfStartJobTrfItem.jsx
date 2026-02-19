@@ -1,23 +1,175 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "utils/axios";
-import { useParams, } from "react-router-dom";
-import TrfItemForm from "./TrfItemForm"; // inline form
+import { useNavigate, useParams } from "react-router-dom";
+import TrfItemForm from "./TrfItemForm";
+import { toast } from "sonner";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
+// ── Action Buttons (mirrors PHP trfitems.php logic) ──────────────────────────
+function ActionCell({ row, onEdit, onDelete }) {
+  // ✅ Fix 1: navigate removed from ActionCell (it belongs in main component)
+  const tid = row.id;
+  const status = row.status;
+
+  if (status === 99) {
+    return <span className="text-xs text-gray-400 italic">LRN Cancelled</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {/* ── Status == 1: Remove Item + Clone ── */}
+      {status === 1 && (
+        <>
+          <button
+            onClick={() => onDelete(tid)}
+            className="rounded bg-cyan-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-cyan-600"
+          >
+            Remove Item
+          </button>
+          <a
+            href={`additemfromclone.php?hakuna=${tid}`}
+            className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+          >
+            Clone
+          </a>
+        </>
+      )}
+
+      {/* ── Status == 2: Technical Acceptance + Remove Item ── */}
+      {status === 2 && (
+        <>
+          {row.can_technical && (
+            <a
+              href={`technical.php?hakuna=${tid}`}
+              className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+            >
+              Technical Acceptance
+            </a>
+          )}
+          <button
+            onClick={() => onDelete(tid)}
+            className="rounded bg-cyan-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-cyan-600"
+          >
+            Remove Item
+          </button>
+        </>
+      )}
+
+      {/* ── Status == 3: Remove Item only ── */}
+      {status === 3 && row.can_delete && (
+        <button
+          onClick={() => onDelete(tid)}
+          className="rounded bg-cyan-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-cyan-600"
+        >
+          Remove Item
+        </button>
+      )}
+
+      {/* ── Status == 5: Perform Test ── */}
+      {status === 5 && row.can_perform && (
+        <a
+          href={`performtest.php?hakuna=${tid}`}
+          className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+        >
+          Perform Test
+        </a>
+      )}
+
+      {/* ── Status == 10: Upload Report / Final Report ── */}
+      {status === 10 && (
+        <>
+          {row.pack_type === 0 ? (
+            row.report == 0 ? (
+              row.can_upload_report && (
+                <a
+                  href={`uploadreport.php?hakuna=${tid}`}
+                  className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+                >
+                  Upload Report
+                </a>
+              )
+            ) : (
+              <a
+                href={row.report_link}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+              >
+                Final Report
+              </a>
+            )
+          ) : (
+            <a
+              href={`testreport.php?hakuna=${tid}`}
+              className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+            >
+              Final Report
+            </a>
+          )}
+        </>
+      )}
+
+      {/* ── Pending TRF Approval (default) ── */}
+      {![1, 2, 3, 5, 10, 99].includes(status) && (
+        <span className="text-xs text-gray-500 italic">
+          Pending TRF Approval
+        </span>
+      )}
+
+      {/* ── Print Review Form ── */}
+      <a
+        href={`printslip.php?hakuna=${tid}`}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+      >
+        Print Review Form
+      </a>
+
+      {/* ── Edit Item Detail ── */}
+      {row.can_edit && (
+        <button
+          onClick={() => onEdit(tid)}
+          className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+        >
+          Edit Item Detail
+        </button>
+      )}
+
+      {/* ── Cancel LRN ── */}
+      {row.can_cancel_lrn && !row.invoice && !row.ulr && (
+        <button
+          onClick={() => handleCancelLRN(tid)}
+          className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
+        >
+          Cancel LRN
+        </button>
+      )}
+    </div>
+  );
+}
+
+function handleCancelLRN(tid) {
+  alert(`Cancel LRN for item ${tid} — wire up modal here`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function TrfProductsList() {
   const { id } = useParams();
-//   const navigate = useNavigate();
+  const navigate = useNavigate(); // ✅ Fix 3: navigate moved to main component
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ── Inline form state ──────────────────────────────────────────
-  const [showForm, setShowForm] = useState(false);   // toggle add-form
-  const [editItemId, setEditItemId] = useState(null); // null = add, number = edit
+  // ✅ Fix 2: proper useState with both value and setter
+  const [trfStatus, setTrfStatus] = useState(null);
 
-  // Table state
+  const [showForm, setShowForm] = useState(false);
+  const [editItemId, setEditItemId] = useState(null);
+
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,27 +179,37 @@ export default function TrfProductsList() {
     setError(null);
     try {
       const response = await axios.get(`testing/get-trf-item-list/${id}`);
-      const items = response.data?.trf_products ?? [];
-      setData(items);
+      setData(response.data?.trf_products ?? []);
+      if (response.data?.trf_status !== undefined) {
+        setTrfStatus(response.data.trf_status);
+      }
     } catch (err) {
       setError(err?.response?.data?.message ?? "Failed to load TRF items.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id]); // ✅ Fix 2: setTrfStatus is stable, no need in deps
 
   useEffect(() => {
     if (id) fetchItems();
   }, [fetchItems, id]);
 
-  // Derived state
   const filtered = data.filter((row) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return [
-      row.product_name, row.package_name, row.lrn,
-      row.brn, row.ulr, row.grade_size, row.brand,
-    ].some((v) => String(v ?? "").toLowerCase().includes(q));
+      row.product_name,
+      row.package_name,
+      row.lrn,
+      row.brn,
+      row.ulr,
+      row.grade_size,
+      row.brand,
+    ].some((v) =>
+      String(v ?? "")
+        .toLowerCase()
+        .includes(q),
+    );
   });
 
   const totalEntries = filtered.length;
@@ -56,26 +218,43 @@ export default function TrfProductsList() {
   const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginated = filtered.slice(startIndex, startIndex + pageSize);
 
-  const handleSearchChange = (e) => { setSearch(e.target.value); setCurrentPage(1); };
-  const handlePageSizeChange = (e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); };
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+    setCurrentPage(1);
+  };
+  const handlePageSizeChange = (e) => {
+    setPageSize(Number(e.target.value));
+    setCurrentPage(1);
+  };
 
-  // Open form for ADD
   const handleAddNew = () => {
     setEditItemId(null);
     setShowForm(true);
   };
-
-  // Open form for EDIT
   const handleEdit = (itemId) => {
     setEditItemId(itemId);
     setShowForm(true);
   };
 
-  // Close form & refresh
-  const handleFormSuccess = () => {
+  const handleFormSuccess = (res) => {
     setShowForm(false);
     setEditItemId(null);
     fetchItems();
+    if (res?.bookingrefno) {
+      toast.success(
+        <div>
+          <p className="font-semibold">Item Added Successfully ✅</p>
+          <p className="mt-0.5 text-xs text-green-700">
+            BRN: <span className="font-mono font-bold">{res.bookingrefno}</span>
+          </p>
+        </div>,
+        { duration: 4000 },
+      );
+    } else {
+      toast.success(res?.message ?? "TRF Item added successfully", {
+        duration: 3000,
+      });
+    }
   };
 
   const handleFormCancel = () => {
@@ -93,6 +272,9 @@ export default function TrfProductsList() {
     }
   };
 
+  // Suppress unused warning — trfStatus available for future use
+  void trfStatus;
+
   const columns = [
     { key: "id", label: "ID" },
     { key: "product_name", label: "Product" },
@@ -107,232 +289,231 @@ export default function TrfProductsList() {
   const TableHeaders = () => (
     <tr>
       {columns.map((col) => (
-        <th key={col.key} style={styles.th}>{col.label}</th>
+        <th
+          key={col.key}
+          className="border-y border-gray-200 bg-white px-3 py-2.5 text-left text-xs font-semibold whitespace-nowrap text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+        >
+          {col.label}
+        </th>
       ))}
-      <th style={styles.th}>Action</th>
+      <th className="border-y border-gray-200 bg-white px-3 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+        Action
+      </th>
     </tr>
   );
 
   return (
-    <div style={styles.wrapper}>
+    <div className="transition-content w-full pb-5">
+    <div className="flex h-full w-full flex-col">
+      <div className="pb-4 text-sm text-gray-700 dark:text-gray-300">
+        {/* ── Header Row ── */}
+        {/* ── Header Row ── */}
+        <div className="mb-4 flex items-center justify-between">
+          {/* Left Side - Title */}
+          <h2 className="text-lg font-bold text-gray-800 dark:text-white">
+            TRF Products
+          </h2>
 
-      {/* ── Header Row ── */}
-      <div style={styles.headerRow}>
-        <span style={styles.sectionTitle}>TRF Products</span>
-        <button
-          style={{
-            ...styles.addButton,
-            ...(showForm && !editItemId ? styles.addButtonActive : {}),
-          }}
-          onClick={handleAddNew}
-        >
-          <span style={styles.addIcon}>{showForm && !editItemId ? "✕" : "+"}</span>
-          {showForm && !editItemId ? "Close Form" : "Add New Item"}
-        </button>
-      </div>
+          {/* Right Side - Buttons */}
+          <div className="flex items-center gap-3">
+            {/* Back Button */}
+            <button
+              onClick={() => navigate("/dashboards/testing/trfs-starts-jobs")}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
+            >
+              Back to TRF Entry List
+            </button>
 
-      {/* ── Inline Add / Edit Form ── */}
-      {showForm && (
-        <div style={styles.formWrapper}>
-          {/* animated slide-down */}
-          <TrfItemForm
-            trfId={id}
-            itemId={editItemId}           // null = new, number = edit
-            onSuccess={handleFormSuccess}
-            onCancel={handleFormCancel}
-          />
+            {/* Add / Close Button */}
+            <button
+              onClick={handleAddNew}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition ${
+                showForm && !editItemId
+                  ? "bg-slate-500 hover:bg-slate-600"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              <span className="mr-1 font-bold">
+                {showForm && !editItemId ? "✕" : "+"}
+              </span>
+              {showForm && !editItemId ? "Close Form" : "Add New Item"}
+            </button>
+          </div>
         </div>
-      )}
 
-      {/* ── Controls Row ── */}
-      <div style={styles.controlsRow}>
-        <div style={styles.showEntries}>
-          <span style={styles.label}>Show</span>
-          <select style={styles.select} value={pageSize} onChange={handlePageSizeChange}>
-            {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-          <span style={styles.label}>entries</span>
+        {/* ── Inline Add / Edit Form ── */}
+        {showForm && (
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+            <TrfItemForm
+              trfId={id}
+              itemId={editItemId}
+              onSuccess={handleFormSuccess}
+              onCancel={handleFormCancel}
+            />
+          </div>
+        )}
+
+        {/* ── Controls Row ── */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">Show</span>
+            <select
+              value={pageSize}
+              onChange={handlePageSizeChange}
+              className="rounded border border-gray-300 bg-white px-1.5 py-1 text-sm text-gray-700 outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              entries
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Search:
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Search…"
+              className="w-44 rounded border border-gray-300 bg-white px-2.5 py-1 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            />
+          </div>
         </div>
-        <div style={styles.searchWrapper}>
-          <span style={styles.label}>Search:</span>
-          <input
-            style={styles.searchInput}
-            type="text"
-            value={search}
-            onChange={handleSearchChange}
-            placeholder="Search…"
-          />
-        </div>
-      </div>
 
-      {error && <div style={styles.error}>{error}</div>}
+        {/* Error */}
+        {error && (
+          <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400">
+            {error}
+          </div>
+        )}
 
-      {/* ── Table ── */}
-      <div style={styles.tableWrapper}>
-        <table style={styles.table}>
-          <thead><TableHeaders /></thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={columns.length + 1} style={styles.emptyCell}>Loading…</td></tr>
-            ) : paginated.length === 0 ? (
-              <tr><td colSpan={columns.length + 1} style={styles.emptyCell}>No data available in table</td></tr>
-            ) : (
-              paginated.map((row, idx) => (
-                <tr
-                  key={row.id}
-                  style={{
-                    ...(idx % 2 === 0 ? styles.trEven : styles.trOdd),
-                    ...(editItemId === row.id ? styles.trHighlight : {}),
-                  }}
-                >
-                  {columns.map((col) => (
-                    <td key={col.key} style={styles.td}>{row[col.key] ?? ""}</td>
-                  ))}
-                  <td style={styles.td}>
-                    <div style={styles.actionGroup}>
-                      {row.can_edit && (
-                        <>
-                          <button
-                            style={{
-                              ...styles.editBtn,
-                              ...(editItemId === row.id ? styles.editBtnActive : {}),
-                            }}
-                            onClick={() => handleEdit(row.id)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            style={styles.deleteBtn}
-                            onClick={() => handleDelete(row.id)}
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
+        {/* ── Table ── */}
+        <div className="overflow-x-auto rounded-lg border-t border-gray-200 dark:border-gray-700">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead>
+              <TableHeaders />
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={columns.length + 1}
+                    className="py-8 text-center text-gray-400 dark:text-gray-500"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg
+                        className="h-4 w-4 animate-spin text-blue-500"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+                        />
+                      </svg>
+                      Loading…
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-          <tfoot><TableHeaders /></tfoot>
-        </table>
-      </div>
-
-      {/* ── Footer ── */}
-      <div style={styles.footerRow}>
-        <span style={styles.label}>
-          {totalEntries === 0
-            ? "Showing 0 to 0 of 0 entries"
-            : `Showing ${startIndex + 1} to ${Math.min(startIndex + pageSize, totalEntries)} of ${totalEntries} entries`}
-        </span>
-        <div style={styles.paginationGroup}>
-          <button
-            style={{ ...styles.pageBtn, ...(safeCurrentPage === 1 ? styles.pageBtnDisabled : {}) }}
-            disabled={safeCurrentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          >
-            Previous
-          </button>
-          <button
-            style={{ ...styles.pageBtn, ...(safeCurrentPage === totalPages ? styles.pageBtnDisabled : {}) }}
-            disabled={safeCurrentPage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          >
-            Next
-          </button>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columns.length + 1}
+                    className="py-8 text-center text-gray-400 dark:text-gray-500"
+                  >
+                    No data available in table
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((row, idx) => (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-gray-100 transition-colors dark:border-gray-800 ${
+                      editItemId === row.id
+                        ? "bg-blue-50 dark:bg-blue-900/20"
+                        : idx % 2 === 0
+                          ? "bg-white dark:bg-gray-900"
+                          : "bg-gray-50 dark:bg-gray-800/50"
+                    }`}
+                  >
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className="px-3 py-2 align-middle text-gray-700 dark:text-gray-300"
+                      >
+                        {row[col.key] ?? ""}
+                      </td>
+                    ))}
+                    <td className="min-w-[200px] px-3 py-2 align-middle">
+                      <ActionCell
+                        row={row}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            <tfoot>
+              <TableHeaders />
+            </tfoot>
+          </table>
         </div>
-      </div>
 
-      {!loading && totalEntries === 0 && !showForm && (
-        <div style={styles.noItemMsg}>No Item added</div>
-      )}
+        {/* ── Footer ── */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {totalEntries === 0
+              ? "Showing 0 to 0 of 0 entries"
+              : `Showing ${startIndex + 1} to ${Math.min(startIndex + pageSize, totalEntries)} of ${totalEntries} entries`}
+          </span>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              disabled={safeCurrentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              Previous
+            </button>
+
+            <span className="min-w-[36px] rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-center text-sm font-semibold text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+              {safeCurrentPage}
+            </span>
+
+            <button
+              disabled={safeCurrentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        {!loading && totalEntries === 0 && !showForm && (
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            No Item added
+          </p>
+        )}
+      </div>
+      </div>
     </div>
   );
 }
-
-const styles = {
-  wrapper: {
-    fontFamily: "'Segoe UI', Arial, sans-serif",
-    fontSize: 13, color: "#333",
-    padding: "0 0 16px 0",
-  },
-  headerRow: {
-    display: "flex", alignItems: "center",
-    justifyContent: "space-between", marginBottom: 14,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: 700, color: "#1e293b" },
-  addButton: {
-    display: "inline-flex", alignItems: "center", gap: 6,
-    padding: "7px 16px", background: "#3b82f6", color: "#fff",
-    border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-    cursor: "pointer", boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
-    transition: "background 0.18s",
-  },
-  addButtonActive: {
-    background: "#64748b",
-    boxShadow: "0 2px 6px rgba(100,116,139,0.25)",
-  },
-  addIcon: { fontSize: 15, lineHeight: 1, fontWeight: 700 },
-
-  // ── Inline form container ──
-  formWrapper: {
-    marginBottom: 16,
-    border: "1px solid #bfdbfe",
-    borderRadius: 8,
-    background: "#f0f7ff",
-    padding: "18px 18px 10px",
-    animation: "slideDown 0.2s ease",
-  },
-
-  controlsRow: {
-    display: "flex", justifyContent: "space-between",
-    alignItems: "center", marginBottom: 8,
-    flexWrap: "wrap", gap: 8,
-  },
-  showEntries: { display: "flex", alignItems: "center", gap: 6 },
-  label: { fontSize: 13, color: "#555" },
-  select: { border: "1px solid #ccc", borderRadius: 3, padding: "2px 4px", fontSize: 13 },
-  searchWrapper: { display: "flex", alignItems: "center", gap: 6 },
-  searchInput: {
-    border: "1px solid #ccc", borderRadius: 3,
-    padding: "3px 8px", fontSize: 13, width: 180, outline: "none",
-  },
-  error: {
-    color: "#c0392b", background: "#fdecea", border: "1px solid #e74c3c",
-    borderRadius: 3, padding: "6px 12px", marginBottom: 8, fontSize: 13,
-  },
-  tableWrapper: { overflowX: "auto", borderTop: "1px solid #ddd" },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 800 },
-  th: {
-    padding: "8px 10px", textAlign: "left",
-    borderBottom: "1px solid #ddd", borderTop: "1px solid #ddd",
-    background: "#fff", fontWeight: 600, color: "#333", whiteSpace: "nowrap",
-  },
-  td: { padding: "7px 10px", borderBottom: "1px solid #e8e8e8", color: "#444", verticalAlign: "middle" },
-  trEven: { background: "#fff" },
-  trOdd: { background: "#f9f9f9" },
-  trHighlight: { background: "#eff6ff" },
-  emptyCell: { textAlign: "center", padding: "14px", color: "#777", borderBottom: "1px solid #e8e8e8" },
-  actionGroup: { display: "flex", gap: 4 },
-  editBtn: {
-    padding: "3px 10px", background: "#5bc0de", color: "#fff",
-    border: "none", borderRadius: 3, cursor: "pointer", fontSize: 12,
-  },
-  editBtnActive: { background: "#0ea5e9" },
-  deleteBtn: {
-    padding: "3px 10px", background: "#d9534f", color: "#fff",
-    border: "none", borderRadius: 3, cursor: "pointer", fontSize: 12,
-  },
-  footerRow: {
-    display: "flex", justifyContent: "space-between",
-    alignItems: "center", marginTop: 10, flexWrap: "wrap", gap: 8,
-  },
-  paginationGroup: { display: "flex", gap: 4 },
-  pageBtn: {
-    padding: "4px 12px", background: "#fff", border: "1px solid #ccc",
-    borderRadius: 3, cursor: "pointer", fontSize: 13, color: "#333",
-  },
-  pageBtnDisabled: { opacity: 0.5, cursor: "default" },
-  noItemMsg: { fontSize: 12, color: "#888", marginTop: 6 },
-};
