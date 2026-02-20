@@ -6,165 +6,246 @@ import { toast } from "sonner";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
-// ── Action Buttons (mirrors PHP trfitems.php logic) ──────────────────────────
-function ActionCell({ row, onEdit, onDelete }) {
-  // ✅ Fix 1: navigate removed from ActionCell (it belongs in main component)
-  const tid = row.id;
-  const status = row.status;
+// ── Permissions from localStorage ────────────────────────────────────────────
+function usePermissions() {
+  return localStorage.getItem("userPermissions")?.split(",").map(Number) || [];
+}
 
-  if (status === 99) {
-    return <span className="text-xs text-gray-400 italic">LRN Cancelled</span>;
+// ── Action Buttons — PHP trfitems.php logic exact match ──────────────────────
+function ActionCell({ row, onEdit, onDelete, onCancelLRN, trfId }) {
+  const permissions = usePermissions();
+  const tid = row.id;
+  const trfstatus = Number(row.status);
+  const packtype = Number(row.pack_type ?? 1); // 0 = upload type, else test report
+  const reportid = row.report ?? 0;
+
+  // ── PHP: if ($trfstatus == 99) → "LRN Cancled"
+  if (trfstatus === 99) {
+    return (
+      <span className="text-xs italic text-gray-400">LRN Cancelled</span>
+    );
   }
+
+  // ── Pending signature status check (Edit Item Detail condition)
+  // PHP: $status = selectfieldwhere("pendingsignatures", ...) if status==0 or ""
+  const canEditItem =
+    (row.pending_signature_status === 0 || row.pending_signature_status === "" || row.pending_signature_status == null) &&
+    permissions.includes(367);
+
+  // ── Cancel LRN condition: permission 268 + no invoice + no ulr
+  const canCancelLRN =
+    permissions.includes(268) &&
+    !row.invoice &&
+    !row.ulr &&
+    (row.pending_signature_status === 0 || row.pending_signature_status === "" || row.pending_signature_status == null);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {/* ── Status == 1: Remove Item + Clone ── */}
-      {status === 1 && (
+
+      {/* ── Status 1: Remove Item + Clone ── */}
+      {trfstatus === 1 && (
         <>
-          <button
-            onClick={() => onDelete(tid)}
-            className="rounded bg-cyan-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-cyan-600"
-          >
+          <ActionBtn color="cyan" onClick={() => onDelete(tid)}>
             Remove Item
-          </button>
-          <a
-            href={`additemfromclone.php?hakuna=${tid}`}
-            className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-          >
+          </ActionBtn>
+          <ActionBtn color="blue" onClick={() => window.location.href = `additemfromclone.php?hakuna=${tid}`}>
             Clone
-          </a>
+          </ActionBtn>
         </>
       )}
 
-      {/* ── Status == 2: Technical Acceptance + Remove Item ── */}
-      {status === 2 && (
+      {/* ── Status 2: Technical Acceptance (permission 126) + Remove Item ── */}
+      {trfstatus === 2 && (
         <>
-          {row.can_technical && (
-            <a
-              href={`technical.php?hakuna=${tid}`}
-              className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-            >
+          {permissions.includes(126) && (
+            <ActionBtn color="blue" onClick={() => window.location.href = `technical.php?hakuna=${tid}`}>
               Technical Acceptance
-            </a>
+            </ActionBtn>
           )}
-          <button
-            onClick={() => onDelete(tid)}
-            className="rounded bg-cyan-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-cyan-600"
-          >
+          <ActionBtn color="cyan" onClick={() => onDelete(tid)}>
             Remove Item
-          </button>
+          </ActionBtn>
         </>
       )}
 
-      {/* ── Status == 3: Remove Item only ── */}
-      {status === 3 && row.can_delete && (
-        <button
-          onClick={() => onDelete(tid)}
-          className="rounded bg-cyan-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-cyan-600"
-        >
+      {/* ── Status 3: Remove Item (permission 128) ── */}
+      {trfstatus === 3 && permissions.includes(128) && (
+        <ActionBtn color="cyan" onClick={() => onDelete(tid)}>
           Remove Item
-        </button>
+        </ActionBtn>
       )}
 
-      {/* ── Status == 5: Perform Test ── */}
-      {status === 5 && row.can_perform && (
-        <a
-          href={`performtest.php?hakuna=${tid}`}
-          className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-        >
+      {/* ── Status 4: PHP mein koi button nahi ── */}
+
+      {/* ── Status 5: Perform Test (permission 7) ── */}
+      {trfstatus === 5 && permissions.includes(7) && (
+        <ActionBtn color="blue" onClick={() => window.location.href = `performtest.php?hakuna=${tid}`}>
           Perform Test
-        </a>
+        </ActionBtn>
       )}
 
-      {/* ── Status == 10: Upload Report / Final Report ── */}
-      {status === 10 && (
+      {/* ── Status 10: Upload Report / Final Report ── */}
+      {trfstatus === 10 && (
         <>
-          {row.pack_type === 0 ? (
-            row.report == 0 ? (
-              row.can_upload_report && (
-                <a
-                  href={`uploadreport.php?hakuna=${tid}`}
-                  className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-                >
+          {packtype === 0 ? (
+            reportid === 0 || reportid === "0" ? (
+              permissions.includes(333) && (
+                <ActionBtn color="blue" onClick={() => window.location.href = `uploadreport.php?hakuna=${tid}`}>
                   Upload Report
-                </a>
+                </ActionBtn>
               )
             ) : (
-              <a
-                href={row.report_link}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-              >
+              <ActionBtn color="blue" onClick={() => window.open(row.report_link, "_blank")}>
                 Final Report
-              </a>
+              </ActionBtn>
             )
           ) : (
-            <a
-              href={`testreport.php?hakuna=${tid}`}
-              className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-            >
+            <ActionBtn color="blue" onClick={() => window.location.href = `testreport.php?hakuna=${tid}`}>
               Final Report
-            </a>
+            </ActionBtn>
           )}
         </>
       )}
 
-      {/* ── Pending TRF Approval (default) ── */}
-      {![1, 2, 3, 5, 10, 99].includes(status) && (
-        <span className="text-xs text-gray-500 italic">
+      {/* ── Pending TRF Approval: jab koi status match na ho ── */}
+      {![1, 2, 3, 4, 5, 10, 99].includes(trfstatus) && (
+        <span className="text-xs italic text-gray-500">
           Pending TRF Approval
         </span>
       )}
 
-      {/* ── Print Review Form ── */}
-      <a
-        href={`printslip.php?hakuna=${tid}`}
-        target="_blank"
-        rel="noreferrer"
-        className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-      >
+      {/* ── Print Review Form — har status pe ── */}
+      <ActionBtn color="blue" onClick={() => window.open(`printslip.php?hakuna=${tid}`, "_blank")}>
         Print Review Form
-      </a>
+      </ActionBtn>
 
-      {/* ── Edit Item Detail ── */}
-      {row.can_edit && (
-        <button
-          onClick={() => onEdit(tid)}
-          className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-        >
-          Edit Item Detail
-        </button>
+      {/* ── View Raw Data — status >= 5 ── */}
+      {trfstatus >= 5 && (
+        <ActionBtn color="blue" onClick={() => window.open(`viewrawdata.php?hakuna=${tid}`, "_blank")}>
+          View Raw Data
+        </ActionBtn>
       )}
 
-      {/* ── Cancel LRN ── */}
-      {row.can_cancel_lrn && !row.invoice && !row.ulr && (
-        <button
-          onClick={() => handleCancelLRN(tid)}
-          className="rounded bg-blue-500 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-blue-600"
-        >
+      {/* ── Edit Item Detail — permission 367 + pending signature check ── */}
+      {canEditItem && (
+        <ActionBtn color="blue" onClick={() => onEdit(tid)}>
+          Edit Item Detail
+        </ActionBtn>
+      )}
+
+      {/* ── Cancel LRN — permission 268 + no invoice + no ulr ── */}
+      {canCancelLRN && (
+        <ActionBtn color="blue" onClick={() => onCancelLRN(trfId, tid)}>
           Cancel LRN
-        </button>
+        </ActionBtn>
       )}
     </div>
   );
 }
 
-function handleCancelLRN(tid) {
-  alert(`Cancel LRN for item ${tid} — wire up modal here`);
+// ── Reusable button ───────────────────────────────────────────────────────────
+function ActionBtn({ children, onClick, color = "blue" }) {
+  const colorMap = {
+    blue: "bg-blue-500 hover:bg-blue-600",
+    cyan: "bg-cyan-500 hover:bg-cyan-600",
+    red: "bg-red-500 hover:bg-red-600",
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded px-2.5 py-1 text-xs font-medium text-white transition ${colorMap[color] ?? colorMap.blue}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Cancel LRN Modal ──────────────────────────────────────────────────────────
+function CancelLRNModal({ show, trfId, trfProductId, onClose, onSuccess }) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) {
+      toast.error("Please enter a reason for cancellation.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.post(`testing/cancel-lrn`, {
+        trf: trfId,
+        trfproduct: trfProductId,
+        reason,
+      });
+      toast.success("LRN cancelled successfully ✅");
+      onSuccess();
+      onClose();
+    } catch {
+      toast.error("Failed to cancel LRN ❌");
+    } finally {
+      setLoading(false);
+      setReason("");
+    }
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-gray-900">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+          <h4 className="text-base font-semibold text-gray-800 dark:text-white">
+            Cancel LRN
+          </h4>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Reason For Cancellation
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={4}
+            placeholder="Reason For Accept / Reject"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+          />
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3 dark:border-gray-700">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400"
+          >
+            Close
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {loading ? "Submitting..." : "Submit"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TrfProductsList() {
   const { id } = useParams();
-  const navigate = useNavigate(); // ✅ Fix 3: navigate moved to main component
+  const navigate = useNavigate();
+  const permissions = usePermissions();
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // ✅ Fix 2: proper useState with both value and setter
   const [trfStatus, setTrfStatus] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -174,21 +255,48 @@ export default function TrfProductsList() {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Cancel LRN modal state
+  const [cancelLRNModal, setCancelLRNModal] = useState({
+    show: false,
+    trfId: null,
+    trfProductId: null,
+  });
+
   const fetchItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get(`testing/get-trf-item-list/${id}`);
-      setData(response.data?.trf_products ?? []);
-      if (response.data?.trf_status !== undefined) {
-        setTrfStatus(response.data.trf_status);
+      const products = response.data?.trf_products ?? [];
+      setData(products);
+
+      // ✅ Fix: trf_status top-level se lo pehle
+      // Agar top-level nahi hai to pehle product ke trf_status se lo
+      // Agar products bhi empty hain to alag API se TRF status fetch karo
+      const topStatus =
+        response.data?.trf_status ??
+        response.data?.trfStatus ??
+        response.data?.status ??
+        (products.length > 0 ? products[0]?.trf_status : undefined);
+
+      if (topStatus !== null && topStatus !== undefined) {
+        setTrfStatus(Number(topStatus));
+      } else {
+        // ✅ Products empty hain (naya TRF) — alag endpoint se status lo
+        try {
+          const trfRes = await axios.get(`testing/get-trf-status/${id}`);
+          const s = trfRes.data?.status ?? trfRes.data?.trf_status ?? null;
+          if (s !== null) setTrfStatus(Number(s));
+        } catch {
+          // fallback — agar koi bhi API nahi hai to null rahega
+        }
       }
     } catch (err) {
       setError(err?.response?.data?.message ?? "Failed to load TRF items.");
     } finally {
       setLoading(false);
     }
-  }, [id]); // ✅ Fix 2: setTrfStatus is stable, no need in deps
+  }, [id]);
 
   useEffect(() => {
     if (id) fetchItems();
@@ -211,6 +319,9 @@ export default function TrfProductsList() {
         .includes(q),
     );
   });
+
+  // PHP: counter — status!=99 wale items count hote hain
+  const activeItemCount = data.filter((row) => Number(row.status) !== 99).length;
 
   const totalEntries = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
@@ -272,51 +383,59 @@ export default function TrfProductsList() {
     }
   };
 
-  // Suppress unused warning — trfStatus available for future use
-  void trfStatus;
+  const handleCancelLRN = (trfId, trfProductId) => {
+    setCancelLRNModal({ show: true, trfId, trfProductId });
+  };
+
+  const handleCancelLRNClose = () => {
+    setCancelLRNModal({ show: false, trfId: null, trfProductId: null });
+  };
+
+  // PHP: permission check for LRN/BRN columns
+  const showLRN = permissions.includes(375);
+  const showBRN = permissions.includes(376);
 
   const columns = [
     { key: "id", label: "ID" },
     { key: "product_name", label: "Product" },
     { key: "package_name", label: "Package" },
-    { key: "lrn", label: "LRN" },
-    { key: "brn", label: "BRN" },
+    ...(showLRN ? [{ key: "lrn", label: "LRN" }] : []),
+    ...(showBRN ? [{ key: "brn", label: "BRN" }] : []),
     { key: "ulr", label: "ULR" },
     { key: "grade_size", label: "Grade/Size" },
     { key: "brand", label: "Brand/Source" },
   ];
 
-  const TableHeaders = () => (
-    <tr>
-      {columns.map((col) => (
-        <th
-          key={col.key}
-          className="border-y border-gray-200 bg-white px-3 py-2.5 text-left text-xs font-semibold whitespace-nowrap text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
-        >
-          {col.label}
-        </th>
-      ))}
-      <th className="border-y border-gray-200 bg-white px-3 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-        Action
-      </th>
-    </tr>
-  );
+  // PHP: "Add New Item" button — sirf status 0 ya 98 pe dikhta hai
+  // Number() se wrap kiya — API string "0" ya null bhi handle hoga
+  const trfStatusNum = trfStatus !== null && trfStatus !== undefined ? Number(trfStatus) : null;
+  const canAddItem = trfStatusNum === 0 || trfStatusNum === 98;
+
+  // PHP: "Submit For Review" — status==0 and counter>0
+  const canSubmitReview = trfStatusNum === 0 && activeItemCount > 0;
+
+  const handleSubmitForReview = async () => {
+    try {
+      await axios.post(`testing/submit-for-review/${id}`);
+      toast.success("Submitted for review successfully ✅");
+      fetchItems();
+    } catch {
+      toast.error("Failed to submit for review ❌");
+    }
+  };
 
   return (
     <div className="transition-content w-full pb-5">
       <div className="flex h-full w-full flex-col">
         <div className="pb-4 text-sm text-gray-700 dark:text-gray-300">
-          {/* ── Header Row ── */}
+
           {/* ── Header Row ── */}
           <div className="mb-4 flex items-center justify-between">
-            {/* Left Side - Title */}
             <h2 className="text-lg font-bold text-gray-800 dark:text-white">
               TRF Products
             </h2>
 
-            {/* Right Side - Buttons */}
             <div className="flex items-center gap-3">
-              {/* Back Button */}
               <button
                 onClick={() => navigate("/dashboards/testing/trfs-starts-jobs")}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
@@ -324,20 +443,22 @@ export default function TrfProductsList() {
                 Back to TRF Entry List
               </button>
 
-              {/* Add / Close Button */}
-              <button
-                onClick={handleAddNew}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition ${
-                  showForm && !editItemId
-                    ? "bg-slate-500 hover:bg-slate-600"
-                    : "bg-blue-600 hover:bg-blue-700"
-                }`}
-              >
-                <span className="mr-1 font-bold">
-                  {showForm && !editItemId ? "✕" : "+"}
-                </span>
-                {showForm && !editItemId ? "Close Form" : "Add New Item"}
-              </button>
+              {/* PHP: Add New Item sirf status 0 ya 98 pe */}
+              {canAddItem && (
+                <button
+                  onClick={handleAddNew}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition ${
+                    showForm && !editItemId
+                      ? "bg-slate-500 hover:bg-slate-600"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  <span className="mr-1 font-bold">
+                    {showForm && !editItemId ? "✕" : "+"}
+                  </span>
+                  {showForm && !editItemId ? "Close Form" : "Add New Item"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -356,29 +477,21 @@ export default function TrfProductsList() {
           {/* ── Controls Row ── */}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Show
-              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Show</span>
               <select
                 value={pageSize}
                 onChange={handlePageSizeChange}
                 className="rounded border border-gray-300 bg-white px-1.5 py-1 text-sm text-gray-700 outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
               >
                 {PAGE_SIZE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
+                  <option key={n} value={n}>{n}</option>
                 ))}
               </select>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                entries
-              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">entries</span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Search:
-              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Search:</span>
               <input
                 type="text"
                 value={search}
@@ -400,33 +513,28 @@ export default function TrfProductsList() {
           <div className="table-wrapper min-w-full grow overflow-x-auto">
             <table className="w-full text-left rtl:text-right">
               <thead>
-                <TableHeaders />
+                <tr>
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      className="border-y border-gray-200 bg-white px-3 py-2.5 text-left text-xs font-semibold whitespace-nowrap text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                  <th className="border-y border-gray-200 bg-white px-3 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                    Action
+                  </th>
+                </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td
-                      colSpan={columns.length + 1}
-                      className="py-8 text-center text-gray-400 dark:text-gray-500"
-                    >
+                    <td colSpan={columns.length + 1} className="py-8 text-center text-gray-400 dark:text-gray-500">
                       <div className="flex items-center justify-center gap-2">
-                        <svg
-                          className="h-4 w-4 animate-spin text-blue-500"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
-                          />
+                        <svg className="h-4 w-4 animate-spin text-blue-500" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
                         </svg>
                         Loading…
                       </div>
@@ -434,10 +542,7 @@ export default function TrfProductsList() {
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={columns.length + 1}
-                      className="py-8 text-center text-gray-400 dark:text-gray-500"
-                    >
+                    <td colSpan={columns.length + 1} className="py-8 text-center text-gray-400 dark:text-gray-500">
                       No data available in table
                     </td>
                   </tr>
@@ -454,18 +559,17 @@ export default function TrfProductsList() {
                       }`}
                     >
                       {columns.map((col) => (
-                        <td
-                          key={col.key}
-                          className="px-3 py-2 align-middle text-gray-700 dark:text-gray-300"
-                        >
+                        <td key={col.key} className="px-3 py-2 align-middle text-gray-700 dark:text-gray-300">
                           {row[col.key] ?? ""}
                         </td>
                       ))}
-                      <td className="min-w-[200px] px-3 py-2 align-middle">
+                      <td className="min-w-[220px] px-3 py-2 align-middle">
                         <ActionCell
                           row={row}
+                          trfId={id}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
+                          onCancelLRN={handleCancelLRN}
                         />
                       </td>
                     </tr>
@@ -491,16 +595,12 @@ export default function TrfProductsList() {
               >
                 Previous
               </button>
-
               <span className="min-w-[36px] rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-center text-sm font-semibold text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
                 {safeCurrentPage}
               </span>
-
               <button
                 disabled={safeCurrentPage === totalPages}
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
               >
                 Next
@@ -508,13 +608,33 @@ export default function TrfProductsList() {
             </div>
           </div>
 
-          {!loading && totalEntries === 0 && !showForm && (
+          {/* PHP: status==0 && counter>0 → Submit For Review button */}
+          {canSubmitReview && (
+            <button
+              onClick={handleSubmitForReview}
+              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
+            >
+              Submit For Review
+            </button>
+          )}
+
+          {/* PHP: status==0 && counter==0 → "No Item added" */}
+          {!loading && trfStatus === 0 && activeItemCount === 0 && !showForm && (
             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
               No Item added
             </p>
           )}
         </div>
       </div>
+
+      {/* ── Cancel LRN Modal ── */}
+      <CancelLRNModal
+        show={cancelLRNModal.show}
+        trfId={cancelLRNModal.trfId}
+        trfProductId={cancelLRNModal.trfProductId}
+        onClose={handleCancelLRNClose}
+        onSuccess={fetchItems}
+      />
     </div>
   );
 }

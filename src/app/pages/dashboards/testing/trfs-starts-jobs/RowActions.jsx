@@ -1,13 +1,5 @@
 // Import Dependencies
 import {
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuItems,
-  Transition,
-} from "@headlessui/react";
-import {
-  EllipsisHorizontalIcon,
   PencilIcon,
   FolderOpenIcon,
   TrashIcon,
@@ -21,12 +13,10 @@ import {
   DocumentMagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
-import { Fragment, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import PropTypes from "prop-types";
 
-// Local Imports
 import { ConfirmModal } from "components/shared/ConfirmModal";
-import { Button } from "components/ui";
 import axios from "utils/axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router";
@@ -43,16 +33,40 @@ const confirmMessages = {
   },
 };
 
+function ActionPill({ onClick, icon: Icon, label, danger = false }) {
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-150",
+        danger
+          ? "border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+          : "dark:border-dark-500 dark:bg-dark-700 dark:text-dark-100 dark:hover:bg-dark-600 border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100",
+      )}
+    >
+      <Icon className="size-3.5 shrink-0 stroke-[1.5]" />
+      <span className="whitespace-nowrap">{label}</span>
+    </button>
+  );
+}
+
 export function RowActions({ row, table }) {
   const navigate = useNavigate();
 
-  // ── Fields from actual API response ──────────────────────────────────────
   const trfId = row.original.id;
   const status = Number(row.original.status);
-  const hasProducts =
-    Array.isArray(row.original.products) && row.original.products.length > 0;
 
-  // ── Delete modal state ────────────────────────────────────────────────────
+  // ✅ hasProducts — multiple fields se check karo
+  const hasProducts =
+    !!row.original.products_display ||
+    !!row.original.brn_nos_display ||
+    !!row.original.lrn_nos_display ||
+    (Array.isArray(row.original.products) && row.original.products.length > 0);
+
+  // Permissions from localStorage
+  const permissions =
+    localStorage.getItem("userPermissions")?.split(",").map(Number) || [];
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
@@ -90,406 +104,245 @@ export function RowActions({ row, table }) {
   }, [row, table, trfId]);
 
   const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
+  const base = `/dashboards/testing/trfs-starts-jobs`;
+  const go = (path) => () => navigate(path);
 
-  // ── Button class helper ───────────────────────────────────────────────────
-  const btnCls = (focus, danger = false) =>
-    clsx(
-      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
-      danger
-        ? clsx(
-            "text-red-600 dark:text-red-400",
-            focus && "bg-red-50 dark:bg-red-900/20",
-          )
-        : clsx(
-            focus &&
-              "dark:bg-dark-600 dark:text-dark-100 bg-gray-100 text-gray-800",
-          ),
-    );
+  const actions = [
+    // Add Items — status 0 or 98, permission 98
+    ...(status === 0 || status === 98
+      ? [
+          {
+            label: "Add Items",
+            icon: FolderOpenIcon,
+            permission: 98,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // ✅ Sample Review — sirf status 1 check, hasProducts hata diya
+    ...(status === 1
+      ? [
+          {
+            label: "Sample Review",
+            icon: DocumentMagnifyingGlassIcon,
+            permission: 125,
+            onClick: go(`${base}/samplereview/${trfId}`),
+          },
+        ]
+      : []),
+
+    // ✅ Technical Acceptance — sirf status 2 check
+    ...(status === 2
+      ? [
+          {
+            label: "Technical Acceptance",
+            icon: ClipboardDocumentCheckIcon,
+            permission: 126,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // ✅ Allot Sample — sirf status 3 check
+    ...(status === 3
+      ? [
+          {
+            label: "Allot Sample",
+            icon: BeakerIcon,
+            permission: 128,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // ✅ Assign Chemist — status 3 or 4, permission 6
+    ...(status === 3 || status === 4
+      ? [
+          {
+            label: "Assign Chemist",
+            icon: UserIcon,
+            permission: 6,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // Details — always visible
+    {
+      label: "Details",
+      icon: DocumentTextIcon,
+      onClick: go(`${base}/trfitems/${trfId}`),
+    },
+
+    // Perform Testing — status 5, permission 7 or 182
+    ...(status === 5
+      ? [
+          {
+            label: "Perform Testing",
+            icon: ClipboardDocumentCheckIcon,
+            anyPermission: [7, 182],
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // View Draft Report — status 6, permission 179
+    ...(status === 6
+      ? [
+          {
+            label: "View Draft Report",
+            icon: DocumentTextIcon,
+            permission: 179,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // HOD Review — status 7, permission 180
+    ...(status === 7
+      ? [
+          {
+            label: "HOD Review",
+            icon: ClipboardDocumentCheckIcon,
+            permission: 180,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // QA Review — status 8, permission 181
+    ...(status === 8
+      ? [
+          {
+            label: "QA Review",
+            icon: ClipboardDocumentCheckIcon,
+            permission: 181,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // Generate ULR — status 9, permission 182
+    ...(status === 9
+      ? [
+          {
+            label: "Generate ULR",
+            icon: DocumentTextIcon,
+            permission: 182,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // View Reports — status 10, permission 182
+    ...(status === 10
+      ? [
+          {
+            label: "View Reports",
+            icon: FolderOpenIcon,
+            permission: 182,
+            onClick: go(`${base}/trfitems/${trfId}`),
+          },
+        ]
+      : []),
+
+    // Print Slip — status > 3
+    ...(status > 3
+      ? [
+          {
+            label: "Print Slip",
+            icon: PrinterIcon,
+            onClick: go(`${base}/print-slip/${trfId}`),
+          },
+        ]
+      : []),
+
+    // Edit TRF — status < 10 or 98, permission 2
+    ...(status < 10 || status === 98
+      ? [
+          {
+            label: "Edit TRF",
+            icon: PencilIcon,
+            permission: 2,
+            onClick: go(`${base}/edit/${trfId}`),
+          },
+        ]
+      : []),
+
+    // Edit Work Order — permission 284
+    {
+      label: "Edit Work Order detail",
+      icon: DocumentTextIcon,
+      permission: 284,
+      onClick: go(`${base}/addPoDetailToTrf/${trfId}`),
+    },
+
+    // Edit Billing Detail — permission 284
+    {
+      label: "Edit Billing Detail",
+      icon: BanknotesIcon,
+      permission: 284,
+      onClick: go(`${base}/editBillingDetailTrf/${trfId}`),
+    },
+
+    // Edit Customer Responsible — permission 297
+    {
+      label: "Edit Customer Responsible for Payment",
+      icon: UserIcon,
+      permission: 297,
+      onClick: go(`${base}/editmaincustomerTrf/${trfId}`),
+    },
+
+    // Edit BD Person — permission 406
+    {
+      label: "Edit BD Person",
+      icon: PencilIcon,
+      permission: 406,
+      onClick: go(`${base}/edit_bd_person/${trfId}`),
+    },
+
+    // Fill Feedback Form — permission 283
+    {
+      label: "Fill Feedback Form",
+      icon: ChatBubbleBottomCenterTextIcon,
+      permission: 283,
+      onClick: go(`${base}/customerFeedbackForm/${trfId}`),
+    },
+  ];
+
+  // Filter: permission check — single ya anyPermission (OR logic)
+  const filteredActions = actions.filter((action) => {
+    if (action.anyPermission) {
+      return action.anyPermission.some((p) => permissions.includes(p));
+    }
+    if (action.permission) {
+      return permissions.includes(action.permission);
+    }
+    return true;
+  });
 
   return (
     <>
-      <div className="flex justify-center space-x-1.5">
-        <Menu as="div" className="relative inline-block text-left">
-          <MenuButton as={Button} isIcon className="size-8 rounded-full">
-            <EllipsisHorizontalIcon className="size-4.5" />
-          </MenuButton>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out"
-            enterFrom="opacity-0 translate-y-2"
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-2"
-          >
-            <MenuItems
-              anchor={{ to: "bottom end", gap: 12 }}
-              className="dark:border-dark-500 dark:bg-dark-750 absolute z-100 max-h-[400px] w-[14rem] overflow-y-auto rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden ltr:right-0 rtl:left-0 dark:shadow-none"
-            >
-              {/* ── Add Items — status 0 or 98 ── */}
-              {(status === 0 || status === 98) && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <FolderOpenIcon className="size-4.5 stroke-1" />
-                      <span>Add Items</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
+      <div className="flex flex-wrap gap-1.5 py-1">
+        {filteredActions.map((action, index) => (
+          <ActionPill
+            key={index}
+            onClick={action.onClick}
+            icon={action.icon}
+            label={action.label}
+          />
+        ))}
 
-              {/* ── Sample Review — status 1 & has products ── */}
-              {status === 1 && hasProducts && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/samplereview/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <DocumentMagnifyingGlassIcon className="size-4.5 stroke-1" />
-                      <span>Sample Review</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Technical Acceptance — status 2, has products ── */}
-              {status === 2 && hasProducts && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
-                      <span>Technical Acceptance</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Allot Sample — status 3, has products ── */}
-              {status === 3 && hasProducts && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <BeakerIcon className="size-4.5 stroke-1" />
-                      <span>Allot Sample</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Assign Chemist — status 3 or 4, has products ── */}
-              {(status === 3 || status === 4) && hasProducts && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/assign-chemist/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <UserIcon className="size-4.5 stroke-1" />
-                      <span>Assign Chemist</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Details — always ── */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
-                      )
-                    }
-                    className={btnCls(focus)}
-                  >
-                    <DocumentTextIcon className="size-4.5 stroke-1" />
-                    <span>Details</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* ── Perform Testing — status 5 ── */}
-              {status === 5 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/perform-testing/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
-                      <span>Perform Testing</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── View Draft Report — status 6 ── */}
-              {status === 6 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/draft-report/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <DocumentTextIcon className="size-4.5 stroke-1" />
-                      <span>View Draft Report</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── HOD Review — status 7 ── */}
-              {status === 7 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/hod-review/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
-                      <span>HOD Review</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── QA Review — status 8 ── */}
-              {status === 8 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/qa-review/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
-                      <span>QA Review</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Generate ULR — status 9 ── */}
-              {status === 9 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/generate-ulr/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <DocumentTextIcon className="size-4.5 stroke-1" />
-                      <span>Generate ULR</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── View Reports — status 10 ── */}
-              {status === 10 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/reports/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <FolderOpenIcon className="size-4.5 stroke-1" />
-                      <span>View Reports</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Print Slip — status > 3 ── */}
-              {status > 3 && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/print-slip/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <PrinterIcon className="size-4.5 stroke-1" />
-                      <span>Print Slip</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Edit TRF — status < 10 or 98 ── */}
-              {(status < 10 || status === 98) && (
-                <MenuItem>
-                  {({ focus }) => (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/dashboards/testing/trfs-starts-jobs/edit/${trfId}`,
-                        )
-                      }
-                      className={btnCls(focus)}
-                    >
-                      <PencilIcon className="size-4.5 stroke-1" />
-                      <span>Edit TRF</span>
-                    </button>
-                  )}
-                </MenuItem>
-              )}
-
-              {/* ── Edit Work Order / Billing / Customer — status < 10 or 98 ── */}
-              {(status < 10 || status === 98) && (
-                <>
-                  <MenuItem>
-                    {({ focus }) => (
-                      <button
-                        onClick={() =>
-                          navigate(
-                            `/dashboards/testing/trfs-starts-jobs/addPoDetailToTrf/${trfId}`,
-                          )
-                        }
-                        className={btnCls(focus)}
-                      >
-                        <DocumentTextIcon className="size-4.5 stroke-1" />
-                        <span>Edit Work Order detail</span>
-                      </button>
-                    )}
-                  </MenuItem>
-                  <MenuItem>
-                    {({ focus }) => (
-                      <button
-                        onClick={() =>
-                          navigate(
-                            `/dashboards/testing/trfs-starts-jobs/editBillingDetailTrf/${trfId}`,
-                          )
-                        }
-                        className={btnCls(focus)}
-                      >
-                        <BanknotesIcon className="size-4.5 stroke-1" />
-                        <span>Edit Billing Detail</span>
-                      </button>
-                    )}
-                  </MenuItem>
-                  <MenuItem>
-                    {({ focus }) => (
-                      <button
-                        onClick={() =>
-                          navigate(
-                            `/dashboards/testing/trfs-starts-jobs/editmaincustomerTrf/${trfId}`,
-                          )
-                        }
-                        className={btnCls(focus)}
-                      >
-                        <UserIcon className="size-4.5 stroke-1" />
-                        <span>Edit Customer Responsible for Payment</span>
-                      </button>
-                    )}
-                  </MenuItem>
-                </>
-              )}
-
-              {/* ── Edit BD Person — always ── */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/dashboards/testing/trfs-starts-jobs/edit_bd_person/${trfId}`,
-                      )
-                    }
-                    className={btnCls(focus)}
-                  >
-                    <PencilIcon className="size-4.5 stroke-1" />
-                    <span>Edit BD Person</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* ── Fill Feedback Form — always ── */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/dashboards/testing/trfs-starts-jobs/customerFeedbackForm/${trfId}`,
-                      )
-                    }
-                    className={btnCls(focus)}
-                  >
-                    <ChatBubbleBottomCenterTextIcon className="size-4.5 stroke-1" />
-                    <span>Fill Feedback Form</span>
-                  </button>
-                )}
-              </MenuItem>
-
-              {/* Divider */}
-              <div className="dark:bg-dark-500 my-1 h-px bg-gray-200" />
-
-              {/* ── Delete ── */}
-              <MenuItem>
-                {({ focus }) => (
-                  <button onClick={openModal} className={btnCls(focus, true)}>
-                    <TrashIcon className="size-4.5 stroke-1" />
-                    <span>Delete</span>
-                  </button>
-                )}
-              </MenuItem>
-            </MenuItems>
-          </Transition>
-        </Menu>
+        {/* ✅ Delete — permission 395, no products check bhi */}
+        {permissions.includes(395) && !hasProducts && (
+          <ActionPill
+            onClick={openModal}
+            icon={TrashIcon}
+            label="Delete"
+            danger
+          />
+        )}
       </div>
 
       <ConfirmModal

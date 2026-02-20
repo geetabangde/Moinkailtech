@@ -197,7 +197,8 @@ export default function TrfEntryList() {
 
   const [columnPinning, setColumnPinning] = useLocalStorage(
     "column-pinning-trf-entries",
-    {},
+    { right: ["actions"] },
+  
   );
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
