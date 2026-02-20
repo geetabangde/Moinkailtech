@@ -12,11 +12,11 @@ import {
 import clsx from "clsx";
 import { useState, useEffect } from "react";
 import axios from "utils/axios";
-export { columns } from './columns';
-export { Toolbar } from './Toolbar';
-export { RowActions } from './RowActions';
-export { SelectedRowsActions } from './SelectedRowsActions';
-export { TableConfig } from './TableConfig';
+export { columns } from "./columns";
+export { Toolbar } from "./Toolbar";
+export { RowActions } from "./RowActions";
+export { SelectedRowsActions } from "./SelectedRowsActions";
+export { TableConfig } from "./TableConfig";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -57,104 +57,127 @@ export default function TrfEntryList() {
   }, [filters]);
 
   // fetchTrfEntries function में:
-const fetchTrfEntries = async () => {
-  try {
-    setLoading(true);
-    
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (filters.searchByFromdate) params.append("searchByFromdate", filters.searchByFromdate);
-    if (filters.searchByTodate) params.append("searchByTodate", filters.searchByTodate);
-    if (filters.ctype) params.append("ctype", filters.ctype);
-    if (filters.specificpurpose) params.append("specificpurpose", filters.specificpurpose);
-    if (filters.searchstatus) params.append("searchstatus", filters.searchstatus);
-
-    const response = await axios.get(`/testing/get-testing-trflist?${params.toString()}`);
-    
-    console.log("API response:", response.data);
-
-    let data = [];
-    
-    // Handle response structure
-    if (response.data && Array.isArray(response.data)) {
-      data = response.data;
-    } else if (response.data.status && Array.isArray(response.data.data)) {
-      data = response.data.data;
-    } else {
-      console.warn("Unexpected response structure:", response.data);
-      data = [];
-    }
-
-    // ✅ Customer Types fetch करें
-    let customerTypes = [];
+  const fetchTrfEntries = async () => {
     try {
-      const customerTypesResponse = await axios.get("/people/get-customer-type-list");
-      if (customerTypesResponse.data?.Data && Array.isArray(customerTypesResponse.data.Data)) {
-        customerTypes = customerTypesResponse.data.Data;
+      setLoading(true);
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters.searchByFromdate)
+        params.append("searchByFromdate", filters.searchByFromdate);
+      if (filters.searchByTodate)
+        params.append("searchByTodate", filters.searchByTodate);
+      if (filters.ctype) params.append("ctype", filters.ctype);
+      if (filters.specificpurpose)
+        params.append("specificpurpose", filters.specificpurpose);
+      if (filters.searchstatus)
+        params.append("searchstatus", filters.searchstatus);
+
+      const response = await axios.get(
+        `/testing/get-testing-trflist?${params.toString()}`,
+      );
+
+      console.log("API response:", response.data);
+
+      let data = [];
+
+      // Handle response structure
+      if (response.data && Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data.status && Array.isArray(response.data.data)) {
+        data = response.data.data;
+      } else {
+        console.warn("Unexpected response structure:", response.data);
+        data = [];
       }
-    } catch (error) {
-      console.error("Error fetching customer types:", error);
-    }
 
-    // ✅ Specific Purposes fetch करें
-    let specificPurposes = [];
-    try {
-      const specificPurposesResponse = await axios.get("/people/get-specific-purpose-list");
-      if (specificPurposesResponse.data?.data && Array.isArray(specificPurposesResponse.data.data)) {
-        specificPurposes = specificPurposesResponse.data.data;
+      // ✅ Customer Types fetch करें
+      let customerTypes = [];
+      try {
+        const customerTypesResponse = await axios.get(
+          "/people/get-customer-type-list",
+        );
+        if (
+          customerTypesResponse.data?.Data &&
+          Array.isArray(customerTypesResponse.data.Data)
+        ) {
+          customerTypes = customerTypesResponse.data.Data;
+        }
+      } catch (error) {
+        console.error("Error fetching customer types:", error);
       }
-    } catch (error) {
-      console.error("Error fetching specific purposes:", error);
+
+      // ✅ Specific Purposes fetch करें
+      let specificPurposes = [];
+      try {
+        const specificPurposesResponse = await axios.get(
+          "/people/get-specific-purpose-list",
+        );
+        if (
+          specificPurposesResponse.data?.data &&
+          Array.isArray(specificPurposesResponse.data.data)
+        ) {
+          specificPurposes = specificPurposesResponse.data.data;
+        }
+      } catch (error) {
+        console.error("Error fetching specific purposes:", error);
+      }
+
+      // ✅ Map IDs to names
+      const processedData = data.map((entry) => {
+        // Find customer type name
+        const customerTypeObj = customerTypes.find(
+          (type) => type.id === entry.ctype,
+        );
+        const customerTypeName = customerTypeObj
+          ? customerTypeObj.name
+          : `Type ${entry.ctype}`;
+
+        // Find specific purpose name
+        const specificPurposeObj = specificPurposes.find(
+          (purpose) => purpose.id === entry.specificpurpose,
+        );
+        const specificPurposeName = specificPurposeObj
+          ? specificPurposeObj.name
+          : `Purpose ${entry.specificpurpose}`;
+
+        // Format products, grades, sizes, brn, lrn arrays
+        const formatArray = (arr) => {
+          if (!arr || !Array.isArray(arr) || arr.length === 0) return "-";
+          return arr.join(", ");
+        };
+
+        return {
+          ...entry,
+          // Add new fields for display
+          customer_type_display: customerTypeName,
+          specific_purpose_display: specificPurposeName,
+
+          // Format existing fields
+          products_display: formatArray(entry.products),
+          grades_display: formatArray(entry.grades),
+          sizes_display: formatArray(entry.sizes),
+          brn_nos_display: formatArray(entry.brn),
+          lrn_nos_display: formatArray(entry.lrn),
+
+          // TRF Entry No (if not present, use ID)
+          trf_entry_no: entry.trf_entry_no || `TRF-${entry.id}`,
+
+          // Original fields kept for reference
+          customer_type_id: entry.ctype,
+          specific_purpose_id: entry.specificpurpose,
+        };
+      });
+
+      console.log("Processed data:", processedData);
+      setTrfEntries(processedData);
+    } catch (err) {
+      console.error("Error fetching TRF entry list:", err);
+      setTrfEntries([]);
+    } finally {
+      setLoading(false);
     }
-
-    // ✅ Map IDs to names
-    const processedData = data.map(entry => {
-      // Find customer type name
-      const customerTypeObj = customerTypes.find(type => type.id === entry.ctype);
-      const customerTypeName = customerTypeObj ? customerTypeObj.name : `Type ${entry.ctype}`;
-      
-      // Find specific purpose name
-      const specificPurposeObj = specificPurposes.find(purpose => purpose.id === entry.specificpurpose);
-      const specificPurposeName = specificPurposeObj ? specificPurposeObj.name : `Purpose ${entry.specificpurpose}`;
-
-      // Format products, grades, sizes, brn, lrn arrays
-      const formatArray = (arr) => {
-        if (!arr || !Array.isArray(arr) || arr.length === 0) return "-";
-        return arr.join(", ");
-      };
-
-      return {
-        ...entry,
-        // Add new fields for display
-        customer_type_display: customerTypeName,
-        specific_purpose_display: specificPurposeName,
-        
-        // Format existing fields
-        products_display: formatArray(entry.products),
-        grades_display: formatArray(entry.grades),
-        sizes_display: formatArray(entry.sizes),
-        brn_nos_display: formatArray(entry.brn),
-        lrn_nos_display: formatArray(entry.lrn),
-        
-        // TRF Entry No (if not present, use ID)
-        trf_entry_no: entry.trf_entry_no || `TRF-${entry.id}`,
-        
-        // Original fields kept for reference
-        customer_type_id: entry.ctype,
-        specific_purpose_id: entry.specificpurpose,
-      };
-    });
-
-    console.log("Processed data:", processedData);
-    setTrfEntries(processedData);
-
-  } catch (err) {
-    console.error("Error fetching TRF entry list:", err);
-    setTrfEntries([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
@@ -201,13 +224,13 @@ const fetchTrfEntries = async () => {
               };
             }
             return row;
-          })
+          }),
         );
       },
       deleteRow: (row) => {
         skipAutoResetPageIndex();
         setTrfEntries((old) =>
-          old.filter((oldRow) => oldRow.id !== row.original.id)
+          old.filter((oldRow) => oldRow.id !== row.original.id),
         );
       },
       deleteRows: (rows) => {
@@ -248,9 +271,23 @@ const fetchTrfEntries = async () => {
     return (
       <Page title="TRF Entry List">
         <div className="flex h-[60vh] items-center justify-center text-gray-600">
-          <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
+          <svg
+            className="mr-2 h-6 w-6 animate-spin text-blue-600"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+            ></path>
           </svg>
           Loading TRF Entries...
         </div>
@@ -265,7 +302,7 @@ const fetchTrfEntries = async () => {
           className={clsx(
             "flex h-full w-full flex-col",
             tableSettings.enableFullScreen &&
-              "fixed inset-0 z-61 bg-white pt-3 dark:bg-dark-900",
+              "dark:bg-dark-900 fixed inset-0 z-61 bg-white pt-3",
           )}
         >
           <Toolbar table={table} />
@@ -297,7 +334,7 @@ const fetchTrfEntries = async () => {
                           <Th
                             key={header.id}
                             className={clsx(
-                              "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
+                              "dark:bg-dark-800 dark:text-dark-100 bg-gray-200 font-semibold text-gray-800 uppercase first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                               header.column.getCanPin() && [
                                 header.column.getIsPinned() === "left" &&
                                   "sticky z-2 ltr:left-0 rtl:right-0",
@@ -308,7 +345,7 @@ const fetchTrfEntries = async () => {
                           >
                             {header.column.getCanSort() ? (
                               <div
-                                className="flex cursor-pointer select-none items-center space-x-3 "
+                                className="flex cursor-pointer items-center space-x-3 select-none"
                                 onClick={header.column.getToggleSortingHandler()}
                               >
                                 <span className="flex-1">
@@ -340,9 +377,10 @@ const fetchTrfEntries = async () => {
                         <Tr
                           key={row.id}
                           className={clsx(
-                            "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
-                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                            "dark:border-b-dark-500 relative border-y border-transparent border-b-gray-200",
+                            row.getIsSelected() &&
+                              !isSafari &&
+                              "row-selected after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500 after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent",
                           )}
                         >
                           {row.getVisibleCells().map((cell) => {
@@ -365,7 +403,7 @@ const fetchTrfEntries = async () => {
                                 {cell.column.getIsPinned() && (
                                   <div
                                     className={clsx(
-                                      "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
+                                      "dark:border-dark-500 pointer-events-none absolute inset-0 border-gray-200",
                                       cell.column.getIsPinned() === "left"
                                         ? "ltr:border-r rtl:border-l"
                                         : "ltr:border-l rtl:border-r",
@@ -391,7 +429,7 @@ const fetchTrfEntries = async () => {
                   className={clsx(
                     "px-4 pb-4 sm:px-5 sm:pt-4",
                     tableSettings.enableFullScreen &&
-                      "bg-gray-50 dark:bg-dark-800",
+                      "dark:bg-dark-800 bg-gray-50",
                     !(
                       table.getIsSomeRowsSelected() ||
                       table.getIsAllRowsSelected()

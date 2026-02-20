@@ -580,7 +580,7 @@ const protectedRoutes = {
                           )
                         ).default,
                       }),
-                    }
+                    },
                   ],
                 },
 
@@ -1697,18 +1697,16 @@ const protectedRoutes = {
             },
             // ==========================Testing==========================
             {
-             path: "testing",
-             children: [
-                 {
+              path: "testing",
+              children: [
+                {
                   path: "products",
                   children: [
                     {
                       path: "",
                       lazy: async () => ({
                         Component: (
-                          await import(
-                            "app/pages/dashboards/testing/products"
-                          )
+                          await import("app/pages/dashboards/testing/products")
                         ).default,
                       }),
                     },
@@ -1846,9 +1844,7 @@ const protectedRoutes = {
                       path: "",
                       lazy: async () => ({
                         Component: (
-                          await import(
-                            "app/pages/dashboards/testing/standards"
-                          )
+                          await import("app/pages/dashboards/testing/standards")
                         ).default,
                       }),
                     },
@@ -2068,9 +2064,53 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
+                    {
+                      path: "addPoDetailToTrf/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/AddPoDetailToTrf"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "editBillingDetailTrf/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/EditBillingDetailTrf"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "editmaincustomerTrf/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (
+                          await import("app/pages/dashboards/testing/trfs-starts-jobs/EditMainCustomerTrf") 
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "customerFeedbackForm/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/CustomerFeedbackForm"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "samplereview/:id", // Edit Page
+                      lazy: async () => ({
+                        Component: (await import("app/pages/dashboards/testing/trfs-starts-jobs/SampleReview" )).default,
+                      }),
+                    }
                   ],
                 },
-             ],
+              ],
             },
             {
               path: "people",

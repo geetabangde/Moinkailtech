@@ -16,6 +16,18 @@ export const columns = [
     header: SelectHeader,
     cell: SelectCell,
   }),
+  columnHelper.accessor((_row, index) => index + 1, {
+    id: "s_no",
+    header: "S No",
+    cell: (info) => info.row.index + 1,
+  }),
+
+  // ✅ ID
+  columnHelper.accessor("id", {
+    id: "id",
+    header: "TRF Inward Entry No",
+    cell: (info) => info.getValue(),
+  }),
 
   // ✅ TRF Entry No
   columnHelper.accessor("trf_entry_no", {
@@ -122,7 +134,7 @@ export const columns = [
     ),
   }),
 
-  // ✅ Customer Type (अब name show होगा)
+  
   columnHelper.accessor("customer_type_display", {  // Processed field
     id: "customer_type",
     header: "Customer Type",
@@ -133,7 +145,7 @@ export const columns = [
     ),
   }),
 
-  // ✅ Specific Purpose (अब name show होगा)
+
   columnHelper.accessor("specific_purpose_display", {  // Processed field
     id: "specific_purpose",
     header: "Specific Purpose",
@@ -152,7 +164,7 @@ export const columns = [
   }),
 
   // ✅ Remarks
-  columnHelper.accessor("reviewremark", {  // JSON में "reviewremark" है
+  columnHelper.accessor("reviewremark", { 
     id: "remarks",
     header: "Remarks",
     cell: (info) => (

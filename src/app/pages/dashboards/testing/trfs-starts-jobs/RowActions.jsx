@@ -47,18 +47,19 @@ export function RowActions({ row, table }) {
   const navigate = useNavigate();
 
   // ── Fields from actual API response ──────────────────────────────────────
-  const trfId      = row.original.id;
-  const status     = Number(row.original.status);
-  const hasProducts = Array.isArray(row.original.products) && row.original.products.length > 0;
+  const trfId = row.original.id;
+  const status = Number(row.original.status);
+  const hasProducts =
+    Array.isArray(row.original.products) && row.original.products.length > 0;
 
   // ── Delete modal state ────────────────────────────────────────────────────
-  const [deleteModalOpen,      setDeleteModalOpen]      = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
-  const [deleteSuccess,        setDeleteSuccess]        = useState(false);
-  const [deleteError,          setDeleteError]          = useState(false);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
 
   const closeModal = () => setDeleteModalOpen(false);
-  const openModal  = () => {
+  const openModal = () => {
     setDeleteModalOpen(true);
     setDeleteError(false);
     setDeleteSuccess(false);
@@ -70,7 +71,10 @@ export function RowActions({ row, table }) {
       await axios.delete(`/testing/delete-trf?id=${trfId}`);
       table.options.meta?.deleteRow(row);
       setDeleteSuccess(true);
-      toast.success("TRF entry deleted successfully ✅", { duration: 1000, icon: "🗑️" });
+      toast.success("TRF entry deleted successfully ✅", {
+        duration: 1000,
+        icon: "🗑️",
+      });
       setTimeout(() => setDeleteModalOpen(false), 1000);
     } catch (error) {
       console.error("Delete failed:", error);
@@ -92,8 +96,14 @@ export function RowActions({ row, table }) {
     clsx(
       "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors",
       danger
-        ? clsx("text-red-600 dark:text-red-400", focus && "bg-red-50 dark:bg-red-900/20")
-        : clsx(focus && "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100")
+        ? clsx(
+            "text-red-600 dark:text-red-400",
+            focus && "bg-red-50 dark:bg-red-900/20",
+          )
+        : clsx(
+            focus &&
+              "dark:bg-dark-600 dark:text-dark-100 bg-gray-100 text-gray-800",
+          ),
     );
 
   return (
@@ -114,14 +124,20 @@ export function RowActions({ row, table }) {
           >
             <MenuItems
               anchor={{ to: "bottom end", gap: 12 }}
-              className="absolute z-100 w-[14rem] max-h-[400px] overflow-y-auto rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-750 dark:shadow-none ltr:right-0 rtl:left-0"
+              className="dark:border-dark-500 dark:bg-dark-750 absolute z-100 max-h-[400px] w-[14rem] overflow-y-auto rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden ltr:right-0 rtl:left-0 dark:shadow-none"
             >
-
               {/* ── Add Items — status 0 or 98 ── */}
               {(status === 0 || status === 98) && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <FolderOpenIcon className="size-4.5 stroke-1" />
                       <span>Add Items</span>
                     </button>
@@ -133,7 +149,14 @@ export function RowActions({ row, table }) {
               {status === 1 && hasProducts && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/sample-review/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/samplereview/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <DocumentMagnifyingGlassIcon className="size-4.5 stroke-1" />
                       <span>Sample Review</span>
                     </button>
@@ -145,7 +168,14 @@ export function RowActions({ row, table }) {
               {status === 2 && hasProducts && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
                       <span>Technical Acceptance</span>
                     </button>
@@ -157,7 +187,14 @@ export function RowActions({ row, table }) {
               {status === 3 && hasProducts && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <BeakerIcon className="size-4.5 stroke-1" />
                       <span>Allot Sample</span>
                     </button>
@@ -169,7 +206,14 @@ export function RowActions({ row, table }) {
               {(status === 3 || status === 4) && hasProducts && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/assign-chemist/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/assign-chemist/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <UserIcon className="size-4.5 stroke-1" />
                       <span>Assign Chemist</span>
                     </button>
@@ -180,7 +224,14 @@ export function RowActions({ row, table }) {
               {/* ── Details — always ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`)} className={btnCls(focus)}>
+                  <button
+                    onClick={() =>
+                      navigate(
+                        `/dashboards/testing/trfs-starts-jobs/trfitems/${trfId}`,
+                      )
+                    }
+                    className={btnCls(focus)}
+                  >
                     <DocumentTextIcon className="size-4.5 stroke-1" />
                     <span>Details</span>
                   </button>
@@ -191,7 +242,14 @@ export function RowActions({ row, table }) {
               {status === 5 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/perform-testing/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/perform-testing/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
                       <span>Perform Testing</span>
                     </button>
@@ -203,7 +261,14 @@ export function RowActions({ row, table }) {
               {status === 6 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/draft-report/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/draft-report/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <DocumentTextIcon className="size-4.5 stroke-1" />
                       <span>View Draft Report</span>
                     </button>
@@ -215,7 +280,14 @@ export function RowActions({ row, table }) {
               {status === 7 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/hod-review/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/hod-review/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
                       <span>HOD Review</span>
                     </button>
@@ -227,7 +299,14 @@ export function RowActions({ row, table }) {
               {status === 8 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/qa-review/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/qa-review/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <ClipboardDocumentCheckIcon className="size-4.5 stroke-1" />
                       <span>QA Review</span>
                     </button>
@@ -239,7 +318,14 @@ export function RowActions({ row, table }) {
               {status === 9 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/generate-ulr/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/generate-ulr/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <DocumentTextIcon className="size-4.5 stroke-1" />
                       <span>Generate ULR</span>
                     </button>
@@ -251,7 +337,14 @@ export function RowActions({ row, table }) {
               {status === 10 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/reports/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/reports/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <FolderOpenIcon className="size-4.5 stroke-1" />
                       <span>View Reports</span>
                     </button>
@@ -263,7 +356,14 @@ export function RowActions({ row, table }) {
               {status > 3 && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/print-slip/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/print-slip/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <PrinterIcon className="size-4.5 stroke-1" />
                       <span>Print Slip</span>
                     </button>
@@ -275,7 +375,14 @@ export function RowActions({ row, table }) {
               {(status < 10 || status === 98) && (
                 <MenuItem>
                   {({ focus }) => (
-                    <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit/${trfId}`)} className={btnCls(focus)}>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboards/testing/trfs-starts-jobs/edit/${trfId}`,
+                        )
+                      }
+                      className={btnCls(focus)}
+                    >
                       <PencilIcon className="size-4.5 stroke-1" />
                       <span>Edit TRF</span>
                     </button>
@@ -288,15 +395,29 @@ export function RowActions({ row, table }) {
                 <>
                   <MenuItem>
                     {({ focus }) => (
-                      <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit-work-order/${trfId}`)} className={btnCls(focus)}>
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/dashboards/testing/trfs-starts-jobs/addPoDetailToTrf/${trfId}`,
+                          )
+                        }
+                        className={btnCls(focus)}
+                      >
                         <DocumentTextIcon className="size-4.5 stroke-1" />
-                        <span>Edit Work Order</span>
+                        <span>Edit Work Order detail</span>
                       </button>
                     )}
                   </MenuItem>
                   <MenuItem>
                     {({ focus }) => (
-                      <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit-billing/${trfId}`)} className={btnCls(focus)}>
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/dashboards/testing/trfs-starts-jobs/editBillingDetailTrf/${trfId}`,
+                          )
+                        }
+                        className={btnCls(focus)}
+                      >
                         <BanknotesIcon className="size-4.5 stroke-1" />
                         <span>Edit Billing Detail</span>
                       </button>
@@ -304,9 +425,16 @@ export function RowActions({ row, table }) {
                   </MenuItem>
                   <MenuItem>
                     {({ focus }) => (
-                      <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit-customer-responsible/${trfId}`)} className={btnCls(focus)}>
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/dashboards/testing/trfs-starts-jobs/editmaincustomerTrf/${trfId}`,
+                          )
+                        }
+                        className={btnCls(focus)}
+                      >
                         <UserIcon className="size-4.5 stroke-1" />
-                        <span>Edit Customer Responsible</span>
+                        <span>Edit Customer Responsible for Payment</span>
                       </button>
                     )}
                   </MenuItem>
@@ -316,7 +444,14 @@ export function RowActions({ row, table }) {
               {/* ── Edit BD Person — always ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/edit_bd_person/${trfId}`)} className={btnCls(focus)}>
+                  <button
+                    onClick={() =>
+                      navigate(
+                        `/dashboards/testing/trfs-starts-jobs/edit_bd_person/${trfId}`,
+                      )
+                    }
+                    className={btnCls(focus)}
+                  >
                     <PencilIcon className="size-4.5 stroke-1" />
                     <span>Edit BD Person</span>
                   </button>
@@ -326,7 +461,14 @@ export function RowActions({ row, table }) {
               {/* ── Fill Feedback Form — always ── */}
               <MenuItem>
                 {({ focus }) => (
-                  <button onClick={() => navigate(`/dashboards/testing/trfs-starts-jobs/feedback/${trfId}`)} className={btnCls(focus)}>
+                  <button
+                    onClick={() =>
+                      navigate(
+                        `/dashboards/testing/trfs-starts-jobs/customerFeedbackForm/${trfId}`,
+                      )
+                    }
+                    className={btnCls(focus)}
+                  >
                     <ChatBubbleBottomCenterTextIcon className="size-4.5 stroke-1" />
                     <span>Fill Feedback Form</span>
                   </button>
@@ -334,7 +476,7 @@ export function RowActions({ row, table }) {
               </MenuItem>
 
               {/* Divider */}
-              <div className="my-1 h-px bg-gray-200 dark:bg-dark-500" />
+              <div className="dark:bg-dark-500 my-1 h-px bg-gray-200" />
 
               {/* ── Delete ── */}
               <MenuItem>
@@ -345,7 +487,6 @@ export function RowActions({ row, table }) {
                   </button>
                 )}
               </MenuItem>
-
             </MenuItems>
           </Transition>
         </Menu>

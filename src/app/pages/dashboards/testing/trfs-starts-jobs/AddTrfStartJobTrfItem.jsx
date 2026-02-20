@@ -304,215 +304,216 @@ export default function TrfProductsList() {
 
   return (
     <div className="transition-content w-full pb-5">
-    <div className="flex h-full w-full flex-col">
-      <div className="pb-4 text-sm text-gray-700 dark:text-gray-300">
-        {/* ── Header Row ── */}
-        {/* ── Header Row ── */}
-        <div className="mb-4 flex items-center justify-between">
-          {/* Left Side - Title */}
-          <h2 className="text-lg font-bold text-gray-800 dark:text-white">
-            TRF Products
-          </h2>
+      <div className="flex h-full w-full flex-col">
+        <div className="pb-4 text-sm text-gray-700 dark:text-gray-300">
+          {/* ── Header Row ── */}
+          {/* ── Header Row ── */}
+          <div className="mb-4 flex items-center justify-between">
+            {/* Left Side - Title */}
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white">
+              TRF Products
+            </h2>
 
-          {/* Right Side - Buttons */}
-          <div className="flex items-center gap-3">
-            {/* Back Button */}
-            <button
-              onClick={() => navigate("/dashboards/testing/trfs-starts-jobs")}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
-            >
-              Back to TRF Entry List
-            </button>
+            {/* Right Side - Buttons */}
+            <div className="flex items-center gap-3">
+              {/* Back Button */}
+              <button
+                onClick={() => navigate("/dashboards/testing/trfs-starts-jobs")}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
+              >
+                Back to TRF Entry List
+              </button>
 
-            {/* Add / Close Button */}
-            <button
-              onClick={handleAddNew}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition ${
-                showForm && !editItemId
-                  ? "bg-slate-500 hover:bg-slate-600"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
-            >
-              <span className="mr-1 font-bold">
-                {showForm && !editItemId ? "✕" : "+"}
+              {/* Add / Close Button */}
+              <button
+                onClick={handleAddNew}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition ${
+                  showForm && !editItemId
+                    ? "bg-slate-500 hover:bg-slate-600"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                <span className="mr-1 font-bold">
+                  {showForm && !editItemId ? "✕" : "+"}
+                </span>
+                {showForm && !editItemId ? "Close Form" : "Add New Item"}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Inline Add / Edit Form ── */}
+          {showForm && (
+            <div className="mb-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <TrfItemForm
+                trfId={id}
+                itemId={editItemId}
+                onSuccess={handleFormSuccess}
+                onCancel={handleFormCancel}
+              />
+            </div>
+          )}
+
+          {/* ── Controls Row ── */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                Show
               </span>
-              {showForm && !editItemId ? "Close Form" : "Add New Item"}
-            </button>
-          </div>
-        </div>
+              <select
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                className="rounded border border-gray-300 bg-white px-1.5 py-1 text-sm text-gray-700 outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                entries
+              </span>
+            </div>
 
-        {/* ── Inline Add / Edit Form ── */}
-        {showForm && (
-          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <TrfItemForm
-              trfId={id}
-              itemId={editItemId}
-              onSuccess={handleFormSuccess}
-              onCancel={handleFormCancel}
-            />
-          </div>
-        )}
-
-        {/* ── Controls Row ── */}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Show</span>
-            <select
-              value={pageSize}
-              onChange={handlePageSizeChange}
-              className="rounded border border-gray-300 bg-white px-1.5 py-1 text-sm text-gray-700 outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-            >
-              {PAGE_SIZE_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              entries
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                Search:
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={handleSearchChange}
+                placeholder="Search…"
+                className="w-44 rounded border border-gray-300 bg-white px-2.5 py-1 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              />
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Search:
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={handleSearchChange}
-              placeholder="Search…"
-              className="w-44 rounded border border-gray-300 bg-white px-2.5 py-1 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-            />
-          </div>
-        </div>
+          {/* Error */}
+          {error && (
+            <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400">
+              {error}
+            </div>
+          )}
 
-        {/* Error */}
-        {error && (
-          <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400">
-            {error}
-          </div>
-        )}
-
-        {/* ── Table ── */}
-        <div className="overflow-x-auto rounded-lg border-t border-gray-200 dark:border-gray-700">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
-            <thead>
-              <TableHeaders />
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={columns.length + 1}
-                    className="py-8 text-center text-gray-400 dark:text-gray-500"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg
-                        className="h-4 w-4 animate-spin text-blue-500"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
-                        />
-                      </svg>
-                      Loading…
-                    </div>
-                  </td>
-                </tr>
-              ) : paginated.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={columns.length + 1}
-                    className="py-8 text-center text-gray-400 dark:text-gray-500"
-                  >
-                    No data available in table
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((row, idx) => (
-                  <tr
-                    key={row.id}
-                    className={`border-b border-gray-100 transition-colors dark:border-gray-800 ${
-                      editItemId === row.id
-                        ? "bg-blue-50 dark:bg-blue-900/20"
-                        : idx % 2 === 0
-                          ? "bg-white dark:bg-gray-900"
-                          : "bg-gray-50 dark:bg-gray-800/50"
-                    }`}
-                  >
-                    {columns.map((col) => (
-                      <td
-                        key={col.key}
-                        className="px-3 py-2 align-middle text-gray-700 dark:text-gray-300"
-                      >
-                        {row[col.key] ?? ""}
-                      </td>
-                    ))}
-                    <td className="min-w-[200px] px-3 py-2 align-middle">
-                      <ActionCell
-                        row={row}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
+          {/* ── Table ── */}
+          <div className="table-wrapper min-w-full grow overflow-x-auto">
+            <table className="w-full text-left rtl:text-right">
+              <thead>
+                <TableHeaders />
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="py-8 text-center text-gray-400 dark:text-gray-500"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg
+                          className="h-4 w-4 animate-spin text-blue-500"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+                          />
+                        </svg>
+                        Loading…
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            <tfoot>
-              <TableHeaders />
-            </tfoot>
-          </table>
-        </div>
+                ) : paginated.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="py-8 text-center text-gray-400 dark:text-gray-500"
+                    >
+                      No data available in table
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((row, idx) => (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-gray-100 transition-colors dark:border-gray-800 ${
+                        editItemId === row.id
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : idx % 2 === 0
+                            ? "bg-white dark:bg-gray-900"
+                            : "bg-gray-50 dark:bg-gray-800/50"
+                      }`}
+                    >
+                      {columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className="px-3 py-2 align-middle text-gray-700 dark:text-gray-300"
+                        >
+                          {row[col.key] ?? ""}
+                        </td>
+                      ))}
+                      <td className="min-w-[200px] px-3 py-2 align-middle">
+                        <ActionCell
+                          row={row}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {/* ── Footer ── */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {totalEntries === 0
-              ? "Showing 0 to 0 of 0 entries"
-              : `Showing ${startIndex + 1} to ${Math.min(startIndex + pageSize, totalEntries)} of ${totalEntries} entries`}
-          </span>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              disabled={safeCurrentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            >
-              Previous
-            </button>
-
-            <span className="min-w-[36px] rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-center text-sm font-semibold text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-              {safeCurrentPage}
+          {/* ── Footer ── */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {totalEntries === 0
+                ? "Showing 0 to 0 of 0 entries"
+                : `Showing ${startIndex + 1} to ${Math.min(startIndex + pageSize, totalEntries)} of ${totalEntries} entries`}
             </span>
 
-            <button
-              disabled={safeCurrentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                disabled={safeCurrentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              >
+                Previous
+              </button>
 
-        {!loading && totalEntries === 0 && !showForm && (
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-            No Item added
-          </p>
-        )}
-      </div>
+              <span className="min-w-[36px] rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-center text-sm font-semibold text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                {safeCurrentPage}
+              </span>
+
+              <button
+                disabled={safeCurrentPage === totalPages}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
+          {!loading && totalEntries === 0 && !showForm && (
+            <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+              No Item added
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
