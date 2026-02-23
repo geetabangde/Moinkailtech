@@ -2107,9 +2107,44 @@ const protectedRoutes = {
                       lazy: async () => ({
                         Component: (await import("app/pages/dashboards/testing/trfs-starts-jobs/SampleReview" )).default,
                       }),
-                    }
+                    },
+                    {
+                      path: "technical-acceptance/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/TechnicalAcceptance"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "pending-technical-acceptance",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/PendingTechnicalAcceptance"
+                          )
+                        ).default,
+                      }),
+                    },
                   ],
                 },
+                {
+                path: "lrn-cancel-requests",
+                  children: [
+                    {
+                      path: "",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/lrn-cancel-requests"
+                          )
+                        ).default,
+                      }),
+                    },
+                  ],
+                }
               ],
             },
             {

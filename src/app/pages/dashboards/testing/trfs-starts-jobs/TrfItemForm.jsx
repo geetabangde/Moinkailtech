@@ -36,7 +36,7 @@ const INITIAL_FORM = {
   total:         0,
 };
 
-// ─── Shared class strings (matching AddModes Input style) ─────────────────────
+// ─── Shared class strings ─────────────────────────────────────────────────────
 const inputCls =
   "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm " +
   "text-gray-800 dark:text-white bg-white dark:bg-gray-800 outline-none " +
@@ -60,8 +60,8 @@ const selectErrCls =
 const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5";
 const errCls   = "text-red-500 text-xs mt-1";
 
-const iCls  = (err) => (err ? inputErrCls  : inputCls);
-const sCls  = (err) => (err ? selectErrCls : selectCls);
+const iCls = (err) => (err ? inputErrCls  : inputCls);
+const sCls = (err) => (err ? selectErrCls : selectCls);
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function toArray(responseData, ...keys) {
@@ -73,15 +73,34 @@ function toArray(responseData, ...keys) {
   return [];
 }
 
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+function Spinner({ className = "h-4 w-4" }) {
+  return (
+    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+    </svg>
+  );
+}
+
 /**
  * Props:
- *   trfId      — TRF ID (from parent)
- *   itemId     — null = Add New, number = Edit existing
- *   onSuccess  — called after successful submit
- *   onCancel   — called when user cancels
+ *   trfId    — TRF ID (required)
+ *   itemId   — null = Add New | number = Edit existing
+ *   cloneId  — number = Clone from this trfProduct id (submit as NEW item)
+ *   onSuccess — called after successful submit
+ *   onCancel  — called when user cancels
+ *
+ * Priority: cloneId > itemId
+ *   - cloneId provided → pre-fill from clone source, submit as new
+ *   - itemId provided  → edit existing item
+ *   - neither          → blank add-new form
  */
-export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
-  const isNew = !itemId;
+export default function TrfItemForm({ trfId, itemId, cloneId, onSuccess, onCancel }) {
+  // ── Mode detection ────────────────────────────────────────────────────────
+  const isClone = !!cloneId;
+  const isEdit  = !isClone && !!itemId;
+  const isNew   = !isClone && !itemId;
 
   // ─── Static dropdowns ────────────────────────────────────────────────────
   const [products,    setProducts]    = useState([]);
@@ -113,14 +132,56 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
   const [submitting,  setSubmitting]  = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
+  // ─── Refs ─────────────────────────────────────────────────────────────────
+  const prevProduct       = useRef(null);
+  const prevProductForPkg = useRef(null);
+  const prevPkgType       = useRef(null);
+  const prevPkg           = useRef(null);
+  // Track if we just pre-filled from item/clone (so cascades don't reset values)
+  const prefillDone = useRef(false);
+
   const clearPkgDetails = () => {
     setQuantities([]); setReceived([]);
     setParameters([]); setSelectedParams([]);
     setIsSpecial(false);
   };
 
+  // ── Helper: set form from item data + mark refs so cascades skip reset ────
+  const applyItemData = (item) => {
+    const pid  = String(item.product      ?? "");
+    const type = String(item.package_type ?? "");
+    const pkg  = String(item.package      ?? "");
+
+    // Pre-set refs so effect cascades know these are already loaded
+    prevProduct.current       = pid;
+    prevProductForPkg.current = pid;
+    prevPkgType.current       = type;
+    prevPkg.current           = pkg;
+    prefillDone.current       = true;
+
+    setForm({
+      product:       pid,
+      brand:         item.brand                ?? "",
+      qrcode:        item.qrcode               ?? "",
+      testrequest:   item.testrequest          ?? "",
+      grade:         String(item.grade         ?? ""),
+      size:          String(item.size          ?? ""),
+      package:       pkg,
+      package_type:  type,
+      isok:          String(item.isok          ?? ""),
+      sealed:        item.sealed               ?? 0,
+      disposable:    String(item.disposable    ?? ""),
+      condition:     String(item.condition     ?? ""),
+      specification: String(item.specification ?? ""),
+      conformity:    String(item.conformity    ?? ""),
+      unitcost:      item.unitcost             ?? 0,
+      total:         item.total                ?? 0,
+    });
+  };
+
   // ── 1. Static dropdowns ───────────────────────────────────────────────────
   const fetchDropdowns = useCallback(async () => {
+    if (isClone) return; // clone API khud sab deta hai
     setLoadingDropdowns(true);
     try {
       const [prodRes, choiceRes, dispRes, condRes] = await Promise.all([
@@ -138,40 +199,85 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
     } finally {
       setLoadingDropdowns(false);
     }
-  }, []);
+  }, [isClone]);
 
-  // ── 2. Load existing item for edit ────────────────────────────────────────
-  const fetchItem = useCallback(async () => {
-    if (isNew) return;
-    try {
-      const res  = await axios.get(`/testing/get-trf-item/${itemId}`);
-      const item = res.data?.item ?? res.data?.data ?? res.data ?? {};
-      setForm({
-        product:       String(item.product       ?? ""),
-        brand:         item.brand                ?? "",
-        qrcode:        item.qrcode               ?? "",
-        testrequest:   item.testrequest          ?? "",
-        grade:         String(item.grade         ?? ""),
-        size:          String(item.size          ?? ""),
-        package:       String(item.package       ?? ""),
-        package_type:  String(item.package_type  ?? ""),
-        isok:          String(item.isok          ?? ""),
-        sealed:        item.sealed               ?? 0,
-        disposable:    String(item.disposable    ?? ""),
-        condition:     String(item.condition     ?? ""),
-        specification: String(item.specification ?? ""),
-        conformity:    String(item.conformity    ?? ""),
-        unitcost:      item.unitcost             ?? 0,
-        total:         item.total                ?? 0,
-      });
-    } catch {
-      setSubmitError("Failed to load item details.");
+  // ── 2. Load item data (edit OR clone) ─────────────────────────────────────
+  const fetchItemData = useCallback(async () => {
+
+    // ── CLONE MODE ────────────────────────────────────────────────────────
+    // ✅ Correct endpoint: GET /testing/trf-item-clone/:cloneId
+    // ✅ Response key: res.data.trf_product (NOT item/data)
+    // ✅ package_type: packages[].nabl se derive karo (trf_product mein nahi hota)
+    // ✅ Sab dropdowns ek hi response se: products, grades, sizes, packages,
+    //    quantities, parameters, special, price, choices, disposables, conditions
+    if (isClone) {
+      setLoadingDropdowns(true);
+      try {
+        const res = await axios.get(`/testing/trf-item-clone/${cloneId}`);
+        const d   = res.data ?? {};
+
+        // Sab dropdowns populate karo ek hi response se
+        setProducts(   toArray(d, "products"));
+        setChoices(    toArray(d, "choices"));
+        setDisposables(toArray(d, "disposables"));
+        setConditions( toArray(d, "conditions"));
+        setGrades(     toArray(d, "grades"));
+        setSizes(      toArray(d, "sizes"));
+        setPackages(   toArray(d, "packages"));
+        setQuantities( toArray(d, "quantities"));
+        setReceived(   toArray(d, "quantities").map(() => ""));
+        setParameters( toArray(d, "parameters"));
+
+        const special = d.special ?? false;
+        setIsSpecial(!!special);
+        setSelectedParams(special ? toArray(d, "parameters").map((p) => p.id) : []);
+
+        // trf_product se form fill
+        const item = d.trf_product ?? {};
+
+        // package_type trf_product mein nahi hota —
+        // packages array se package ka nabl field = package_type value
+        // nabl: 1=NABL, 3=QAI, 2=NO  (same as PACKAGE_TYPE_OPTIONS)
+        const pkgList    = toArray(d, "packages");
+        const matchedPkg = pkgList.find((p) => String(p.id) === String(item.package));
+        const derivedPkgType = matchedPkg ? String(matchedPkg.nabl ?? "") : "";
+
+        const price = d.price ?? item.unitcost ?? 0;
+
+        applyItemData({
+          ...item,
+          package_type: derivedPkgType,
+          unitcost:     price,
+          total:        price,
+        });
+
+      } catch {
+        setSubmitError("Failed to load clone source. Please try again.");
+      } finally {
+        setLoadingDropdowns(false);
+      }
+      return;
     }
-  }, [isNew, itemId]);
 
-  useEffect(() => { fetchDropdowns(); fetchItem(); }, [fetchDropdowns, fetchItem]);
+    // ── EDIT MODE ─────────────────────────────────────────────────────────
+    if (isEdit) {
+      try {
+        const res  = await axios.get(`/testing/get-trf-item/${itemId}`);
+        const item = res.data?.item ?? res.data?.data ?? res.data ?? {};
+        applyItemData(item);
+      } catch {
+        setSubmitError("Failed to load item details.");
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClone, cloneId, isEdit, itemId]);
 
-  // ── 3. Default first options ──────────────────────────────────────────────
+  useEffect(() => {
+    fetchDropdowns();
+    fetchItemData();
+  }, [fetchDropdowns, fetchItemData]);
+
+  // ── 3. Default first options (only for blank add-new) ────────────────────
   useEffect(() => {
     if (!loadingDropdowns && isNew) {
       setForm((prev) => ({
@@ -186,18 +292,23 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
   }, [loadingDropdowns, isNew, choices, disposables, conditions]);
 
   // ── 4. Product → grades + sizes ───────────────────────────────────────────
-  const prevProduct = useRef(null);
   useEffect(() => {
     const pid = form.product;
-    if (!pid || pid === prevProduct.current) return;
-    prevProduct.current = pid;
-    setGrades([]); setSizes([]); setPackages([]);
-    setForm((prev) => ({ ...prev, grade: "", size: "", package: "", package_type: "", unitcost: 0, total: 0 }));
-    clearPkgDetails();
+    if (!pid) return;
+
+    const isUserChange = pid !== prevProduct.current;
+
+    // User changed product → reset downstream
+    if (isUserChange) {
+      setGrades([]); setSizes([]); setPackages([]);
+      setForm((prev) => ({ ...prev, grade: "", size: "", package: "", package_type: "", unitcost: 0, total: 0 }));
+      clearPkgDetails();
+      prevProduct.current = pid;
+    }
+
     const load = async () => {
       setLoadingGradeSize(true);
       try {
-        // ✅ Single API call for both grades and sizes
         const res = await axios.get(`/testing/get-grade-and-size?pid=${pid}`);
         setGrades(toArray(res.data, "grades"));
         setSizes( toArray(res.data, "sizes"));
@@ -205,14 +316,14 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
       finally { setLoadingGradeSize(false); }
     };
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.product]);
 
-  // ── 5. Product + type → package list ─────────────────────────────────────
-  const prevProductForPkg = useRef(null);
-  const prevPkgType       = useRef(null);
+  // ── 5. Product + package_type → package list ──────────────────────────────
   useEffect(() => {
     const pid  = form.product;
     const type = form.package_type;
+
     if (!pid || !type) {
       if (prevPkgType.current && !type) {
         setPackages([]);
@@ -222,11 +333,19 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
       prevPkgType.current = type;
       return;
     }
+
+    // Skip on initial pre-fill (refs already match)
     if (pid === prevProductForPkg.current && type === prevPkgType.current) return;
+
+    // User-driven change → reset package
+    if (!prefillDone.current) {
+      setForm((prev) => ({ ...prev, package: "", unitcost: 0, total: 0 }));
+      clearPkgDetails();
+    }
+    prefillDone.current       = false;
     prevProductForPkg.current = pid;
     prevPkgType.current       = type;
-    setForm((prev) => ({ ...prev, package: "", unitcost: 0, total: 0 }));
-    clearPkgDetails();
+
     const load = async () => {
       setLoadingPackages(true);
       try {
@@ -239,14 +358,15 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
   }, [form.product, form.package_type]);
 
   // ── 6. Package → quantities, price, parameters ───────────────────────────
-  const prevPkg = useRef(null);
   useEffect(() => {
     const pkgId = form.package;
     if (!pkgId || pkgId === prevPkg.current) return;
     prevPkg.current = pkgId;
+
     const cached = packages.find((p) => String(p.id) === String(pkgId));
     if (cached?.rate !== undefined)
       setForm((prev) => ({ ...prev, unitcost: cached.rate, total: cached.rate }));
+
     const load = async () => {
       setLoadingPkgDetails(true);
       try {
@@ -304,14 +424,14 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  // POST /testing/add-trf-item
-  // Response: { status, message, trf_id, trf_product_id, bookingrefno }
+  // Clone & New both → POST /testing/add-trf-item
+  // Edit             → PUT  /testing/update-trf-item/:itemId  (ya jo bhi edit endpoint ho)
   const handleSubmit = async () => {
     const validationErrors = validate();
     if (Object.keys(validationErrors).length) { setErrors(validationErrors); return; }
     setSubmitting(true); setSubmitError(null);
     try {
-      const res = await axios.post("/testing/add-trf-item", {
+      const payload = {
         product:       Number(form.product),
         brand:         form.brand,
         qrcode:        form.qrcode,
@@ -332,11 +452,26 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
         received:      received.map((r) => Number(r) || 0),
         id:            Number(trfId),
         ...(isSpecial && selectedParams.length ? { parameters: selectedParams } : {}),
-      });
-      // Pass { bookingrefno, trf_product_id, message } to parent for toast
+        
+      };
+
+      let res;
+      if (isEdit) {
+        // Edit existing item
+        res = await axios.post(`/testing/add-trf-item`, { ...payload, trfproduct_id: Number(itemId) });
+      } else {
+        // Add new (fresh or cloned)
+        res = await axios.post("/testing/add-trf-item", payload);
+      }
+
       onSuccess?.(res.data);
     } catch (err) {
-      setSubmitError(err?.response?.data?.message ?? "Failed to save item.");
+      const apiMsg = err?.response?.data?.message
+        ?? err?.response?.data?.error
+        ?? err?.response?.data?.msg
+        ?? (typeof err?.response?.data === "string" ? err.response.data : null)
+        ?? `Failed to save item. (Status: ${err?.response?.status ?? "network error"})`;
+      setSubmitError(apiMsg);
     } finally {
       setSubmitting(false);
     }
@@ -347,10 +482,7 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
     return (
       <div className="flex items-center justify-center py-10">
         <div className="text-center">
-          <svg className="animate-spin h-7 w-7 text-blue-600 mx-auto mb-2" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
-          </svg>
+          <Spinner className="h-7 w-7 text-blue-600 mx-auto mb-2" />
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading form...</p>
         </div>
       </div>
@@ -359,12 +491,25 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
 
   const allParamsSelected = parameters.length > 0 && selectedParams.length === parameters.length;
 
+  // ── Title + banner logic ──────────────────────────────────────────────────
+  const formTitle = isClone
+    ? `Clone Item #${cloneId}`
+    : isEdit
+    ? `Edit Item #${itemId}`
+    : "Add New Item";
+
+  const submitLabel = isClone
+    ? "Clone & Add Item"
+    : isEdit
+    ? "Save Changes"
+    : "Add Item";
+
   return (
     <div className="space-y-5 text-sm">
 
       {/* Title */}
       <h3 className="text-base font-semibold text-gray-800 dark:text-white">
-        {isNew ? "Add New Item" : `Edit Item #${itemId}`}
+        {formTitle}
       </h3>
 
       {/* Error banner */}
@@ -413,11 +558,7 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
       {/* ════ SECTION 2 — Package Type → Grades/Sizes → Packages ════ */}
       {loadingGradeSize && (
         <div className="flex items-center gap-2 text-sm text-gray-400">
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
-          </svg>
-          Loading grades and sizes…
+          <Spinner /> Loading grades and sizes…
         </div>
       )}
 
@@ -461,11 +602,7 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
             <label className={labelCls}>Packages <span className="text-red-500">*</span></label>
             {loadingPackages ? (
               <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
-                </svg>
-                Loading packages…
+                <Spinner /> Loading packages…
               </div>
             ) : (
               <select
@@ -581,23 +718,16 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
       {/* ════ SECTION 6 — Quantities ════ */}
       {loadingPkgDetails && (
         <div className="flex items-center gap-2 text-sm text-gray-400">
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
-          </svg>
-          Loading package details…
+          <Spinner /> Loading package details…
         </div>
       )}
 
       {!loadingPkgDetails && quantities.length > 0 && (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          {/* Header */}
           <div className="grid grid-cols-2 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Required Quantity</span>
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Received Quantity</span>
           </div>
-
-          {/* Rows */}
           {quantities.map((qty, idx) => (
             <div key={qty.id} className="grid grid-cols-2 items-center px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
               <div>
@@ -620,13 +750,10 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
               </div>
             </div>
           ))}
-
-          {/* Total row */}
           <div className="grid grid-cols-2 items-center px-4 py-2.5 bg-gray-50 dark:bg-gray-800">
             <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Total Quantity</span>
             <input
               type="number"
-              id="totalqty"
               readOnly
               className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 outline-none cursor-default"
               value={received.reduce((sum, v) => sum + (Number(v) || 0), 0)}
@@ -638,11 +765,9 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
       {/* ════ SECTION 7 — Parameters ════ */}
       {!loadingPkgDetails && parameters.length > 0 && (
         <div className="border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
-          {/* Header */}
           <div className="px-4 py-2.5 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800">
             <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-400">Parameters Of Package</h4>
           </div>
-
           <div className="px-4 py-3 space-y-1">
             {isSpecial && (
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 pb-2 mb-1 border-b border-gray-100 dark:border-gray-800 cursor-pointer">
@@ -655,7 +780,6 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
                 Select / Deselect All
               </label>
             )}
-
             {parameters.map((param) => (
               <div key={param.id}>
                 {isSpecial ? (
@@ -699,13 +823,10 @@ export default function TrfItemForm({ trfId, itemId, onSuccess, onCancel }) {
         >
           {submitting ? (
             <>
-              <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
-              </svg>
+              <Spinner className="h-4 w-4 text-white" />
               Saving…
             </>
-          ) : isNew ? "Add Item" : "Save Changes"}
+          ) : submitLabel}
         </button>
       </div>
     </div>

@@ -105,7 +105,12 @@ export function RowActions({ row, table }) {
 
   const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
   const base = `/dashboards/testing/trfs-starts-jobs`;
-  const go = (path) => () => navigate(path);
+
+  // ✅ KEY FIX: navigate ke saath trfStatus pass karo (route state mein)
+  // TrfProductsList mein useLocation().state?.trfStatus se milega
+  // PHP: $trfstatus = $trfrow['status'] — yahi value hai jo Add Item button control karta hai
+  const go = (path) => () =>
+    navigate(path, { state: { trfStatus: status } });
 
   const actions = [
     // Add Items — status 0 or 98, permission 98
@@ -120,7 +125,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // ✅ Sample Review — sirf status 1 check, hasProducts hata diya
+    // Sample Review — status 1
     ...(status === 1
       ? [
           {
@@ -132,7 +137,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // ✅ Technical Acceptance — sirf status 2 check
+    // Technical Acceptance — status 2
     ...(status === 2
       ? [
           {
@@ -144,7 +149,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // ✅ Allot Sample — sirf status 3 check
+    // Allot Sample — status 3
     ...(status === 3
       ? [
           {
@@ -156,7 +161,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // ✅ Assign Chemist — status 3 or 4, permission 6
+    // Assign Chemist — status 3 or 4
     ...(status === 3 || status === 4
       ? [
           {
@@ -175,7 +180,7 @@ export function RowActions({ row, table }) {
       onClick: go(`${base}/trfitems/${trfId}`),
     },
 
-    // Perform Testing — status 5, permission 7 or 182
+    // Perform Testing — status 5
     ...(status === 5
       ? [
           {
@@ -187,7 +192,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // View Draft Report — status 6, permission 179
+    // View Draft Report — status 6
     ...(status === 6
       ? [
           {
@@ -199,7 +204,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // HOD Review — status 7, permission 180
+    // HOD Review — status 7
     ...(status === 7
       ? [
           {
@@ -211,7 +216,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // QA Review — status 8, permission 181
+    // QA Review — status 8
     ...(status === 8
       ? [
           {
@@ -223,7 +228,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // Generate ULR — status 9, permission 182
+    // Generate ULR — status 9
     ...(status === 9
       ? [
           {
@@ -235,7 +240,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // View Reports — status 10, permission 182
+    // View Reports — status 10
     ...(status === 10
       ? [
           {
@@ -258,7 +263,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // Edit TRF — status < 10 or 98, permission 2
+    // Edit TRF — status < 10 or 98
     ...(status < 10 || status === 98
       ? [
           {
@@ -270,7 +275,7 @@ export function RowActions({ row, table }) {
         ]
       : []),
 
-    // Edit Work Order — permission 284
+    // Edit Work Order
     {
       label: "Edit Work Order detail",
       icon: DocumentTextIcon,
@@ -278,7 +283,7 @@ export function RowActions({ row, table }) {
       onClick: go(`${base}/addPoDetailToTrf/${trfId}`),
     },
 
-    // Edit Billing Detail — permission 284
+    // Edit Billing Detail
     {
       label: "Edit Billing Detail",
       icon: BanknotesIcon,
@@ -286,7 +291,7 @@ export function RowActions({ row, table }) {
       onClick: go(`${base}/editBillingDetailTrf/${trfId}`),
     },
 
-    // Edit Customer Responsible — permission 297
+    // Edit Customer Responsible
     {
       label: "Edit Customer Responsible for Payment",
       icon: UserIcon,
@@ -294,7 +299,7 @@ export function RowActions({ row, table }) {
       onClick: go(`${base}/editmaincustomerTrf/${trfId}`),
     },
 
-    // Edit BD Person — permission 406
+    // Edit BD Person
     {
       label: "Edit BD Person",
       icon: PencilIcon,
@@ -302,7 +307,7 @@ export function RowActions({ row, table }) {
       onClick: go(`${base}/edit_bd_person/${trfId}`),
     },
 
-    // Fill Feedback Form — permission 283
+    // Fill Feedback Form
     {
       label: "Fill Feedback Form",
       icon: ChatBubbleBottomCenterTextIcon,
@@ -311,7 +316,6 @@ export function RowActions({ row, table }) {
     },
   ];
 
-  // Filter: permission check — single ya anyPermission (OR logic)
   const filteredActions = actions.filter((action) => {
     if (action.anyPermission) {
       return action.anyPermission.some((p) => permissions.includes(p));
@@ -334,7 +338,6 @@ export function RowActions({ row, table }) {
           />
         ))}
 
-        {/* ✅ Delete — permission 395, no products check bhi */}
         {permissions.includes(395) && !hasProducts && (
           <ActionPill
             onClick={openModal}
