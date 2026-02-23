@@ -2131,7 +2131,7 @@ const protectedRoutes = {
                   ],
                 },
                 {
-                path: "lrn-cancel-requests",
+                  path: "lrn-cancel-requests",
                   children: [
                     {
                       path: "",
@@ -2139,6 +2139,31 @@ const protectedRoutes = {
                         Component: (
                           await import(
                             "app/pages/dashboards/testing/lrn-cancel-requests"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "dispatchformtesting/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/dispatch-list/DispatchFormTesting"
+                          )
+                        ).default,
+                      }),
+                    },
+                  ],
+                },
+                {
+                  path: "dispatch-list",
+                  children: [
+                    {
+                      path: "",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/dispatch-list"
                           )
                         ).default,
                       }),
