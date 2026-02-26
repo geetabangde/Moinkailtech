@@ -112,7 +112,7 @@ export default function TechnicalAcceptance() {
         trfitem:             trfItemInt,
       });
       toast.success("Technical Acceptance submitted successfully ✅");
-      navigate("/dashboards/testing/trfs-starts-jobs/pending-technical-acceptance");
+      navigate("/dashboards/action-items/pending-technical-acceptance");
     } catch (err) {
       const msg = err?.response?.data?.message ?? "Failed to submit. Please try again.";
       setError(msg);

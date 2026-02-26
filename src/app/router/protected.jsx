@@ -2088,7 +2088,9 @@ const protectedRoutes = {
                       path: "editmaincustomerTrf/:id", // Edit Page
                       lazy: async () => ({
                         Component: (
-                          await import("app/pages/dashboards/testing/trfs-starts-jobs/EditMainCustomerTrf") 
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/EditMainCustomerTrf"
+                          )
                         ).default,
                       }),
                     },
@@ -2105,7 +2107,11 @@ const protectedRoutes = {
                     {
                       path: "samplereview/:id", // Edit Page
                       lazy: async () => ({
-                        Component: (await import("app/pages/dashboards/testing/trfs-starts-jobs/SampleReview" )).default,
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/trfs-starts-jobs/SampleReview"
+                          )
+                        ).default,
                       }),
                     },
                     {
@@ -2169,7 +2175,85 @@ const protectedRoutes = {
                       }),
                     },
                   ],
-                }
+                },
+              ],
+            },
+            // ========================action-item=======================
+            {
+              path: "action-items",
+              children: [
+                {
+                  path: "pending-technical-acceptance",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/testing/trfs-starts-jobs/PendingTechnicalAcceptance"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "allot-sample",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/allot-sample/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                 path: "allot-sample/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/allot-sample/AllotSampleForm"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "accept-sample",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/action-items/accept-sample/index")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "assign-chemist",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/action-items/assign-chemist/index")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "assign-chemist/:id",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/assign-chemist/AssignChemistForm")).default
+                  })
+                },
+                {
+                  path: "perform-testing",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/perform-testing/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "perform-testing/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/perform-testing/PerformTestDetail"
+                      )
+                    ).default,
+                  }),
+                },
               ],
             },
             {

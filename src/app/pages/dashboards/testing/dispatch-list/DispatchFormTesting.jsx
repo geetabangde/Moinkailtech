@@ -119,7 +119,7 @@ export default function DispatchFormTesting() {
             {/* Logo */}
             <div className="flex items-center">
               <img
-                src="/assets/logo.png"
+                src="/images/logo.png" 
                 alt="KTRC Logo"
                 className="h-16 w-auto object-contain"
                 onError={(e) => { e.target.style.display = "none"; }}

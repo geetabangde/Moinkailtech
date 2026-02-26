@@ -6,9 +6,89 @@ import { toast } from "sonner";
 
 import { Page } from "components/shared/Page";
 import { Button } from "components/ui";
-import { Input, Textarea, Select as FormSelect } from "components/ui/Form";
+import { Input, Textarea } from "components/ui/Form";
 import { Card } from "components/ui/Card";
 import ReactSelect from "react-select";
+
+// ── Reusable SearchSelect component ─────────────────────────────────────────
+const SearchSelect = ({
+  options = [],
+  value,
+  onChange,
+  placeholder = "Search and select...",
+  isMulti = false,
+  isDisabled = false,
+  error = false,
+  inputRef = null,
+}) => {
+  const styles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: "42px",
+      borderColor: error
+        ? "#ef4444"
+        : state.isFocused
+        ? "#3b82f6"
+        : "rgb(209 213 219)",
+      boxShadow: error
+        ? "0 0 0 1px #ef4444"
+        : state.isFocused
+        ? "0 0 0 2px rgb(59 130 246 / 0.5)"
+        : "none",
+      "&:hover": { borderColor: error ? "#ef4444" : "#3b82f6" },
+      backgroundColor: isDisabled ? "#f9fafb" : "white",
+      borderRadius: "0.5rem",
+      opacity: isDisabled ? 0.7 : 1,
+    }),
+    menu: (base) => ({ ...base, borderRadius: "0.5rem", zIndex: 9999 }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    multiValue: (base) => ({ ...base, backgroundColor: "#dbeafe", borderRadius: "0.25rem" }),
+    multiValueLabel: (base) => ({ ...base, color: "#1e40af" }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: "#3b82f6",
+      "&:hover": { backgroundColor: "#3b82f6", color: "white" },
+    }),
+    placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
+    singleValue: (base) => ({ ...base, fontSize: "0.875rem" }),
+    option: (base, state) => ({
+      ...base,
+      fontSize: "0.875rem",
+      backgroundColor: state.isSelected
+        ? "#3b82f6"
+        : state.isFocused
+        ? "#eff6ff"
+        : "white",
+      color: state.isSelected ? "white" : "#374151",
+      "&:active": { backgroundColor: "#bfdbfe" },
+    }),
+  };
+
+  return (
+    <ReactSelect
+      ref={inputRef}
+      options={options}
+      value={value}
+      onChange={onChange}
+      isMulti={isMulti}
+      isDisabled={isDisabled}
+      placeholder={placeholder}
+      styles={styles}
+      menuPortalTarget={document.body}
+      isClearable
+      isSearchable
+      noOptionsMessage={() => "No options found"}
+    />
+  );
+};
+
+// ── Helper: array → ReactSelect options ─────────────────────────────────────
+const toOptions = (arr = [], labelFn, valueFn = (x) => String(x.id)) =>
+  arr.map((x) => ({ value: valueFn(x), label: labelFn(x) }));
+
+// ── Helper: find selected option by value ────────────────────────────────────
+const findOption = (options = [], value) =>
+  options.find((o) => String(o.value) === String(value)) || null;
 
 export default function AddTrfStartJob() {
   const navigate = useNavigate();
@@ -130,7 +210,6 @@ export default function AddTrfStartJob() {
   const [concernPersons, setConcernPersons]     = useState([]);
   const [quotations, setQuotations]             = useState([]);
 
-
   // ── Customer credit info ────────────────────────────────────────────────────
   const [customerCredit, setCustomerCredit] = useState(null);
   const [customerEmail, setCustomerEmail]   = useState("");
@@ -151,7 +230,7 @@ export default function AddTrfStartJob() {
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
 
-  // ── ReactSelect styles ──────────────────────────────────────────────────────
+  // ── ReactSelect styles (kept for certcollectiondetail multi-select) ─────────
   const customSelectStyles = {
     control: (base, state) => ({
       ...base,
@@ -257,18 +336,12 @@ export default function AddTrfStartJob() {
   };
 
   // ── Fetch customer-dependent data ───────────────────────────────────────────
-  // FIX: Matches PHP fetchcustomerdetails.php logic:
-  //   - Loads addresses for the MAIN selected customer (custid) immediately
-  //   - Pre-fills gstno and modeofpayment from customer record
-  //   - reportname / billingname are separate selects (any customer), but
-  //     addresses start pre-loaded from the main customer
   const fetchCustomerDependentData = async (customerId) => {
     if (!customerId) return;
     setLoadingCustomer(true);
     try {
       const [creditRes, addressRes, concernPersonsRes, quotationsRes] = await Promise.all([
         axios.get(`/people/get-all-customers?id=${customerId}`),
-        // PHP: customer-address where customer=$custid — pre-load for both report & billing
         axios.get(`/people/get-customers-address/${customerId}`),
         axios.get(`/get-concern-person/${customerId}`),
         axios.get(`/get-quotaion/${customerId}`),
@@ -283,20 +356,16 @@ export default function AddTrfStartJob() {
         });
         setCustomerEmail(c.email || "");
 
-        // FIX: Also pre-select customer's default modeofpayment (PHP fetchpaymentmode.php logic)
         setFormData((prev) => ({
           ...prev,
           gstno:          c.gstno          || "",
           customername:   c.name           || "",
           customeraddress: "nothing",
-          // Pre-select customer's saved default payment mode
           modeofpayment:  c.modeofpayment  ? String(c.modeofpayment) : prev.modeofpayment,
         }));
       }
 
       if (addressRes.data?.data) {
-        // FIX: PHP pre-loads addresses for the main customer into BOTH report and billing
-        // address dropdowns — do NOT wait for reportname / billingname selection
         setReportAddresses(addressRes.data.data);
         setBillingAddresses(addressRes.data.data);
       }
@@ -333,8 +402,6 @@ export default function AddTrfStartJob() {
     }
   };
 
-  // FIX: fetchAddresses — called when reportname or billingname is CHANGED by user
-  // (matches PHP onchange="search(this.id, 'readd', 'fetchreportdetails.php', ...)")
   const fetchAddresses = async (customerId, type) => {
     try {
       const res = await axios.get(`/people/get-customers-address/${customerId}`);
@@ -396,7 +463,7 @@ export default function AddTrfStartJob() {
       concernpersonname: "", concernpersondesignation: "",
       concernpersonemail: "", concernpersonmobile: "",
       quotationid: "0",
-      modeofpayment: "",  // reset payment mode; will be re-filled by fetchCustomerDependentData
+      modeofpayment: "",
     }));
     setReportAddresses([]);
     setBillingAddresses([]);
@@ -408,17 +475,13 @@ export default function AddTrfStartJob() {
     if (value) await fetchCustomerDependentData(value);
   };
 
-  // FIX: handleReportNameChange — when user picks a DIFFERENT customer for reporting
-  // fetches that customer's addresses (PHP: onchange fetchreportdetails.php)
   const handleReportNameChange = async (e) => {
     const value = e.target.value;
     clearError("reportname");
-    // Reset address selection when customer name changes
     setFormData((prev) => ({ ...prev, reportname: value, reportaddress: "" }));
     if (value) {
       await fetchAddresses(value, "report");
     } else {
-      // If cleared, reload from main customer's addresses
       if (formData.customerid) {
         await fetchAddresses(formData.customerid, "report");
       } else {
@@ -427,7 +490,6 @@ export default function AddTrfStartJob() {
     }
   };
 
-  // FIX: handleBillingNameChange — same logic as report
   const handleBillingNameChange = async (e) => {
     const value = e.target.value;
     clearError("billingname");
@@ -507,7 +569,6 @@ export default function AddTrfStartJob() {
     if (!formData.specificpurpose)    newErrors.specificpurpose    = "Specific Purpose is required";
     if (!formData.letterrefno)        newErrors.letterrefno        = "Customer Reference is required";
 
-    // Customer-detail fields (required when a customer is selected)
     if (formData.customerid) {
       if (!formData.reportname)        newErrors.reportname        = "Report Customer Name is required";
       if (!formData.reportaddress)     newErrors.reportaddress     = "Report Address is required";
@@ -524,7 +585,6 @@ export default function AddTrfStartJob() {
     if (!formData.witness)       newErrors.witness       = "Witness Required is required";
     if (!formData.modeofreciept) newErrors.modeofreciept = "Mode of Receipt is required";
 
-    // Payment fields — only when payment is done
     if (formData.paymentstatus !== "2") {
       if (!formData.modeofpayment)    newErrors.modeofpayment    = "Mode of Payment is required";
       if (!formData.detailsofpayment) newErrors.detailsofpayment = "Payment Details are required";
@@ -545,7 +605,7 @@ export default function AddTrfStartJob() {
     const newErrors = validate();
 
     if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);   // triggers useEffect → scrollToFirstError
+      setErrors(newErrors);
       setLoading(false);
       return;
     }
@@ -570,7 +630,6 @@ export default function AddTrfStartJob() {
       if (wuploadFile) submitData.append("wupload", wuploadFile);
       if (ruploadFile) submitData.append("rupload", ruploadFile);
 
-      // Debug log
       for (let [key, value] of submitData.entries()) console.log(`${key}:`, value);
 
       const response = await axios.post("/testing/add-trf-entry", submitData, {
@@ -609,6 +668,32 @@ export default function AddTrfStartJob() {
       </Page>
     );
   }
+
+  // ── Pre-compute option arrays (used in multiple places) ─────────────────────
+  const customerOptions    = toOptions(customers,    (c) => `${c.name} (${c.pnumber || c.phone || "N/A"})`);
+  const customerTypeOptions = toOptions(customerTypes, (t) => t.name);
+  const specificPurposeOptions = toOptions(specificPurposes, (p) => p.name);
+  const bdOptions          = toOptions(bds,          (b) => `${b.firstname} ${b.lastname}`);
+  const promoterOptions    = toOptions(promoters,    (p) => p.name);
+  const choiceOptions      = toOptions(choices,      (c) => c.name);
+  const modeOfReceiptOptions = toOptions(modesOfReceipt, (m) => m.name);
+  const paymentModeOptions = toOptions(paymentModes, (m) => m.name);
+  const reportAddressOptions  = toOptions(reportAddresses,  (a) => `${a.name} (${a.address})`);
+  const billingAddressOptions = toOptions(billingAddresses, (a) => `${a.name} (${a.address})`);
+  const concernPersonOptions  = toOptions(concernPersons,   (p) => `${p.name} (${p.mobile})`);
+  const quotationOptions = [
+    { value: "0", label: "Select Quotation" },
+    ...quotations.map((q) => ({
+      value: String(q.id),
+      label: String(q.id).padStart(5, "0"),
+    })),
+  ];
+  const returnableOptions = choiceOptions;
+  const pchargesTypeOptions = [
+    { value: "1", label: "₹ (Rupees)" },
+    { value: "2", label: "% (Percentage)" },
+  ];
+  const wchargesTypeOptions = pchargesTypeOptions;
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -650,33 +735,50 @@ export default function AddTrfStartJob() {
                 <ErrMsg field="sample_received_on" />
               </div>
 
-              {/* Customer Type */}
+              {/* Customer Type — SearchSelect */}
               <div ref={ctypeRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer Type <span className="text-red-500">*</span></label>
-                <FormSelect name="ctype" value={formData.ctype} onChange={handleInputChange} className="w-full">
-                  <option value="">Select Customer Type</option>
-                  {customerTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={customerTypeOptions}
+                  value={findOption(customerTypeOptions, formData.ctype)}
+                  onChange={(opt) => {
+                    clearError("ctype");
+                    setFormData((prev) => ({ ...prev, ctype: opt ? opt.value : "" }));
+                  }}
+                  placeholder="Search Customer Type..."
+                  error={!!errors.ctype}
+                />
                 <ErrMsg field="ctype" />
               </div>
 
-              {/* Customer */}
+              {/* Customer — SearchSelect */}
               <div ref={customeridRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer (Responsible For Payment) <span className="text-red-500">*</span></label>
-                <FormSelect name="customerid" value={formData.customerid} onChange={handleCustomerChange} className="w-full">
-                  <option value="">Select Customer</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.pnumber || c.phone || "N/A"})</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={customerOptions}
+                  value={findOption(customerOptions, formData.customerid)}
+                  onChange={(opt) => {
+                    handleCustomerChange({ target: { value: opt ? opt.value : "" } });
+                  }}
+                  placeholder="Search Customer..."
+                  error={!!errors.customerid}
+                />
                 <ErrMsg field="customerid" />
               </div>
 
-              {/* Specific Purpose */}
+              {/* Specific Purpose — SearchSelect */}
               <div ref={specificpurposeRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Specific Purpose <span className="text-red-500">*</span></label>
-                <FormSelect name="specificpurpose" value={formData.specificpurpose} onChange={handleInputChange} className="w-full">
-                  <option value="">Select Specific Purpose</option>
-                  {specificPurposes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={specificPurposeOptions}
+                  value={findOption(specificPurposeOptions, formData.specificpurpose)}
+                  onChange={(opt) => {
+                    clearError("specificpurpose");
+                    setFormData((prev) => ({ ...prev, specificpurpose: opt ? opt.value : "" }));
+                  }}
+                  placeholder="Search Specific Purpose..."
+                  error={!!errors.specificpurpose}
+                />
                 <ErrMsg field="specificpurpose" />
               </div>
 
@@ -719,40 +821,35 @@ export default function AddTrfStartJob() {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                    {/*
-                      FIX: reportname shows ALL customers (PHP: selectextrawhere customers status=1).
-                      Changing it triggers fetchreportdetails.php equivalent.
-                    */}
+                    {/* Report Customer Name — SearchSelect */}
                     <div ref={reportnameRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name <span className="text-red-500">*</span></label>
-                      <FormSelect name="reportname" value={formData.reportname} onChange={handleReportNameChange} className="w-full">
-                        <option value="">Select Customer</option>
-                        {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.pnumber || c.phone || "N/A"})</option>)}
-                      </FormSelect>
+                      <SearchSelect
+                        options={customerOptions}
+                        value={findOption(customerOptions, formData.reportname)}
+                        onChange={(opt) => {
+                          handleReportNameChange({ target: { value: opt ? opt.value : "" } });
+                        }}
+                        placeholder="Search Report Customer..."
+                        error={!!errors.reportname}
+                      />
                       <ErrMsg field="reportname" />
                     </div>
 
-                    {/*
-                      FIX: reportaddress is NOT disabled while addresses are available.
-                      PHP pre-loads addresses from the main customer ($custid) immediately —
-                      user does not need to pick a reportname first to see addresses.
-                    */}
+                    {/* Report Address — SearchSelect */}
                     <div ref={reportaddressRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Address <span className="text-red-500">*</span></label>
-                      <FormSelect
-                        name="reportaddress"
-                        value={formData.reportaddress}
-                        onChange={handleInputChange}
-                        className="w-full"
-                        disabled={reportAddresses.length === 0}
-                      >
-                        <option value="">
-                          {reportAddresses.length === 0 ? "No addresses found" : "Select Address"}
-                        </option>
-                        {reportAddresses.map((a) => (
-                          <option key={a.id} value={a.id}>{a.name} ({a.address})</option>
-                        ))}
-                      </FormSelect>
+                      <SearchSelect
+                        options={reportAddressOptions}
+                        value={findOption(reportAddressOptions, formData.reportaddress)}
+                        onChange={(opt) => {
+                          clearError("reportaddress");
+                          setFormData((prev) => ({ ...prev, reportaddress: opt ? opt.value : "" }));
+                        }}
+                        placeholder={reportAddressOptions.length === 0 ? "No addresses found" : "Search Address..."}
+                        isDisabled={reportAddressOptions.length === 0}
+                        error={!!errors.reportaddress}
+                      />
                       <ErrMsg field="reportaddress" />
                     </div>
                   </div>
@@ -781,43 +878,39 @@ export default function AddTrfStartJob() {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                    {/*
-                      FIX: billingname shows ALL customers (PHP: selectextrawhere customers status=1).
-                      Changing it triggers fetchbillingdetails.php equivalent.
-                    */}
+                    {/* Billing Customer Name — SearchSelect */}
                     <div ref={billingnameRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name <span className="text-red-500">*</span></label>
-                      <FormSelect name="billingname" value={formData.billingname} onChange={handleBillingNameChange} className="w-full">
-                        <option value="">Select Customer</option>
-                        {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.pnumber || c.phone || "N/A"})</option>)}
-                      </FormSelect>
+                      <SearchSelect
+                        options={customerOptions}
+                        value={findOption(customerOptions, formData.billingname)}
+                        onChange={(opt) => {
+                          handleBillingNameChange({ target: { value: opt ? opt.value : "" } });
+                        }}
+                        placeholder="Search Billing Customer..."
+                        error={!!errors.billingname}
+                      />
                       <ErrMsg field="billingname" />
                     </div>
 
-                    {/*
-                      FIX: billingaddress is NOT disabled while addresses are available.
-                      PHP pre-loads addresses from the main customer ($custid) immediately.
-                    */}
+                    {/* Billing Address — SearchSelect */}
                     <div ref={billingaddressRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Address <span className="text-red-500">*</span></label>
-                      <FormSelect
-                        name="billingaddress"
-                        value={formData.billingaddress}
-                        onChange={handleInputChange}
-                        className="w-full"
-                        disabled={billingAddresses.length === 0}
-                      >
-                        <option value="">
-                          {billingAddresses.length === 0 ? "No addresses found" : "Select Address"}
-                        </option>
-                        {billingAddresses.map((a) => (
-                          <option key={a.id} value={a.id}>{a.name} ({a.address})</option>
-                        ))}
-                      </FormSelect>
+                      <SearchSelect
+                        options={billingAddressOptions}
+                        value={findOption(billingAddressOptions, formData.billingaddress)}
+                        onChange={(opt) => {
+                          clearError("billingaddress");
+                          setFormData((prev) => ({ ...prev, billingaddress: opt ? opt.value : "" }));
+                        }}
+                        placeholder={billingAddressOptions.length === 0 ? "No addresses found" : "Search Address..."}
+                        isDisabled={billingAddressOptions.length === 0}
+                        error={!!errors.billingaddress}
+                      />
                       <ErrMsg field="billingaddress" />
                     </div>
 
-                    {/* GST — pre-filled from customer record (PHP: value="<?php echo $row['gstno']; ?>") */}
+                    {/* GST */}
                     <div className="md:col-span-2" ref={gstnoRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">GST Number <span className="text-red-500">*</span></label>
                       <Input
@@ -842,12 +935,18 @@ export default function AddTrfStartJob() {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
+                    {/* Concern Person Name — SearchSelect */}
                     <div ref={concernpersonnameRef}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Concern Person Name <span className="text-red-500">*</span></label>
-                      <FormSelect name="concernpersonname" value={formData.concernpersonname} onChange={handleConcernPersonChange} className="w-full">
-                        <option value="">Select Concern Person</option>
-                        {concernPersons.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.mobile})</option>)}
-                      </FormSelect>
+                      <SearchSelect
+                        options={concernPersonOptions}
+                        value={findOption(concernPersonOptions, formData.concernpersonname)}
+                        onChange={(opt) => {
+                          handleConcernPersonChange({ target: { value: opt ? opt.value : "" } });
+                        }}
+                        placeholder="Search Concern Person..."
+                        error={!!errors.concernpersonname}
+                      />
                       <ErrMsg field="concernpersonname" />
                     </div>
 
@@ -870,7 +969,7 @@ export default function AddTrfStartJob() {
                   </div>
                 </div>
 
-                {/* Quotation */}
+                {/* Quotation — SearchSelect */}
                 <div className="px-5 py-5">
                   <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow-500 inline-block"></span>
@@ -878,12 +977,14 @@ export default function AddTrfStartJob() {
                   </h4>
                   <div className="max-w-sm">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quotation No.</label>
-                    <FormSelect name="quotationid" value={formData.quotationid} onChange={handleQuotationChange} className="w-full">
-                      <option value="0">Select Quotation</option>
-                      {quotations.map((q) => (
-                        <option key={q.id} value={q.id}>{String(q.id).padStart(5, "0")} — {q.added_on}</option>
-                      ))}
-                    </FormSelect>
+                    <SearchSelect
+                      options={quotationOptions}
+                      value={findOption(quotationOptions, formData.quotationid)}
+                      onChange={(opt) => {
+                        handleQuotationChange({ target: { value: opt ? opt.value : "0" } });
+                      }}
+                      placeholder="Search Quotation..."
+                    />
                   </div>
                 </div>
 
@@ -909,30 +1010,50 @@ export default function AddTrfStartJob() {
                 <p className="text-xs text-gray-500 mt-1">Accepted: PDF, JPG, PNG, DOC, DOCX</p>
               </div>
 
+              {/* Concerned BD — SearchSelect */}
               <div ref={bdRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Concerned BD <span className="text-red-500">*</span></label>
-                <FormSelect name="bd" value={formData.bd} onChange={handleInputChange} className="w-full">
-                  <option value="">Select BD</option>
-                  {bds.map((b) => <option key={b.id} value={b.id}>{b.firstname} {b.lastname}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={bdOptions}
+                  value={findOption(bdOptions, formData.bd)}
+                  onChange={(opt) => {
+                    clearError("bd");
+                    setFormData((prev) => ({ ...prev, bd: opt ? opt.value : "" }));
+                  }}
+                  placeholder="Search BD..."
+                  error={!!errors.bd}
+                />
                 <ErrMsg field="bd" />
               </div>
 
+              {/* Engineer — SearchSelect */}
               <div ref={promoterRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Engineer <span className="text-red-500">*</span></label>
-                <FormSelect name="promoter" value={formData.promoter} onChange={handleInputChange} className="w-full">
-                  <option value="">Select Engineer</option>
-                  {promoters.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={promoterOptions}
+                  value={findOption(promoterOptions, formData.promoter)}
+                  onChange={(opt) => {
+                    clearError("promoter");
+                    setFormData((prev) => ({ ...prev, promoter: opt ? opt.value : "" }));
+                  }}
+                  placeholder="Search Engineer..."
+                  error={!!errors.promoter}
+                />
                 <ErrMsg field="promoter" />
               </div>
 
+              {/* Priority Sample — SearchSelect */}
               <div ref={priorityRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Priority Sample <span className="text-red-500">*</span></label>
-                <FormSelect name="priority" value={formData.priority} onChange={handlePriorityChange} className="w-full">
-                  <option value="">Select Priority</option>
-                  {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={choiceOptions}
+                  value={findOption(choiceOptions, formData.priority)}
+                  onChange={(opt) => {
+                    handlePriorityChange({ target: { value: opt ? opt.value : "" } });
+                  }}
+                  placeholder="Select Priority..."
+                  error={!!errors.priority}
+                />
                 <ErrMsg field="priority" />
               </div>
 
@@ -943,12 +1064,17 @@ export default function AddTrfStartJob() {
                     <Input type="number" name="pcharges" value={formData.pcharges} onChange={handleInputChange} className="w-full" min="0" step="0.01" />
                     <ErrMsg field="pcharges" />
                   </div>
+                  {/* Charge Type — SearchSelect */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Charge Type</label>
-                    <FormSelect name="pchargestype" value={formData.pchargestype} onChange={handleInputChange} className="w-full">
-                      <option value="1">₹ (Rupees)</option>
-                      <option value="2">% (Percentage)</option>
-                    </FormSelect>
+                    <SearchSelect
+                      options={pchargesTypeOptions}
+                      value={findOption(pchargesTypeOptions, formData.pchargestype)}
+                      onChange={(opt) => {
+                        setFormData((prev) => ({ ...prev, pchargestype: opt ? opt.value : "1" }));
+                      }}
+                      placeholder="Select Charge Type..."
+                    />
                   </div>
                 </>
               )}
@@ -958,12 +1084,18 @@ export default function AddTrfStartJob() {
             <h4 className="text-md font-semibold mb-4 text-gray-700 border-b pb-2 mt-8">3. WITNESS DETAILS</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 
+              {/* Witness Required — SearchSelect */}
               <div ref={witnessRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Witness Required <span className="text-red-500">*</span></label>
-                <FormSelect name="witness" value={formData.witness} onChange={handleWitnessChange} className="w-full">
-                  <option value="">Select</option>
-                  {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={choiceOptions}
+                  value={findOption(choiceOptions, formData.witness)}
+                  onChange={(opt) => {
+                    handleWitnessChange({ target: { value: opt ? opt.value : "" } });
+                  }}
+                  placeholder="Select..."
+                  error={!!errors.witness}
+                />
                 <ErrMsg field="witness" />
               </div>
 
@@ -985,12 +1117,17 @@ export default function AddTrfStartJob() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Witness Charges</label>
                     <Input type="number" name="wcharges" value={formData.wcharges} onChange={handleInputChange} className="w-full" min="0" step="0.01" />
                   </div>
+                  {/* Witness Charge Type — SearchSelect */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Charge Type</label>
-                    <FormSelect name="wchargestype" value={formData.wchargestype} onChange={handleInputChange} className="w-full">
-                      <option value="1">₹ (Rupees)</option>
-                      <option value="2">% (Percentage)</option>
-                    </FormSelect>
+                    <SearchSelect
+                      options={wchargesTypeOptions}
+                      value={findOption(wchargesTypeOptions, formData.wchargestype)}
+                      onChange={(opt) => {
+                        setFormData((prev) => ({ ...prev, wchargestype: opt ? opt.value : "1" }));
+                      }}
+                      placeholder="Select Charge Type..."
+                    />
                   </div>
                 </>
               )}
@@ -1000,12 +1137,18 @@ export default function AddTrfStartJob() {
             <h4 className="text-md font-semibold mb-4 text-gray-700 border-b pb-2 mt-8">4. MODE OF RECEIPT</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 
+              {/* Mode Of Receipt — SearchSelect */}
               <div ref={modeofrecieptRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mode Of Receipt <span className="text-red-500">*</span></label>
-                <FormSelect name="modeofreciept" value={formData.modeofreciept} onChange={handleModeOfReceiptChange} className="w-full">
-                  <option value="">Select Mode of Receipt</option>
-                  {modesOfReceipt.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={modeOfReceiptOptions}
+                  value={findOption(modeOfReceiptOptions, formData.modeofreciept)}
+                  onChange={(opt) => {
+                    handleModeOfReceiptChange({ target: { value: opt ? opt.value : "" } });
+                  }}
+                  placeholder="Search Mode of Receipt..."
+                  error={!!errors.modeofreciept}
+                />
                 <ErrMsg field="modeofreciept" />
               </div>
 
@@ -1041,27 +1184,36 @@ export default function AddTrfStartJob() {
             <h4 className="text-md font-semibold mb-4 text-gray-700 border-b pb-2 mt-8">5. MODE OF PAYMENT</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 
+              {/* Is Payment Done — SearchSelect */}
               <div ref={paymentstatusRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Is Payment Done? <span className="text-red-500">*</span></label>
-                <FormSelect name="paymentstatus" value={formData.paymentstatus} onChange={handlePaymentStatusChange} className="w-full">
-                  <option value="">Select Payment Status</option>
-                  {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={choiceOptions}
+                  value={findOption(choiceOptions, formData.paymentstatus)}
+                  onChange={(opt) => {
+                    handlePaymentStatusChange({ target: { value: opt ? opt.value : "" } });
+                  }}
+                  placeholder="Select Payment Status..."
+                  error={!!errors.paymentstatus}
+                />
                 <ErrMsg field="paymentstatus" />
               </div>
 
               {showPaymentDetails && (
                 <>
-                  {/*
-                    FIX: modeofpayment is pre-selected from the customer's saved default
-                    (PHP fetchpaymentmode.php: selectfieldwhere customers modeofpayment id=$cid)
-                  */}
+                  {/* Mode Of Payment — SearchSelect */}
                   <div ref={modeofpaymentRef}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Mode Of Payment <span className="text-red-500">*</span></label>
-                    <FormSelect name="modeofpayment" value={formData.modeofpayment} onChange={handleInputChange} className="w-full">
-                      <option value="">Select Mode of Payment</option>
-                      {paymentModes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </FormSelect>
+                    <SearchSelect
+                      options={paymentModeOptions}
+                      value={findOption(paymentModeOptions, formData.modeofpayment)}
+                      onChange={(opt) => {
+                        clearError("modeofpayment");
+                        setFormData((prev) => ({ ...prev, modeofpayment: opt ? opt.value : "" }));
+                      }}
+                      placeholder="Search Payment Mode..."
+                      error={!!errors.modeofpayment}
+                    />
                     <ErrMsg field="modeofpayment" />
                   </div>
 
@@ -1095,6 +1247,7 @@ export default function AddTrfStartJob() {
                   onChange={(selected) => handleReactSelectChange(selected, "certcollectiondetail")}
                   styles={customSelectStyles}
                   placeholder="Select certificate collection methods..."
+                  menuPortalTarget={document.body}
                   isClearable
                   isSearchable
                 />
@@ -1119,13 +1272,20 @@ export default function AddTrfStartJob() {
             {/* ━━━━ 7. SPECIAL INSTRUCTIONS ━━━━ */}
             <h4 className="text-md font-semibold mb-4 text-gray-700 border-b pb-2 mt-8">7. SPECIAL INSTRUCTIONS</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+              {/* Any Returnable Items — SearchSelect */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Any Returnable Items</label>
-                <FormSelect name="returnable" value={formData.returnable} onChange={handleInputChange} className="w-full">
-                  <option value="">Select</option>
-                  {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </FormSelect>
+                <SearchSelect
+                  options={returnableOptions}
+                  value={findOption(returnableOptions, formData.returnable)}
+                  onChange={(opt) => {
+                    setFormData((prev) => ({ ...prev, returnable: opt ? opt.value : "" }));
+                  }}
+                  placeholder="Select..."
+                />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Documents Submitted, if any (Details)</label>
                 <Input type="text" name="documents" value={formData.documents} onChange={handleInputChange} className="w-full" placeholder="Enter document details" />
