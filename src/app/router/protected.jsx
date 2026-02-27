@@ -2254,6 +2254,58 @@ const protectedRoutes = {
                     ).default,
                   }),
                 },
+                {
+                  path: "view-draft-report",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/view-draft-report/index"
+                      )
+                    ).default,
+                  }),
+                },
+                { 
+                  path: "view-draft-report/:id", lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/view-draft-report/DraftReportView"
+                      )
+                    ).default,
+                  })  
+                },
+                {
+                  path: "review-by-hod",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/review-by-hod/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "review-by-hod/:tid",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/review-by-hod/ReviewByHodDetail"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path:"review-by-qa",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/review-by-qa/index")).default,
+                  }),
+                },
+                {
+                  path:"review-by-qa/:tid",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/review-by-qa/ReviewByQaDetail")).default,
+                  }),
+                }
+
               ],
             },
             {

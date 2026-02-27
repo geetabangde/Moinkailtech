@@ -36,29 +36,50 @@ function isTATOverdue(tatDate) {
 
 // ─── Action Cell ───────────────────────────────────────────────────────────────
 // PHP status logic:
-// status=0, witnesslock=0, starttime="" → Start / Upload Document
-// status=0, witnesslock=0, starttime≠"" → Test Input
-// status=0, witnesslock≠0 → Locked For Witness
-// status=24 → Test Input (same as above)
-// else → Test Completed + View Raw Data
-// has_documents → always show View Documents
+//   status=0, witnesslock=0, startdate=""  → Start / Upload Document  (if chemist)
+//   status=0, witnesslock=0, startdate≠""  → Test Input               (if chemist)
+//   status=0, witnesslock≠0               → Locked For Witness
+//   status=24, witnesslock=0              → Test Input                (if chemist)
+//   status=24, witnesslock≠0              → Locked For Witness
+//   else                                  → Test Completed + View Raw Data
+//   has_documents (any status)            → View Documents button
+//
+// API field mapping (what backend actually returns):
+//   testeventdata_id  → row unique id (teid)
+//   tid               → trfproduct id
+//   trfid             → trf id
+//   witnesslock       → witness lock flag
+//   start_time        → startdate from testeventdata (backend should send this)
+//   is_chemist        → whether logged-in user is the assigned chemist (backend should send this)
+//   has_documents     → whether testdocuments exist for this row (backend should send this)
 function ActionCell({ row }) {
-  const d = row.original;
+  // ── Destructure using actual API field names ──────────────────────────────
+  const {
+    testeventdata_id,   // unique id of testeventdata row  (maps to teid / id in PHP)
+    tid,                // trfproduct id                   (maps to trfproduct_id in PHP)
+    trfid,              // trf id                          (maps to trf in PHP)
+    status,
+    witnesslock,        // 0 = not locked, non-zero = locked
+    start_time,         // "" or null = not started yet   (PHP: $starttime = $row['startdate'])
+    is_chemist,         // true/false — backend resolves chemist == employeeid
+    has_documents,      // true/false — backend checks testdocuments count
+  } = row.original;
+
   const [startDateModal, setStartDateModal] = useState(false);
   const [uploadModal,    setUploadModal]    = useState(false);
   const [startDate,      setStartDate]      = useState("");
   const [submitting,     setSubmitting]     = useState(false);
 
-  // POST /actionitem/start-test
+  // ── POST /actionitem/start-test ───────────────────────────────────────────
   // PHP: $data['startdate'] = changedateformatespecito($_POST['start_date'], "d/m/Y", "Y-m-d H:i:s")
-  // Body: { id, enddate: "dd/mm/yyyy" }
+  // Body: { id: testeventdata_id, enddate: "dd/mm/yyyy" }
   const handleSetStartDate = async () => {
     if (!startDate) { toast.error("Please select a start date."); return; }
     const [y, m, day] = startDate.split("-");
     const formatted = `${day}/${m}/${y}`;
     try {
       setSubmitting(true);
-      await axios.post("/actionitem/start-test", { id: d.id, enddate: formatted });
+      await axios.post("/actionitem/start-test", { id: testeventdata_id, enddate: formatted });
       toast.success("Test started successfully ✅");
       setStartDateModal(false);
     } catch (err) {
@@ -68,13 +89,13 @@ function ActionCell({ row }) {
     }
   };
 
-  // Direct start (no docs) — PHP: GET starttest.php → sets startdate = now
+  // ── Direct start — no docs, no modal (PHP: GET starttest.php → startdate = now) ──
   const handleDirectStart = async () => {
     try {
       setSubmitting(true);
-      const today = new Date();
+      const today     = new Date();
       const formatted = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`;
-      await axios.post("/actionitem/start-test", { id: d.id, enddate: formatted });
+      await axios.post("/actionitem/start-test", { id: testeventdata_id, enddate: formatted });
       toast.success("Test started successfully ✅");
     } catch (err) {
       toast.error(err?.response?.data?.message ?? "Failed to start test. ❌");
@@ -83,22 +104,22 @@ function ActionCell({ row }) {
     }
   };
 
-  // Determine action buttons (PHP logic)
+  // ── PHP action flag logic ─────────────────────────────────────────────────
   const renderAction = () => {
-    const { status, witness_lock, start_time, is_chemist, has_documents, id, teid } = d;
-
     const actions = [];
+    const isStarted = start_time && start_time !== ""; // PHP: $starttime == ""
 
     if (status === 0 || status === 24) {
-      if (!witness_lock) {
-        if (status === 0 && !start_time) {
-          // PHP: starttime == ""
+      if (!witnesslock) {
+        // ── status=0, not yet started ───────────────────────────────────────
+        if (status === 0 && !isStarted) {
           if (is_chemist) {
             if (!has_documents) {
-              // No docs → Start link + Upload Document
+              // PHP: mysqli_num_rows($itemDocument) == 0
+              // → green Start link (direct, no modal) + Upload Document
               actions.push(
                 <button
-                  key="start-link"
+                  key="start-direct"
                   onClick={handleDirectStart}
                   disabled={submitting}
                   className="inline-flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-green-700 disabled:opacity-60"
@@ -116,10 +137,10 @@ function ActionCell({ row }) {
                 </button>
               );
             } else {
-              // Has docs → green Start button (setStartDate modal)
+              // PHP: has docs → green Start button → set start date modal
               actions.push(
                 <button
-                  key="start-btn"
+                  key="start-modal"
                   onClick={() => setStartDateModal(true)}
                   className="inline-flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-green-700"
                 >
@@ -128,6 +149,7 @@ function ActionCell({ row }) {
               );
             }
           } else {
+            // PHP: $flag = "Pending To start"
             actions.push(
               <span key="pending-start" className="inline-flex items-center gap-1 text-xs text-gray-500">
                 <span className="rounded bg-primary-600 px-1.5 py-0.5 text-xs font-semibold text-white">Pending</span>
@@ -136,12 +158,13 @@ function ActionCell({ row }) {
             );
           }
         } else {
-          // starttime != "" OR status=24
+          // ── status=0 but started, OR status=24 ─────────────────────────────
+          // PHP: Test Input link
           if (is_chemist) {
             actions.push(
               <a
                 key="test-input"
-                href={`/testinput?hakuna=${teid ?? id}`}
+                href={`/testinput?hakuna=${testeventdata_id}`}
                 className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
               >
                 Test Input
@@ -154,18 +177,20 @@ function ActionCell({ row }) {
           }
         }
       } else {
-        // witnesslock != 0
+        // PHP: $witnesslock != 0 → Locked For Witness
         actions.push(
-          <span key="locked" className="text-xs text-orange-600 dark:text-orange-400">Locked For Witness</span>
+          <span key="locked" className="text-xs text-orange-600 dark:text-orange-400">
+            Locked For Witness
+          </span>
         );
       }
     } else {
-      // Test Completed
+      // PHP: else → Test Completed + View Raw Data
       actions.push(
         <div key="completed" className="flex flex-col gap-1">
           <span className="text-xs font-medium text-gray-500">Test Completed</span>
           <a
-            href={`/viewrawdatasingle?hakuna=${teid ?? id}`}
+            href={`/viewrawdatasingle?hakuna=${testeventdata_id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
@@ -176,12 +201,12 @@ function ActionCell({ row }) {
       );
     }
 
-    // View Documents — always show if has_documents
+    // PHP: if(mysqli_num_rows($itemDocument) > 0) → View Documents (always, any status)
     if (has_documents) {
       actions.push(
         <a
           key="view-docs"
-          href={`/viewTestItemDocuments?hakuna=${d.trf}&matata=${d.trfproduct_id}&testeventdata_id=${teid ?? id}`}
+          href={`/viewTestItemDocuments?hakuna=${trfid}&matata=${tid}&testeventdata_id=${testeventdata_id}`}
           className="ml-1 inline-flex items-center gap-1 rounded bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-600"
         >
           View Documents
@@ -213,13 +238,19 @@ function ActionCell({ row }) {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setStartDateModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800">
+              <button
+                onClick={() => setStartDateModal(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
                 Close
               </button>
               <button
                 onClick={handleSetStartDate}
                 disabled={submitting}
-                className={clsx("rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700", submitting && "opacity-60 cursor-not-allowed")}
+                className={clsx(
+                  "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700",
+                  submitting && "cursor-not-allowed opacity-60"
+                )}
               >
                 {submitting ? "Saving..." : "Save"}
               </button>
@@ -236,9 +267,9 @@ function ActionCell({ row }) {
               Upload Calibration Document
             </h3>
             <UploadDocumentForm
-              teid={d.teid ?? d.id}
-              trfId={d.trf}
-              trfProductId={d.trfproduct_id}
+              teid={testeventdata_id}
+              trfId={trfid}
+              trfProductId={tid}
               onClose={() => setUploadModal(false)}
             />
           </div>
@@ -255,17 +286,19 @@ function UploadDocumentForm({ teid, trfId, trfProductId, onClose }) {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!name) { toast.error("Please enter a name."); return; }
-    if (files.every((f) => !f)) { toast.error("Please upload at least one document."); return; }
+    if (!name)                      { toast.error("Please enter a name.");              return; }
+    if (files.every((f) => !f))     { toast.error("Please upload at least one document."); return; }
     try {
       setSubmitting(true);
       const formData = new FormData();
-      formData.append("name",           name);
-      formData.append("trfs_id",        trfId);
-      formData.append("trfproducts_id", trfProductId);
-      formData.append("testeventdata_id", teid);
+      formData.append("name",              name);
+      formData.append("trfs_id",           trfId);
+      formData.append("trfproducts_id",    trfProductId);
+      formData.append("testeventdata_id",  teid);
       files.forEach((f) => { if (f) formData.append("path[]", f); });
-      await axios.post("/actionitem/insert-test-documents", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      await axios.post("/actionitem/insert-test-documents", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       toast.success("Document uploaded successfully ✅");
       onClose();
     } catch (err) {
@@ -301,18 +334,36 @@ function UploadDocumentForm({ teid, trfId, trfProductId, onClose }) {
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm"
             />
             {files.length > 1 && (
-              <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-xs text-red-500 hover:underline">Remove</button>
+              <button
+                onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Remove
+              </button>
             )}
           </div>
         ))}
-        <button onClick={() => setFiles([...files, null])} className="self-start text-xs font-medium text-green-600 hover:underline">+ Add file</button>
+        <button
+          onClick={() => setFiles([...files, null])}
+          className="self-start text-xs font-medium text-green-600 hover:underline"
+        >
+          + Add file
+        </button>
       </div>
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400">Close</button>
+        <button
+          onClick={onClose}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400"
+        >
+          Close
+        </button>
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className={clsx("rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700", submitting && "opacity-60 cursor-not-allowed")}
+          className={clsx(
+            "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700",
+            submitting && "cursor-not-allowed opacity-60"
+          )}
         >
           {submitting ? "Uploading..." : "Save"}
         </button>
@@ -322,6 +373,7 @@ function UploadDocumentForm({ teid, trfId, trfProductId, onClose }) {
 }
 
 // ─── Table Columns ─────────────────────────────────────────────────────────────
+// All accessor keys match actual API response field names
 const detailColumns = [
   columnHelper.accessor((_row, i) => i + 1, {
     id: "s_no",
@@ -331,14 +383,16 @@ const detailColumns = [
   columnHelper.accessor("product", {
     id: "product",
     header: "Product",
-    cell: (info) => <span className="text-sm text-gray-700 dark:text-dark-200">{info.getValue() ?? "—"}</span>,
+    cell: (info) => (
+      <span className="text-sm text-gray-700 dark:text-dark-200">{info.getValue() ?? "—"}</span>
+    ),
   }),
   columnHelper.accessor("package", {
     id: "package",
     header: "Package",
     cell: (info) => info.getValue() ?? "—",
   }),
-  columnHelper.accessor("parameter_name", {
+  columnHelper.accessor("parameter", {          // API: "parameter"  (was "parameter_name")
     id: "parameter",
     header: "Parameter",
     cell: (info) => info.getValue() ?? "—",
@@ -348,17 +402,17 @@ const detailColumns = [
     header: "Description",
     cell: (info) => info.getValue() ?? "—",
   }),
-  columnHelper.accessor("department_name", {
+  columnHelper.accessor("department", {         // API: "department" (was "department_name")
     id: "department",
     header: "Department",
     cell: (info) => info.getValue() ?? "—",
   }),
-  columnHelper.accessor("chemist_name", {
+  columnHelper.accessor("chemist", {            // API: "chemist"    (was "chemist_name")
     id: "chemist",
     header: "Chemist",
     cell: (info) => info.getValue() ?? "—",
   }),
-  columnHelper.accessor("allotment_date", {
+  columnHelper.accessor("assign_date", {        // API: "assign_date" (was "allotment_date")
     id: "assign_date",
     header: "Assign Date",
     cell: (info) => info.getValue() ?? "—",
@@ -373,15 +427,17 @@ const detailColumns = [
     id: "tat",
     header: "TAT",
     cell: (info) => {
-      const val = info.getValue();
+      const val     = info.getValue();
       const overdue = isTATOverdue(val);
       return (
-        <span className={clsx(
-          "inline-block rounded px-2 py-0.5 text-xs font-semibold",
-          overdue
-            ? "bg-red-600 text-white"
-            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-        )}>
+        <span
+          className={clsx(
+            "inline-block rounded px-2 py-0.5 text-xs font-semibold",
+            overdue
+              ? "bg-red-600 text-white"
+              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          )}
+        >
           {val ?? "—"}
         </span>
       );
@@ -396,11 +452,11 @@ const detailColumns = [
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function PerformTestDetail() {
-  const { id } = useParams(); // trfproduct id
+  const { id } = useParams();   // trfproduct id  →  GET ?id=45826
   const navigate = useNavigate();
 
-  const [rows,    setRows]    = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [rows,         setRows]         = useState([]);
+  const [loading,      setLoading]      = useState(true);
   const [globalFilter, setGlobalFilter] = useState("");
 
   // ── Fetch — GET /actionitem/get-perform-testing-byid?id={id} ─────────────
@@ -409,6 +465,7 @@ export default function PerformTestDetail() {
       try {
         setLoading(true);
         const res = await axios.get("/actionitem/get-perform-testing-byid", { params: { id } });
+        // API envelope: { status: true, data: [...] }
         const d = res.data?.data ?? res.data ?? [];
         setRows(Array.isArray(d) ? d : []);
       } catch (err) {
@@ -422,15 +479,15 @@ export default function PerformTestDetail() {
   }, [id]);
 
   const table = useReactTable({
-    data: rows,
-    columns: detailColumns,
-    state: { globalFilter },
-    onGlobalFilterChange: setGlobalFilter,
-    filterFns:            { fuzzy: fuzzyFilter },
-    globalFilterFn:       fuzzyFilter,
-    getCoreRowModel:      getCoreRowModel(),
-    getFilteredRowModel:  getFilteredRowModel(),
-    getSortedRowModel:    getSortedRowModel(),
+    data:                  rows,
+    columns:               detailColumns,
+    state:                 { globalFilter },
+    onGlobalFilterChange:  setGlobalFilter,
+    filterFns:             { fuzzy: fuzzyFilter },
+    globalFilterFn:        fuzzyFilter,
+    getCoreRowModel:       getCoreRowModel(),
+    getFilteredRowModel:   getFilteredRowModel(),
+    getSortedRowModel:     getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
 
@@ -499,11 +556,16 @@ export default function PerformTestDetail() {
               <TBody>
                 {table.getRowModel().rows.length === 0 ? (
                   <Tr>
-                    <Td colSpan={99} className="py-12 text-center text-sm text-gray-400">No tests found.</Td>
+                    <Td colSpan={99} className="py-12 text-center text-sm text-gray-400">
+                      No tests found.
+                    </Td>
                   </Tr>
                 ) : (
                   table.getRowModel().rows.map((row) => (
-                    <Tr key={row.id} className="border-b border-gray-100 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                    <Tr
+                      key={row.id}
+                      className="border-b border-gray-100 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                    >
                       {row.getVisibleCells().map((cell) => (
                         <Td key={cell.id} className="bg-white dark:bg-dark-900 py-2 px-4 align-middle">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
