@@ -1,14 +1,28 @@
-// ReviewByQaDetail.jsx
-// PHP equivalent  : testreport.php  (status=8, QA Review)
-// Route           : review-by-qa/:tid?hid=
+// GenerateUlrDetail.jsx
+// PHP equivalent  : ulrrequest.php + testreport.php  (status=9)
+// Route           : /dashboards/action-items/GenerateUlrDetail/:id?hid=
+//
 // APIs:
-//   GET  /actionitem/view-test-report?tid=&hid=
-//   POST /actionitem/approve-submit-ulr  { hid }
-//   GET  /actionitem/request-reset/{id}
+//   GET  /actionitem/view-test-report?tid=&hid=         → full report data
+//   GET  /actionitem/get-generate-ulr-data?id=&hid=     → signatories, payment, nabl
+//   POST /actionitem/generate-ulr                        → { hid, signatories:[id,id], idater:"DD-MM-YYYY" }
+//   GET  /actionitem/request-reset/{id}                 → re-test
+//
+// POST payload (from Postman):
+//   hid          → hodrequests.id
+//   signatories  → [31, 34]  (array of IDs)
+//   idater       → "13-02-2026"  (DD-MM-YYYY format)
+//
+// get-generate-ulr-data response fields:
+//   product, package, button_label, has_pending_parameters
+//   paymentpass, pass2, pending_request_count
+//   can_generate_button, show_date_field
+//   signatories → [{ id, name }]
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import PropTypes from "prop-types";
+import Select from "react-select";
 import axios from "utils/axios";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -22,8 +36,6 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-// PHP: date("d.m.Y", strtotime($date))
 function fmtDate(d) {
   if (!d) return "—";
   try {
@@ -33,26 +45,68 @@ function fmtDate(d) {
   } catch { return d; }
 }
 
-// PHP: $sflag inline style string → React style object
-// API gives: "background:#008d4c!important;color:#ffffff;text-align:center"
+// Convert JS date input (YYYY-MM-DD) → API format (DD-MM-YYYY)
+function toApiDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${d}-${m}-${y}`;
+}
+
 function parseComplianceStyle(styleStr) {
   if (!styleStr) return {};
   const result = {};
   styleStr.split(";").forEach((part) => {
     const idx = part.indexOf(":");
     if (idx === -1) return;
-    const prop     = part.slice(0, idx).trim();
-    const val      = part.slice(idx + 1).trim().replace("!important", "").trim();
+    const prop  = part.slice(0, idx).trim();
+    const val   = part.slice(idx + 1).trim().replace("!important", "").trim();
     if (!prop || !val) return;
-    const camel    = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-    result[camel]  = val;
+    const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    result[camel] = val;
   });
   return result;
 }
 
+// react-select custom styles
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: "38px",
+    borderRadius: "0.5rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(59,130,246,0.2)" : "none",
+    "&:hover": { borderColor: "#3b82f6" },
+    fontSize: "0.813rem",
+  }),
+  multiValue: (base) => ({
+    ...base,
+    backgroundColor: "#2563eb",
+    borderRadius: "0.375rem",
+  }),
+  multiValueLabel: (base) => ({
+    ...base,
+    color: "#ffffff",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    padding: "2px 6px",
+  }),
+  multiValueRemove: (base) => ({
+    ...base,
+    color: "#ffffff",
+    "&:hover": { backgroundColor: "#1d4ed8", color: "#fff" },
+  }),
+  menu: (base) => ({ ...base, borderRadius: "0.5rem", fontSize: "0.813rem", zIndex: 50 }),
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isSelected ? "#2563eb" : state.isFocused ? "#eff6ff" : "white",
+    color: state.isSelected ? "#fff" : "#374151",
+    cursor: "pointer",
+  }),
+  placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.813rem" }),
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Request Re-test Button
-// PHP: <button onclick="view(id,'catid','requestretest.php',...)">Request Re-test</button>
+// Re-test Button
 // ─────────────────────────────────────────────────────────────────────────────
 function ReTestButton({ testEventId, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -83,7 +137,7 @@ function ReTestButton({ testEventId, onSuccess }) {
 ReTestButton.propTypes = { testEventId: PropTypes.any, onSuccess: PropTypes.func };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Info Row  (customer info table)
+// Info Row
 // ─────────────────────────────────────────────────────────────────────────────
 function InfoRow({ label, value }) {
   return (
@@ -98,136 +152,209 @@ function InfoRow({ label, value }) {
 InfoRow.propTypes = { label: PropTypes.string, value: PropTypes.any };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QA Approve Section
-// PHP: $reportstatus==8 && in_array(181,$permissions) && isset($hid) && !empty($hid)
-//      onclick='view($hid, "resultid", "finalpapproval.php" / "finalapproval.php")'
-// POST /actionitem/approve-submit-ulr  { hid }
+// Generate ULR Form — bottom of report
+// POST /actionitem/generate-ulr
+// Payload: { hid, signatories: [id, id], idater: "DD-MM-YYYY" }
 // ─────────────────────────────────────────────────────────────────────────────
-function QaApproveSection({ hid, allottedItems, disposable, onSuccess }) {
-  const [loading, setLoading] = useState(false);
+function GenerateUlrForm({ hid, formData, onSuccess }) {
+  const {
+    product               = "—",
+    package: packageName  = "—",
+    button_label          = "Generate ULR",
+    has_pending_parameters = false,
+    paymentpass           = true,
+    pass2                 = true,
+    pending_request_count = 0,
+    can_generate_button   = true,
+    show_date_field       = false,
+    signatories: sigList  = [],   // [{ id, name }]
+  } = formData;
 
-  const handleSubmit = useCallback(async () => {
-    setLoading(true);
+  const [selected,   setSelected]   = useState([]);  // react-select [{value,label}]
+  const [reportDate, setReportDate] = useState("");   // YYYY-MM-DD from input
+  const [submitting, setSubmitting] = useState(false);
+
+  // Convert signatories → react-select options
+  const options = sigList.map((s) => ({ value: s.id, label: s.name }));
+
+  const handleSelectChange = (opts) => {
+    if (!opts) { setSelected([]); return; }
+    if (opts.length > 2) {
+      toast.warning("Max 2 signatories allowed.");
+      return;
+    }
+    setSelected(opts);
+  };
+
+  // POST payload matches Postman: { hid, signatories:[id,id], idater:"DD-MM-YYYY" }
+  const handleSubmit = async () => {
+    if (!selected.length) { toast.error("Please select at least one signatory."); return; }
+    if (show_date_field && !reportDate) { toast.error("Please select a date."); return; }
+    setSubmitting(true);
     try {
-      // Postman payload: { hid: 49092 }
-      await axios.post("/actionitem/approve-submit-ulr", { hid });
-      toast.success("Approved & Submitted for ULR ✅");
+      const payload = {
+        hid,
+        signatories: selected.map((s) => s.value),
+        ...(show_date_field && reportDate ? { idater: toApiDate(reportDate) } : {}),
+      };
+      await axios.post("/actionitem/generate-ulr", payload);
+      toast.success(
+        button_label === "Generate ULR"
+          ? "ULR Generated Successfully ✅"
+          : "Report Completed Successfully ✅"
+      );
       onSuccess?.();
     } catch (err) {
       toast.error(err?.response?.data?.message ?? "Submission failed ❌");
-    } finally { setLoading(false); }
-  }, [hid, onSuccess]);
+    } finally { setSubmitting(false); }
+  };
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-dark-800 p-5">
+    <div className="mt-6 rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-dark-800 p-5 space-y-5">
 
-      {/* PHP: if ($trfprow['disposable'] == 2) red else green */}
-      <div className={clsx(
-        "mb-4 rounded-lg px-4 py-2 text-sm font-semibold",
-        disposable === 2
-          ? "bg-red-50 text-red-600 dark:bg-red-900/20"
-          : "bg-green-50 text-green-700 dark:bg-green-900/20"
-      )}>
-        {disposable === 2
-          ? "⚠️ This Item Is To Be Return — Not To Be Disposed"
-          : "✅ This Item Is To Be Disposed"}
+      {/* Product + Package */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-0.5">Product</p>
+          <p className="text-sm text-gray-800 dark:text-gray-200">{product}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-0.5">Package</p>
+          <p className="text-sm text-gray-800 dark:text-gray-200">{packageName}</p>
+        </div>
       </div>
 
-      {/* PHP: alloteditems table — only rows where $qrow['qleft'] > 0 — READ ONLY on QA page */}
-      {allottedItems.length > 0 && (
-        <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-100 dark:bg-dark-700">
-              <tr>
-                {["ID", "Quantity", "Allotted", "Left", "Department", "Remnant", "Remark"].map((h) => (
-                  <th key={h} className="border-b border-gray-200 dark:border-gray-700 px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {allottedItems.map((item, i) =>
-                // PHP: if ($qrow['qleft'] > 0)
-                // API field is "qleft" (NOT "q_left")
-                (item.qleft ?? 0) > 0 ? (
-                  <tr key={item.id ?? i} className="border-b border-gray-100 dark:border-gray-700 last:border-0">
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{item.id}</td>
-                    {/* PHP: packagequantity.name */}
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{item.quantity_name}</td>
-                    {/* PHP: $qrow['alloted'] — API field is "alloted" (single t) */}
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{item.alloted}</td>
-                    {/* PHP: $qrow['qleft'] */}
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{item.qleft}</td>
-                    {/* PHP: labs.name */}
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{item.department_name}</td>
-                    {/* QA page: read-only — HOD already filled these */}
-                    <td className="px-3 py-2 text-center text-gray-500 dark:text-gray-400">{item.remnant ?? "—"}</td>
-                    <td className="px-3 py-2 text-center text-gray-500 dark:text-gray-400">{item.remark  ?? "—"}</td>
-                  </tr>
-                ) : null
-              )}
-            </tbody>
-            {/* PHP: tfoot same headers */}
-            <tfoot className="bg-gray-50 dark:bg-dark-800">
-              <tr>
-                {["ID", "Quantity", "Allotted", "Left", "Department", "Remnant", "Remark"].map((h) => (
-                  <th key={h} className="border-t border-gray-200 dark:border-gray-700 px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </tfoot>
-          </table>
+      {/* PHP: if ($parameter) partial results warning */}
+      {has_pending_parameters && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 dark:bg-red-900/20">
+          ⚠️ Are you sure to do ULR for Partial Reports only?
         </div>
       )}
 
-      {/* PHP: if (isset($hid) && (!empty($hid))) show Approve button */}
-      {!!hid && (
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className={clsx(
-            "w-full rounded-lg bg-green-600 py-3 text-sm font-semibold text-white shadow transition hover:bg-green-700",
-            loading && "opacity-60 cursor-not-allowed"
+      {/* PHP: if ($paymentpass) → form, else → payment messages */}
+      {paymentpass ? (
+        <>
+          {/* Signatory — react-select searchable multi (max 2) */}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Select Reviewed &amp; Authorised By Signatory
+              <span className="ml-1 text-xs font-normal text-gray-400">(max 2)</span>
+            </label>
+            <Select
+              isMulti
+              options={options}
+              value={selected}
+              onChange={handleSelectChange}
+              placeholder="Search and select signatory..."
+              styles={selectStyles}
+              closeMenuOnSelect={false}
+              isOptionDisabled={() => selected.length >= 2}
+              noOptionsMessage={() => "No signatory found"}
+            />
+            {selected.length > 0 && (
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Selected ({selected.length}/2):&nbsp;
+                {selected.map((s) => s.label).join(", ")}
+              </p>
+            )}
+          </div>
+
+          {/* PHP: if (in_array(462, $permissions)) → show_date_field */}
+          {show_date_field && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-400">
+                Select Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={reportDate}
+                onChange={(e) => setReportDate(e.target.value)}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+              />
+            </div>
           )}
-        >
-          {loading ? "Submitting..." : "Approve & Submit For ULR"}
-        </button>
+
+          {/* PHP: if (in_array(137, $permissions)) → can_generate_button */}
+          {can_generate_button && (
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                {button_label}
+              </p>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className={clsx(
+                  "rounded-lg bg-green-600 px-8 py-3 text-sm font-semibold text-white shadow transition hover:bg-green-700",
+                  submitting && "opacity-60 cursor-not-allowed"
+                )}
+              >
+                {submitting ? "Processing..." : button_label}
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        /* PHP: $paymentpass = false */
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20">
+          {!pass2 ? (
+            <p className="text-sm font-semibold text-amber-700">Pending Form Payment</p>
+          ) : pending_request_count >= 1 ? (
+            <p className="text-sm font-semibold text-amber-700">Payment Approval Request Pending</p>
+          ) : (
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-amber-700">Payment approval required before generating ULR.</p>
+              <button
+                onClick={() => toast.info("Request payment approval from Accounts/BD team.")}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+              >
+                Notify BD for Payment Approval
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
-QaApproveSection.propTypes = {
-  hid:           PropTypes.any,
-  allottedItems: PropTypes.array,
-  disposable:    PropTypes.number,
-  onSuccess:     PropTypes.func,
+GenerateUlrForm.propTypes = {
+  hid:       PropTypes.any,
+  formData:  PropTypes.object,
+  onSuccess: PropTypes.func,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ReviewByQaDetail() {
-  const { tid }        = useParams();              // PHP: $_GET['hakuna']
+export default function GenerateUlrDetail() {
+  const { id: tid }    = useParams();
   const [searchParams] = useSearchParams();
   const navigate       = useNavigate();
-  const hid            = searchParams.get("hid") ?? "";  // PHP: $_GET['what']
+  const hid = searchParams.get("hid") ?? "";
 
-  const [report,  setReport]  = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [report,   setReport]   = useState(null);
+  const [formData, setFormData] = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
 
-  // ── Fetch ─────────────────────────────────────────────────────────────────
+  // Fetch both APIs in parallel
   const fetchReport = useCallback(async () => {
     if (!tid) return;
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ tid });
-      if (hid) params.append("hid", hid);
-      const res = await axios.get(`/actionitem/view-test-report?${params}`);
-      setReport(res.data?.data ?? res.data ?? null);
+      const reportParams = new URLSearchParams({ tid });
+      if (hid) reportParams.append("hid", hid);
+
+      const formParams = new URLSearchParams({ id: tid });
+      if (hid) formParams.append("hid", hid);
+
+      const [reportRes, formRes] = await Promise.all([
+        axios.get(`/actionitem/view-test-report?${reportParams}`),
+        axios.get(`/actionitem/get-generate-ulr-data?${formParams}`),
+      ]);
+
+      setReport(reportRes.data?.data ?? reportRes.data ?? null);
+      setFormData(formRes.data?.data ?? formRes.data   ?? null);
     } catch (err) {
       setError(err?.response?.data?.message ?? "Failed to load report.");
     } finally {
@@ -237,9 +364,9 @@ export default function ReviewByQaDetail() {
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
-  // ── Loading ───────────────────────────────────────────────────────────────
+  // Loading
   if (loading) return (
-    <Page title="Test Report">
+    <Page title="Generate ULR">
       <div className="flex h-[60vh] items-center justify-center gap-3 text-gray-500">
         <svg className="h-5 w-5 animate-spin text-blue-600" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -250,9 +377,9 @@ export default function ReviewByQaDetail() {
     </Page>
   );
 
-  // ── Error ─────────────────────────────────────────────────────────────────
+  // Error
   if (error) return (
-    <Page title="Test Report">
+    <Page title="Generate ULR">
       <div className="flex h-60 flex-col items-center justify-center gap-4 rounded-xl border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
         <p className="text-sm text-red-500">{error}</p>
         <button
@@ -267,57 +394,44 @@ export default function ReviewByQaDetail() {
 
   if (!report) return null;
 
-  // ── Destructure API response ──────────────────────────────────────────────
+  // Destructure view-test-report response
   const {
-    trf_product    = {},
-    nabl: nablObj  = {},           // { status:1, is_nabl, is_qai, logo }
+    trf_product:   trf_product  = {},
+    nabl: nablObj               = {},
     size,
     grade,
-    batchno,                       // API key: "batchno"
-    report_status: rsObj = {},     // { code, hodparams, pstatus, label }
-    dates          = {},
-    customer       = {},
-    product        = {},
-    trf            = {},
-    received_items = [],
-    test_results   = [],           // API key: "test_results"
-    remarks: remarksObj = {},      // { hod_remark, witness_detail, witness, bdl_remark, adl_remark }
-    signatories    = [],
-    allotted_items = [],           // API: qleft, alloted (single t)
-    counts         = {},
-    permissions: permsObj = {},    // { has_hod_permission, has_qa_permission, can_view_actions }
-    available_actions = [],
-    meta           = {},
+    batchno,
+    report_status: rsObj        = {},
+    dates                       = {},
+    customer                    = {},
+    product                     = {},
+    trf                         = {},
+    received_items              = [],
+    test_results                = [],
+    remarks: remarksObj         = {},
+    signatories                 = [],
+    counts                      = {},
+    permissions: permsObj       = {},
+    available_actions           = [],
+    meta                        = {},
   } = report;
 
-  // ── Values ────────────────────────────────────────────────────────────────
+  const { brn, ulr, condition_name, sealed_name, reportdate } = trf_product;
 
-  const { brn, ulr, condition_name, sealed_name, reportdate, disposable } = trf_product;
-
-  // PHP: $nabl = testprices.nabl (1=NABL, 3=QAI)
-  const nablStatus = nablObj?.status ?? 0;
-
-  // PHP: $reportstatus = hodrequests.status OR trfProducts.status
-  // API: report_status.code
+  const nablStatus   = nablObj?.status ?? 0;
   const reportStatus = typeof rsObj === "object" ? (rsObj?.code ?? 0) : (Number(rsObj) || 0);
-
   const { start_date, end_date } = dates;
 
-  // PHP: remarks
   const hodRemark     = remarksObj?.hod_remark    ?? "";
   const witnessVal    = remarksObj?.witness        ?? "";
   const witnessDetail = remarksObj?.witness_detail ?? "";
   const bdlRemark     = remarksObj?.bdl_remark     ?? "";
   const adlRemark     = remarksObj?.adl_remark     ?? "";
 
-  // PHP: in_array(180,$permissions) → has_hod_permission
   const canHod = permsObj?.has_hod_permission === true;
   const canQa  = permsObj?.has_qa_permission  === true;
-
-  // PHP: if(perm 180||181) && reportstatus<9 → show Actions column
   const showActionsColumn = (canHod || canQa) && reportStatus < 9;
 
-  // PHP: per-row retest button
   const showRetest = (row) =>
     showActionsColumn && (
       row.can_retest === true ||
@@ -325,25 +439,15 @@ export default function ReviewByQaDetail() {
       available_actions.some((a) => (typeof a === "object" ? a.id : a) === row.id)
     );
 
-  // PHP: $reportstatus==8 && in_array(181) && isset($hid) && !empty($hid)
-  const showQaApprove = reportStatus === 8 && canQa && !!hid;
-
-  // PHP: $specs==1 → show SPECIFICATIONS column
   const hasSpecs =
     trf_product?.specification_flag === 1 ||
     Number(trf_product?.specification) === 1 ||
     test_results.some((r) => r.specification && r.specification !== "—");
 
-  // PHP: nabl==1 → nabltest.png, nabl==3 → qai.jpeg
   const nablLogo =
     nablStatus === 1 ? (nablObj?.logo ?? "/images/nabltest.png") :
-    nablStatus === 3 ? "/images/qai.jpeg" :
-    null;
+    nablStatus === 3 ? "/images/qai.jpeg" : null;
 
-  const sealedLabel    = sealed_name    ?? "—";
-  const conditionLabel = condition_name ?? "—";
-
-  // PHP: receiveditems qty string
   const qtyStr = received_items
     .filter((q) => (q.received ?? 0) > 0)
     .map((q) => {
@@ -353,7 +457,6 @@ export default function ReviewByQaDetail() {
     })
     .join(", ") || "—";
 
-  // PHP: Remarks block — hodremark + witness + BDL + ADL
   const remarkLines = [];
   if (hodRemark?.trim())                   remarkLines.push(hodRemark.trim());
   if (witnessVal === "1" && witnessDetail) remarkLines.push(`The test was witnessed by ${witnessDetail}`);
@@ -369,67 +472,64 @@ export default function ReviewByQaDetail() {
   const contactPerson   = customer?.contact_person ?? "";
   const showContact     = Number(trf?.specificpurpose ?? customer?.specific_purpose) === 2;
   const customerRef     = customer?.letterrefno    ?? "";
-
-  const productName  = product?.name        ?? "—";
-  const productDesc  = product?.description ?? size ?? "—";
-  const displayLRN   = trf_product?.lrn     ?? brn  ?? "—";
-  const ktrcRef      = meta?.ktrc_ref       ?? "KTRC/QF/0708/01";
-  const batchnoClean = (batchno ?? "").replace(/<br\s*\/?>/gi, " ").trim();
+  const productName     = product?.name            ?? "—";
+  const productDesc     = product?.description     ?? size ?? "—";
+  const displayLRN      = trf_product?.lrn         ?? brn  ?? "—";
+  const ktrcRef         = meta?.ktrc_ref            ?? "KTRC/QF/0708/01";
+  const batchnoClean    = (batchno ?? "").replace(/<br\s*\/?>/gi, " ").trim();
 
   return (
     <Page title={`REPORT-${ulr ?? ""}`}>
       <div className="transition-content px-(--margin-x) pb-8">
 
-        {/* ── Page Header ───────────────────────────────────────────────── */}
+        {/* Page Header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/dashboards/action-items/generate-ulr")}
               className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
                 <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
               </svg>
-              Back
+              Back to ULR Requests
             </button>
             <h1 className="text-base font-semibold text-gray-800 dark:text-gray-100">Final Report</h1>
           </div>
 
-          {/* PHP: Print With LH | Without LH | Without LH (2 Signs) */}
+          {/* Print buttons */}
           <div className="flex items-center gap-2 no-print">
             {report && (
-              <div className="flex items-center gap-2 no-print">
+              <>
                 <PrintWithLHButton report={report} />
                 <PrintWithoutLHButton report={report} />
                 <PrintWithoutLHTwoSignButton report={report} />
-              </div>
+              </>
             )}
           </div>
         </div>
 
-        {/* ── Report Card ───────────────────────────────────────────────── */}
+        {/* Report Card */}
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-dark-800">
           <div className="px-6 py-6">
 
-            {/* PHP: if ($nabl==1) nabltest.png elseif ($nabl==3) qai.jpeg */}
+            {/* NABL / QAI logo */}
             {nablLogo && (
               <div className="mb-3 flex justify-center">
                 <img src={nablLogo} alt="Accreditation Logo" className="h-16 w-auto" />
               </div>
             )}
 
-            {/* PHP: <h1><u>TEST REPORT</u></h1> */}
             <h1 className="mb-4 text-center text-xl font-bold underline tracking-wide text-gray-900 dark:text-gray-100">
               TEST REPORT
             </h1>
 
-            {/* PHP: if ($nabl==1) ULR:$ulr  ||  KTRC/QF/0708/01 */}
             <div className="mb-4 flex justify-between text-xs font-semibold text-gray-700 dark:text-gray-300">
               <span>{nablStatus === 1 && ulr ? `ULR: ${ulr}` : "ULR:"}</span>
               <span>{ktrcRef}</span>
             </div>
 
-            {/* ── Customer Info Table ────────────────────────────────────── */}
+            {/* Customer Info Table */}
             <div className="mb-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
               <table className="w-full text-xs">
                 <tbody>
@@ -440,22 +540,20 @@ export default function ReviewByQaDetail() {
                       </p>
                       <p className="text-gray-800 dark:text-gray-200">{customerName}</p>
                       <p className="text-gray-600 dark:text-gray-400">{customerAddress}</p>
-                      {/* PHP: if ($specificpurpose == 2) */}
                       {showContact && contactPerson && (
                         <p className="mt-1 text-gray-700 dark:text-gray-300">
                           Contact Person: {contactPerson}
                         </p>
                       )}
                     </td>
-                    {/* PHP: LRN = $trfprow['brn'] */}
                     <td className="p-2 font-semibold text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 w-1/4">
                       Laboratory Reference Number (LRN)
                     </td>
                     <td className="p-2 text-gray-800 dark:text-gray-200">{displayLRN}</td>
                   </tr>
                   <InfoRow label="Date of Receipt"             value={fmtDate(trf?.date ?? dates?.receipt_date)} />
-                  <InfoRow label="Condition, When Received"    value={conditionLabel} />
-                  <InfoRow label="Packing, When Received"      value={sealedLabel} />
+                  <InfoRow label="Condition, When Received"    value={condition_name ?? "—"} />
+                  <InfoRow label="Packing, When Received"      value={sealed_name    ?? "—"} />
                   <InfoRow label="Quantity Received (Approx.)" value={qtyStr} />
                   <InfoRow label="Date of Start Of Test"       value={fmtDate(start_date)} />
                   <InfoRow label="Date of Completion"          value={fmtDate(end_date)} />
@@ -467,7 +565,6 @@ export default function ReviewByQaDetail() {
                       Sample Identification: {productDesc}
                     </td>
                   </tr>
-                  {/* PHP: if ($trfrow['letterrefno'] != "-") */}
                   {customerRef && customerRef !== "-" && (
                     <tr className="border-b border-gray-200 dark:border-gray-700">
                       <td colSpan={3} className="p-2 text-gray-700 dark:text-gray-300">
@@ -475,7 +572,6 @@ export default function ReviewByQaDetail() {
                       </td>
                     </tr>
                   )}
-                  {/* PHP: Sample Particulars: $proname Grade: $grade $batchno */}
                   <tr>
                     <td colSpan={3} className="p-2 text-gray-700 dark:text-gray-300">
                       Sample Particulars: {productName} Grade: {grade} {batchnoClean}
@@ -485,7 +581,7 @@ export default function ReviewByQaDetail() {
               </table>
             </div>
 
-            {/* ── TEST RESULTS ──────────────────────────────────────────── */}
+            {/* TEST RESULTS */}
             <div className="mb-4">
               <h3 className="mb-2 text-sm font-bold text-gray-800 dark:text-gray-100">TEST RESULTS</h3>
               <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
@@ -497,13 +593,11 @@ export default function ReviewByQaDetail() {
                           {h}
                         </th>
                       ))}
-                      {/* PHP: if ($specs==1) */}
                       {hasSpecs && (
                         <th className="border-b border-gray-200 dark:border-gray-700 px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
                           SPECIFICATIONS
                         </th>
                       )}
-                      {/* PHP: if(perm 180||181) && $reportstatus<9 */}
                       {showActionsColumn && (
                         <th className="border-b border-gray-200 dark:border-gray-700 px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 no-print">
                           Actions
@@ -520,37 +614,19 @@ export default function ReviewByQaDetail() {
                       </tr>
                     ) : (
                       test_results.map((row, idx) => {
-                        // PHP: $sflag inline style
                         const cellStyle     = parseComplianceStyle(row.compliance_style);
-                        // PHP: BDL/ADL display_value
                         const displayResult = row.result?.display_value ?? row.result?.value ?? "—";
-                        // PHP: units.description
                         const unitDisplay   = row.unit?.description ?? row.unit?.name ?? "—";
-                        // PHP: methods.name
                         const methodName    = row.method?.name ?? "—";
-
                         return (
                           <tr key={row.id ?? idx} className="border-b border-gray-100 dark:border-gray-700 last:border-0">
-                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
-                              {row.sno ?? idx + 1}
-                            </td>
-                            <td className="px-3 py-2 text-gray-800 dark:text-gray-200">
-                              {row.parameter_name}
-                            </td>
-                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
-                              {unitDisplay}
-                            </td>
-                            {/* PHP: <td $sflag>$rresult</td> */}
-                            <td className="px-3 py-2" style={cellStyle}>
-                              {displayResult}
-                            </td>
-                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
-                              {methodName}
-                            </td>
+                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{row.sno ?? idx + 1}</td>
+                            <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{row.parameter_name}</td>
+                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{unitDisplay}</td>
+                            <td className="px-3 py-2" style={cellStyle}>{displayResult}</td>
+                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{methodName}</td>
                             {hasSpecs && (
-                              <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
-                                {row.specification ?? "—"}
-                              </td>
+                              <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{row.specification ?? "—"}</td>
                             )}
                             {showActionsColumn && (
                               <td className="px-3 py-2 text-center no-print">
@@ -568,8 +644,7 @@ export default function ReviewByQaDetail() {
               </div>
             </div>
 
-            {/* ── Remarks ───────────────────────────────────────────────── */}
-            {/* PHP: if hodremark || wdetail || remark || remark1 */}
+            {/* Remarks */}
             {remarkLines.length > 0 && (
               <div className="mb-4 rounded-lg bg-gray-50 dark:bg-dark-700 px-4 py-3 text-xs text-gray-700 dark:text-gray-300">
                 <strong>Remark: </strong>
@@ -579,50 +654,33 @@ export default function ReviewByQaDetail() {
               </div>
             )}
 
-            {/* PHP: if ($tid != "1356") **End of Report** */}
             {String(tid) !== "1356" && (
               <div className="mb-6 text-center text-xs font-semibold text-gray-700 dark:text-gray-300">
                 **End of Report**
               </div>
             )}
 
-            {/* ── Signatories ───────────────────────────────────────────── */}
+            {/* Signatories */}
             {signatories.length > 0 && (
               <div className="mb-6 flex flex-wrap gap-8">
                 {signatories.map((signer, i) => (
                   <div key={signer.signer_id ?? i} className="min-w-[180px]">
                     {signer.is_signed ? (
                       <div>
-                        {/* PHP: "Reviewed By:" / "Authorized By:" / "Reviewed & Authorized By:" */}
                         {signer.title && (
-                          <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                            {signer.title}
-                          </p>
+                          <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{signer.title}</p>
                         )}
-                        {/* PHP: fetchattachment(sign_image) */}
                         {signer.sign_image_url && (
-                          <img
-                            src={signer.sign_image_url}
-                            alt=""
-                            className="mb-1 h-6 w-auto object-contain"
-                          />
+                          <img src={signer.sign_image_url} alt="" className="mb-1 h-6 w-auto object-contain" />
                         )}
-                        {/* PHP: PlaceWatermark → digital signature */}
                         {signer.digital_signature_url && (
-                          <img
-                            src={signer.digital_signature_url}
-                            alt={`Signed by ${signer.display_name}`}
-                            className="h-14 object-contain"
-                          />
+                          <img src={signer.digital_signature_url} alt={`Signed by ${signer.display_name}`} className="h-14 object-contain" />
                         )}
                       </div>
                     ) : (
-                      // PHP: not signed — show name + authorizefor only
                       <div className="text-xs text-gray-700 dark:text-gray-300">
                         {signer.title && (
-                          <p className="mb-1 font-medium text-gray-500 dark:text-gray-400">
-                            {signer.title}
-                          </p>
+                          <p className="mb-1 font-medium text-gray-500 dark:text-gray-400">{signer.title}</p>
                         )}
                         <p className="font-semibold">{signer.display_name ?? signer.name}</p>
                         <p className="text-gray-500">{signer.authorizefor}</p>
@@ -633,8 +691,7 @@ export default function ReviewByQaDetail() {
               </div>
             )}
 
-            {/* ── Pending Tests info ─────────────────────────────────────── */}
-            {/* PHP: $leftcount > 0 || ($paramcount > $donecount) */}
+            {/* Pending Tests */}
             {(leftCount > 0 || paramCount > doneCount) && (
               <div className="no-print mb-4 text-center text-xs text-gray-500 dark:text-gray-400">
                 <p>{leftCount} Tests Pending completion</p>
@@ -642,14 +699,12 @@ export default function ReviewByQaDetail() {
               </div>
             )}
 
-            {/* ── QA Approve Section ────────────────────────────────────── */}
-            {/* PHP: $reportstatus==8 && in_array(181,$permissions) && isset($hid) && !empty($hid) */}
-            {showQaApprove && (
-              <QaApproveSection
+            {/* Generate ULR Form — bottom of report */}
+            {formData && (
+              <GenerateUlrForm
                 hid={hid}
-                allottedItems={allotted_items}
-                disposable={Number(disposable)}
-                onSuccess={() => navigate(-1)}
+                formData={formData}
+                onSuccess={() => navigate("/dashboards/action-items/generate-ulr")}
               />
             )}
 

@@ -31,7 +31,6 @@ import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
 
 const isSafari = getUserAgentBrowser() === "Safari";
 
-// PHP: if(!in_array(288, $permissions)) → redirect
 function usePermissions() {
   return localStorage.getItem("userPermissions")?.split(",").map(Number) || [];
 }
@@ -41,36 +40,44 @@ const selectCls =
   "px-3 py-2 text-sm text-gray-700 dark:text-gray-300 outline-none min-w-[200px] " +
   "focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 transition";
 
-export default function AcceptSample() {
-  const { cardSkin }  = useThemeContext();
-  const permissions   = usePermissions();
+// ----------------------------------------------------------------------
 
-  const [products,         setProducts]         = useState([]);
-  const [loading,          setLoading]          = useState(true);
+export default function QAReview() {
+  const { cardSkin } = useThemeContext();
+  const permissions  = usePermissions();
+
+  // ── PHP permission 181 — page access guard ───────────────────────────────
+  const canAccess = permissions.includes(181);
+
+  // ── Dropdown data ────────────────────────────────────────────────────────
   const [customerTypes,    setCustomerTypes]    = useState([]);
   const [specificPurposes, setSpecificPurposes] = useState([]);
   const [departments,      setDepartments]      = useState([]);
-  const [customers,        setCustomers]        = useState([]); // /people/get-all-customers
+  const [customers,        setCustomers]        = useState([]);
 
-  // Filters
-  const [ctype,           setCtype]           = useState("");
-  const [specificpurpose, setSpecificpurpose] = useState("");
-  const [department,      setDepartment]      = useState("");
-  const [cname,           setCname]           = useState(""); // Customer Name
+  // ── Filter state — matches PHP GET params ────────────────────────────────
+  const [ctype,           setCtype]           = useState(""); // ?ctype
+  const [specificpurpose, setSpecificpurpose] = useState(""); // ?specificpurpose
+  const [department,      setDepartment]      = useState(""); // ?department
+  const [cname,           setCname]           = useState(""); // ?cname
 
-  // ── Fetch dropdowns ───────────────────────────────────────────────────────
+  // ── Table data ────────────────────────────────────────────────────────────
+  const [products, setProducts] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+
+  // ── Fetch dropdown lists ─────────────────────────────────────────────────
   useEffect(() => {
     const fetchDropdowns = async () => {
-      // Customer Types — permission 389
+      // Customer Types — PHP: customertypes where status=1 (perm 389)
       if (permissions.includes(389)) {
         try {
           const res = await axios.get("/people/get-customer-type-list");
-          const d   = res.data?.Data ?? res.data?.data ?? res.data ?? [];
+          const d   = res.data?.data ?? res.data?.Data ?? res.data ?? [];
           setCustomerTypes(Array.isArray(d) ? d : []);
         } catch { setCustomerTypes([]); }
       }
 
-      // Specific Purposes — permission 390
+      // Specific Purposes — PHP: specificpurposes where status=1 (perm 390)
       if (permissions.includes(390)) {
         try {
           const res = await axios.get("/people/get-specific-purpose-list");
@@ -79,7 +86,8 @@ export default function AcceptSample() {
         } catch { setSpecificPurposes([]); }
       }
 
-      // Departments — PHP: labs where status=1 (filtered by employeedepartment if no perm 346)
+      // Departments — PHP: labs where status=1
+      // (filtered by employeedepartment if user lacks perm 346 — backend handles this)
       try {
         const res = await axios.get("/hrm/department-list");
         const d   = res.data?.data ?? res.data?.Data ?? res.data ?? [];
@@ -93,11 +101,15 @@ export default function AcceptSample() {
         setCustomers(Array.isArray(d) ? d : []);
       } catch { setCustomers([]); }
     };
+
     fetchDropdowns();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Fetch table data ──────────────────────────────────────────────────────
+  // ── Fetch QA report list — /actionitem/qa-report-list ────────────────────
+  // PHP: trfProducts JOIN trfs JOIN products JOIN testprices JOIN hodrequests
+  //      WHERE hodrequests.status=8
+  //      Filters: ctype, cname, specificpurpose, department
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -107,17 +119,11 @@ export default function AcceptSample() {
       if (department)      params.append("department",      department);
       if (cname)           params.append("cname",           cname);
 
-      const response = await axios.get(
-        `/actionitem/qa-report-list?${params.toString()}`
-      );
+      const res = await axios.get(`/actionitem/qa-report-list?${params.toString()}`);
 
-      if (response.data && Array.isArray(response.data)) {
-        setProducts(response.data);
-      } else if (response.data?.data && Array.isArray(response.data.data)) {
-        setProducts(response.data.data);
-      } else {
-        setProducts([]);
-      }
+      // API returns: { status: true, data: [...] }
+      const d = res.data?.data ?? res.data ?? [];
+      setProducts(Array.isArray(d) ? d : []);
     } catch (err) {
       console.error("Error fetching QA report list:", err);
       setProducts([]);
@@ -128,8 +134,10 @@ export default function AcceptSample() {
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-  // ── Permission-gated column visibility ───────────────────────────────────
-  // PHP: Main Customer (perm 358), Customer Type (perm 389), Specific Purpose (perm 390)
+  // ── Column visibility — PHP permission gates ──────────────────────────────
+  // main_customer    → perm 358
+  // customer_type    → perm 389
+  // specific_purpose → perm 390
   const defaultColumnVisibility = {
     main_customer:    permissions.includes(358),
     customer_type:    permissions.includes(389),
@@ -138,22 +146,24 @@ export default function AcceptSample() {
 
   // ── Table setup ───────────────────────────────────────────────────────────
   const [tableSettings, setTableSettings] = useState({
-    enableFullScreen: false,
-    enableRowDense:   false,
+    enableFullScreen:   false,
+    enableRowDense:     false,
+    enableSorting:      true,
+    enableColumnFilters: false,
   });
 
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [sorting,      setSorting]      = useState([]);
+  const [globalFilter,      setGlobalFilter]      = useState("");
+  const [sorting,           setSorting]           = useState([]);
+  const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
     "column-visibility-qa-review-1",
     defaultColumnVisibility,
   );
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "column-pinning-qa-review-1", {}
+    "column-pinning-qa-review-1",
+    {},
   );
-
-  const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
   const table = useReactTable({
     data: products,
@@ -163,8 +173,8 @@ export default function AcceptSample() {
       updateData: (rowIndex, columnId, value) => {
         skipAutoResetPageIndex();
         setProducts((old) =>
-          old.map((row, index) =>
-            index === rowIndex ? { ...old[rowIndex], [columnId]: value } : row
+          old.map((row, i) =>
+            i === rowIndex ? { ...old[rowIndex], [columnId]: value } : row
           )
         );
       },
@@ -180,18 +190,18 @@ export default function AcceptSample() {
       setTableSettings,
       refreshData: fetchProducts,
     },
-    filterFns:              { fuzzy: fuzzyFilter },
-    enableSorting:          tableSettings.enableSorting,
-    enableColumnFilters:    tableSettings.enableColumnFilters,
-    getCoreRowModel:        getCoreRowModel(),
-    onGlobalFilterChange:   setGlobalFilter,
-    getFilteredRowModel:    getFilteredRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
-    globalFilterFn:         fuzzyFilter,
-    onSortingChange:        setSorting,
-    getSortedRowModel:      getSortedRowModel(),
-    getPaginationRowModel:  getPaginationRowModel(),
+    filterFns:               { fuzzy: fuzzyFilter },
+    enableSorting:           tableSettings.enableSorting,
+    enableColumnFilters:     tableSettings.enableColumnFilters,
+    getCoreRowModel:         getCoreRowModel(),
+    onGlobalFilterChange:    setGlobalFilter,
+    getFilteredRowModel:     getFilteredRowModel(),
+    getFacetedUniqueValues:  getFacetedUniqueValues(),
+    getFacetedMinMaxValues:  getFacetedMinMaxValues(),
+    globalFilterFn:          fuzzyFilter,
+    onSortingChange:         setSorting,
+    getSortedRowModel:       getSortedRowModel(),
+    getPaginationRowModel:   getPaginationRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange:    setColumnPinning,
     autoResetPageIndex,
@@ -200,33 +210,35 @@ export default function AcceptSample() {
   useDidUpdate(() => table.resetRowSelection(), [products]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // ── Access check — PHP: if(!in_array(288, $permissions)) ─────────────────
-  if (!permissions.includes(288)) {
+  // ── Permission guard — PHP: if(!in_array(181, $permissions)) redirect ─────
+  if (!canAccess) {
     return (
       <Page title="QA Review">
         <div className="flex h-60 items-center justify-center rounded-xl border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
           <p className="text-sm font-medium text-red-600 dark:text-red-400">
-            ⛔ Access Denied — Permission 288 required
+            ⛔ Access Denied — Permission 181 required
           </p>
         </div>
       </Page>
     );
   }
 
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
     return (
       <Page title="QA Review">
         <div className="flex h-[60vh] items-center justify-center gap-3 text-gray-500">
-          <svg className="h-5 w-5 animate-spin text-blue-600" viewBox="0 0 24 24">
+          <svg className="h-5 w-5 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
           </svg>
-          Loading...
+          <span className="text-sm">Loading…</span>
         </div>
       </Page>
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Page title="QA Review">
       <div className="transition-content w-full pb-5">
@@ -242,15 +254,18 @@ export default function AcceptSample() {
           <div
             className={clsx(
               "transition-content flex grow flex-col pt-3",
-              tableSettings.enableFullScreen ? "overflow-hidden" : "px-(--margin-x)",
+              tableSettings.enableFullScreen
+                ? "overflow-hidden"
+                : "px-(--margin-x)",
             )}
           >
-            {/* ── Filters ── */}
+            {/* ─── Filters ──────────────────────────────────────────────── */}
             <div className="mb-4 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-              {/* Row 1 — ctype (389), specificpurpose (390), department */}
+
+              {/* Row 1 — Customer Type (perm 389) · Specific Purpose (perm 390) · Department */}
               <div className="flex flex-wrap items-end gap-4">
 
-                {/* Customer Type — perm 389 */}
+                {/* Customer Type — PHP: perm 389, customertypes where status=1 */}
                 {permissions.includes(389) && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -269,7 +284,7 @@ export default function AcceptSample() {
                   </div>
                 )}
 
-                {/* Specific Purpose — perm 390 */}
+                {/* Specific Purpose — PHP: perm 390, specificpurposes where status=1 */}
                 {permissions.includes(390) && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -306,8 +321,9 @@ export default function AcceptSample() {
                 </div>
               </div>
 
-              {/* Row 2 — Customer Name + Clear */}
+              {/* Row 2 — Customer Name + Clear Filters */}
               <div className="mt-3 flex flex-wrap items-end gap-4">
+
                 {/* Customer Name — PHP: customers where status=1 */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -339,6 +355,7 @@ export default function AcceptSample() {
               </div>
             </div>
 
+            {/* ─── Table ────────────────────────────────────────────────── */}
             <Card
               className={clsx(
                 "relative flex grow flex-col",
@@ -372,7 +389,9 @@ export default function AcceptSample() {
                                 onClick={header.column.getToggleSortingHandler()}
                               >
                                 <span className="flex-1">
-                                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                  {header.isPlaceholder
+                                    ? null
+                                    : flexRender(header.column.columnDef.header, header.getContext())}
                                 </span>
                                 <TableSortIcon sorted={header.column.getIsSorted()} />
                               </div>
@@ -384,6 +403,7 @@ export default function AcceptSample() {
                       </Tr>
                     ))}
                   </THead>
+
                   <TBody>
                     {table.getRowModel().rows.length === 0 ? (
                       <Tr>
@@ -417,7 +437,9 @@ export default function AcceptSample() {
                                 <div
                                   className={clsx(
                                     "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
-                                    cell.column.getIsPinned() === "left" ? "ltr:border-r rtl:border-l" : "ltr:border-l rtl:border-r",
+                                    cell.column.getIsPinned() === "left"
+                                      ? "ltr:border-r rtl:border-l"
+                                      : "ltr:border-l rtl:border-r",
                                   )}
                                 />
                               )}
@@ -430,7 +452,9 @@ export default function AcceptSample() {
                   </TBody>
                 </Table>
               </div>
+
               <SelectedRowsActions table={table} />
+
               {table.getCoreRowModel().rows.length > 0 && (
                 <div
                   className={clsx(

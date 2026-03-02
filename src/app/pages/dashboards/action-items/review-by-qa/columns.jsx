@@ -3,13 +3,20 @@ import { createColumnHelper } from "@tanstack/react-table";
 
 // Local Imports
 import { RowActions } from "./RowActions";
-import {
-  SelectCell,
-  SelectHeader,
-} from "components/shared/table/SelectCheckbox";
+import { SelectCell, SelectHeader } from "components/shared/table/SelectCheckbox";
 
-// PHP: permissions checked at render time — columns gated by perm 358/389/390
-// are handled via columnVisibility + meta.permissions in RowActions
+// PHP field mapping → API response fields:
+// pname          → product_name
+// customername   → customername        (perm 358)
+// reportname     → reportname          (ID string — resolved by API or shown raw)
+// lrn/brn/ulr    → lrn / brn / ulr
+// grade+size     → grade_name / size_name
+// department     → lab_name
+// ctype name     → customer_type       (perm 389)
+// specificpurpose→ specific_purpose    (perm 390)
+// hodstatus      → hod_status
+// hodid          → hod_id
+
 const columnHelper = createColumnHelper();
 
 export const columns = [
@@ -19,7 +26,7 @@ export const columns = [
     cell: SelectCell,
   }),
 
-  // Sr No — PHP: $i++
+  // Sr No
   columnHelper.accessor((_row, index) => index + 1, {
     id: "s_no",
     header: "Sr No",
@@ -31,41 +38,47 @@ export const columns = [
     ),
   }),
 
-  // Product — PHP: $row['pname']
-  columnHelper.accessor("pname", {
+  // Product — API: product_name
+  columnHelper.accessor("product_name", {
     id: "product",
     header: "Product",
     cell: (info) => (
-      <span className="max-w-[200px] text-sm font-medium text-gray-800 dark:text-gray-100">
+      <span className="block max-w-[220px] text-sm font-medium text-gray-800 dark:text-gray-100">
         {info.getValue() ?? "—"}
       </span>
     ),
   }),
 
-  // Main Customer — PHP: if(in_array(358, $permissions)) $n[] = $row['customername']
+  // Main Customer — API: customername (PHP: perm 358)
   columnHelper.accessor("customername", {
     id: "main_customer",
     header: "Main Customer",
-    cell: (info) => info.getValue() ?? "—",
+    cell: (info) => (
+      <span className="text-sm text-gray-700 dark:text-gray-300">
+        {info.getValue() ?? "—"}
+      </span>
+    ),
   }),
 
-  // Report Customer — PHP: $row['reportname'] comma→<br/>
+  // Report Customer — API: reportname
+  // PHP resolves comma-separated IDs to names via customers table.
+  // Backend should return resolved name string; if numeric ID is returned, display as-is.
   columnHelper.accessor("reportname", {
     id: "report_customer",
     header: "Report Customer",
     cell: (info) => {
       const val = info.getValue();
       if (!val) return "—";
-      // API returns pre-resolved name string (comma-separated)
+      // If API returns resolved names (comma-separated), split on comma → newline
       return (
-        <span className="whitespace-pre-line text-sm">
+        <span className="block whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">
           {val.replace(/,/g, "\n")}
         </span>
       );
     },
   }),
 
-  // LRN — PHP: $row['lrn']
+  // LRN — API: lrn
   columnHelper.accessor("lrn", {
     id: "lrn",
     header: "LRN",
@@ -76,37 +89,49 @@ export const columns = [
     ),
   }),
 
-  // BRN — PHP: $row['brn']
+  // BRN — API: brn
   columnHelper.accessor("brn", {
     id: "brn",
     header: "BRN",
     cell: (info) => (
-      <span className="font-mono text-xs text-gray-600 dark:text-gray-300">
+      <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
         {info.getValue() ?? "—"}
       </span>
     ),
   }),
 
-  // ULR — PHP: $row['ulr']
+  // ULR — API: ulr
   columnHelper.accessor("ulr", {
     id: "ulr",
     header: "ULR",
     cell: (info) => (
-      <span className="font-mono text-xs text-gray-600 dark:text-gray-300">
+      <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
         {info.getValue() ?? "—"}
       </span>
     ),
   }),
 
-  // Grade/Size — PHP: grades.name + "/" + sizes.name
-  columnHelper.accessor("grade_size", {
-    id: "grade_size",
-    header: "Grade/Size",
-    cell: (info) => info.getValue() ?? "—",
-  }),
+  // Grade/Size — API: grade_name + size_name  (PHP: grades.name + "/" + sizes.name)
+  columnHelper.accessor(
+    (row) => {
+      const g = row.grade_name ?? "";
+      const s = row.size_name  ?? "";
+      if (!g && !s) return "—";
+      return `${g}/${s}`;
+    },
+    {
+      id: "grade_size",
+      header: "Grade/Size",
+      cell: (info) => (
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          {info.getValue()}
+        </span>
+      ),
+    }
+  ),
 
-  // Department — PHP: labs.name where id=hodrequests.department
-  columnHelper.accessor("department_name", {
+  // Department — API: lab_name  (PHP: labs.name where id=hodrequests.department)
+  columnHelper.accessor("lab_name", {
     id: "department",
     header: "Department",
     cell: (info) => (
@@ -116,14 +141,18 @@ export const columns = [
     ),
   }),
 
-  // Customer Type — PHP: if(in_array(389, $permissions)) customertypes.name
+  // Customer Type — API: customer_type  (PHP: customertypes.name, perm 389)
   columnHelper.accessor("customer_type", {
     id: "customer_type",
     header: "Customer Type",
-    cell: (info) => info.getValue() ?? "—",
+    cell: (info) => (
+      <span className="text-sm text-gray-700 dark:text-gray-300">
+        {info.getValue() ?? "—"}
+      </span>
+    ),
   }),
 
-  // Specific Purpose — PHP: if(in_array(390, $permissions)) specificpurposes.name
+  // Specific Purpose — API: specific_purpose  (PHP: specificpurposes.name, perm 390)
   columnHelper.accessor("specific_purpose", {
     id: "specific_purpose",
     header: "Specific Purpose",
@@ -134,7 +163,7 @@ export const columns = [
     ),
   }),
 
-  // Action — PHP status=8: "Review By QA" → testreport.php?hakuna={tid}&what={hid}
+  // Action — driven by hod_status (PHP logic reproduced in RowActions)
   columnHelper.display({
     id: "actions",
     header: "Action",

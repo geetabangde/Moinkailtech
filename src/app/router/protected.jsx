@@ -2304,8 +2304,27 @@ const protectedRoutes = {
                   lazy: async () => ({
                     Component: (await import("app/pages/dashboards/action-items/review-by-qa/ReviewByQaDetail")).default,
                   }),
-                }
-
+                },
+                {
+                  // generate-ulr
+                  path: "generate-ulr",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/generate-ulr/index")).default,
+                  }),
+                },
+                {
+                  path: "generate-ulr/:id",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/generate-ulr/GenerateUlr")).default,
+                  })  
+                },
+                {
+                  path: "GenerateUlrDetail/:id",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/generate-ulr/GenerateUlrDetail")).default,
+                  })
+                },
+                
               ],
             },
             {
