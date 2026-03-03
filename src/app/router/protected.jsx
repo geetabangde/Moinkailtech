@@ -2203,7 +2203,7 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                 path: "allot-sample/:id",
+                  path: "allot-sample/:id",
                   lazy: async () => ({
                     Component: (
                       await import(
@@ -2216,7 +2216,9 @@ const protectedRoutes = {
                   path: "accept-sample",
                   lazy: async () => ({
                     Component: (
-                      await import("app/pages/dashboards/action-items/accept-sample/index")
+                      await import(
+                        "app/pages/dashboards/action-items/accept-sample/index"
+                      )
                     ).default,
                   }),
                 },
@@ -2224,21 +2226,25 @@ const protectedRoutes = {
                   path: "assign-chemist",
                   lazy: async () => ({
                     Component: (
-                      await import("app/pages/dashboards/action-items/assign-chemist/index")
+                      await import(
+                        "app/pages/dashboards/action-items/assign-chemist/index"
+                      )
                     ).default,
                   }),
                 },
                 {
                   path: "assign-chemist/:id",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/assign-chemist/AssignChemistForm")).default
-                  })
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/assign-chemist/AssignChemistForm"
+                      )
+                    ).default,
+                  }),
                 },
                 // ──────────────────────────────────Perform Testing Routes───────────────────────────────────────────
 
-
                 {
-                  
                   path: "perform-testing",
                   lazy: async () => ({
                     Component: (
@@ -2249,7 +2255,6 @@ const protectedRoutes = {
                   }),
                 },
                 {
-
                   path: "perform-testing/:id",
                   lazy: async () => ({
                     Component: (
@@ -2260,7 +2265,6 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  
                   path: "perform-testing/test-input/:teid",
                   lazy: async () => ({
                     Component: (
@@ -2271,7 +2275,6 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  
                   path: "perform-testing/view-raw-data/:teid",
                   lazy: async () => ({
                     Component: (
@@ -2282,7 +2285,6 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  
                   path: "perform-testing/test-documents/:trfid/:tid/:teid",
                   lazy: async () => ({
                     Component: (
@@ -2302,14 +2304,15 @@ const protectedRoutes = {
                     ).default,
                   }),
                 },
-                { 
-                  path: "view-draft-report/:id", lazy: async () => ({
+                {
+                  path: "view-draft-report/:id",
+                  lazy: async () => ({
                     Component: (
                       await import(
                         "app/pages/dashboards/action-items/view-draft-report/DraftReportView"
                       )
                     ).default,
-                  })  
+                  }),
                 },
                 {
                   path: "review-by-hod",
@@ -2332,66 +2335,182 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  path:"review-by-qa",
+                  path: "review-by-qa",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/review-by-qa/index")).default,
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/review-by-qa/index"
+                      )
+                    ).default,
                   }),
                 },
                 {
-                  path:"review-by-qa/:tid",
+                  path: "review-by-qa/:tid",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/review-by-qa/ReviewByQaDetail")).default,
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/review-by-qa/ReviewByQaDetail"
+                      )
+                    ).default,
                   }),
                 },
                 {
                   // generate-ulr
                   path: "generate-ulr",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/generate-ulr/index")).default,
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/generate-ulr/index"
+                      )
+                    ).default,
                   }),
                 },
                 {
                   path: "generate-ulr/:id",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/generate-ulr/GenerateUlr")).default,
-                  })  
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/generate-ulr/GenerateUlr"
+                      )
+                    ).default,
+                  }),
                 },
                 {
                   path: "GenerateUlrDetail/:id",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/generate-ulr/GenerateUlrDetail")).default,
-                  })
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/generate-ulr/GenerateUlrDetail"
+                      )
+                    ).default,
+                  }),
                 },
                 {
-                  path:"pending-upload-reports",
-                    lazy: async () => ({
-                      Component: (await import("app/pages/dashboards/action-items/pending-upload-reports/index")).default,
-                  })
-                },
-                {
-                  path:"pending-upload-reports/:id",
-                    lazy: async () => ({
-                      Component: (await import("app/pages/dashboards/action-items/pending-upload-reports/PendingUploadReportDetail")).default,
-                  })
-                },
-                {
-                  path:"final-reports-unsigned",
+                  path: "pending-upload-reports",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/final-reports-unsigned/index")).default,
-                  })
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/pending-upload-reports/index"
+                      )
+                    ).default,
+                  }),
                 },
                 {
-                   path: "final-reports-unsigned/view",
+                  path: "pending-upload-reports/:id",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/final-reports-unsigned/FinalReportDetail")).default,
-                  })
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/pending-upload-reports/PendingUploadReportDetail"
+                      )
+                    ).default,
+                  }),
                 },
                 {
-                  path:"signed-reports",
+                  path: "final-reports-unsigned",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/action-items/signed-reports/index")).default,
-                  })
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/final-reports-unsigned/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "final-reports-unsigned/view",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/final-reports-unsigned/FinalReportDetail"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "signed-reports",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/signed-reports/index"
+                      )
+                    ).default,
+                  }),
+                },
+              ],
+            },
+            {
+              path: "approvals",
+              children: [
+                {
+                  path: "priority-approval",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/priority-approval/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "payment-approval-testing",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/payment-approval-testing/index"
+                      )
+                    ).default,
+                  }),
+                }, 
+                {
+                  path: "payment-approval-calibration",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/payment-approval-calibration/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "payment-hold-notification-1",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/payment-hold-notification-1/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "payment-approval-2",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/payment-approval-2/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "witness-approval",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/witness-approval/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "witness-lock",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/witness-lock/index"
+                      )
+                    ).default,
+                  }),
                 }
+
               ],
             },
             {
