@@ -11,7 +11,9 @@ import {
 } from "@tanstack/react-table";
 import clsx from "clsx";
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "utils/axios";
+import { createColumnHelper } from "@tanstack/react-table";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -21,7 +23,6 @@ import { useLockScrollbar, useDidUpdate, useLocalStorage } from "hooks";
 import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
 import { Toolbar } from "./Toolbar";
-import { performTestColumns } from "./PerformTestColumns";
 import { PaginationSection } from "components/shared/table/PaginationSection";
 import { SelectedRowsActions } from "./SelectedRowsActions";
 import { useThemeContext } from "app/contexts/theme/context";
@@ -30,14 +31,106 @@ import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
 // ----------------------------------------------------------------------
 
 const isSafari = getUserAgentBrowser() === "Safari";
+const columnHelper = createColumnHelper();
 
+// ── "Perform Test" button → navigates to detail page ─────────────────────────
+// PHP: href="performtest.php?hakuna={id}"
+function PerformTestRowActions({ row }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() =>
+        navigate(`/dashboards/action-items/perform-testing/${row.original.id}`)
+      }
+      className="rounded bg-primary-600 px-4 py-1.5 text-xs font-semibold text-white shadow transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400"
+    >
+      Perform Test
+    </button>
+  );
+}
+
+// ── Column definitions (mirrors PHP $oary & table headers) ───────────────────
+// PHP headers: ID | Product | LRN | Brand/Source | Grade/Size |
+//              Long Term Test | Tentative Report Date (INTERIM) |
+//              Tentative Report Date (LONGTERM) | Tentative Report Date | Action
+const performTestColumns = [
+  columnHelper.accessor("id", {
+    id: "id",
+    header: "ID",
+    cell: (info) => (
+      <span className="font-mono text-xs text-gray-700 dark:text-dark-200">
+        {info.getValue()}
+      </span>
+    ),
+  }),
+  columnHelper.accessor("product", {
+    id: "product",
+    header: "Product",
+    cell: (info) => (
+      <span className="text-sm text-gray-800 dark:text-dark-100">
+        {info.getValue() ?? "—"}
+      </span>
+    ),
+  }),
+  columnHelper.accessor("lrn", {
+    id: "lrn",
+    header: "LRN",
+    cell: (info) => info.getValue() ?? "—",
+  }),
+  columnHelper.accessor("brand", {
+    // PHP: trfProducts.brand
+    id: "brand",
+    header: "Brand/Source",
+    cell: (info) => info.getValue() || "-",
+  }),
+  columnHelper.accessor((row) => `${row.grade ?? "NA"}/${row.size ?? "NA"}`, {
+    // PHP: grades.name + "/" + sizes.name
+    id: "grade_size",
+    header: "Grade/Size",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("longTermTest", {
+    // PHP: trfProducts.longTermTest
+    id: "longTermTest",
+    header: "Long Term Test",
+    cell: (info) => info.getValue() ?? "—",
+  }),
+  columnHelper.accessor("interim_yes", {
+    // PHP: trfProducts.interim_yes → Tentative Report Date (INTERIM)
+    id: "interim_yes",
+    header: "Tentative Report Date (INTERIM)",
+    cell: (info) => info.getValue() ?? "—",
+  }),
+  columnHelper.accessor("longterm", {
+    // PHP: trfProducts.longterm → Tentative Report Date (LONGTERM)
+    id: "longterm",
+    header: "Tentative Report Date (LONGTERM)",
+    cell: (info) => info.getValue() ?? "—",
+  }),
+  columnHelper.accessor("interim_no", {
+    // PHP: trfProducts.interim_no → Tentative Report Date
+    id: "interim_no",
+    header: "Tentative Report Date",
+    cell: (info) => info.getValue() ?? "—",
+  }),
+  columnHelper.display({
+    // PHP: permission check in_array(7, $permissions) → show "Perform Test" button
+    id: "action",
+    header: "Action",
+    cell: PerformTestRowActions,
+  }),
+];
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function PerformTest() {
   const { cardSkin } = useThemeContext();
 
   const [products, setProducts] = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [loading, setLoading] = useState(true);
 
   // ── Fetch list — GET /actionitem/get-perform-testing ─────────────────────
+  // PHP: performmytestsData.php → filters by employeeid + status=24 or status=0
+  //      + trfProducts.status != 99
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -52,22 +145,26 @@ export default function PerformTest() {
     }
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   // ── Table setup ───────────────────────────────────────────────────────────
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
-    enableRowDense:   false,
+    enableRowDense: false,
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
-  const [sorting,      setSorting]      = useState([]);
+  const [sorting, setSorting] = useState([{ id: "id", desc: true }]); // PHP: order by id desc
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
-    "column-visibility-perform-test-1", {}
+    "column-visibility-perform-test-1",
+    {}
   );
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "column-pinning-perform-test-1", {}
+    "column-pinning-perform-test-1",
+    {}
   );
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
@@ -75,7 +172,13 @@ export default function PerformTest() {
   const table = useReactTable({
     data: products,
     columns: performTestColumns,
-    state: { globalFilter, sorting, columnVisibility, columnPinning, tableSettings },
+    state: {
+      globalFilter,
+      sorting,
+      columnVisibility,
+      columnPinning,
+      tableSettings,
+    },
     meta: {
       updateData: (rowIndex, columnId, value) => {
         skipAutoResetPageIndex();
@@ -97,21 +200,22 @@ export default function PerformTest() {
       setTableSettings,
       refreshData: fetchProducts,
     },
-    filterFns:              { fuzzy: fuzzyFilter },
-    enableSorting:          tableSettings.enableSorting,
-    enableColumnFilters:    tableSettings.enableColumnFilters,
-    getCoreRowModel:        getCoreRowModel(),
-    onGlobalFilterChange:   setGlobalFilter,
-    getFilteredRowModel:    getFilteredRowModel(),
+    filterFns: { fuzzy: fuzzyFilter },
+    enableSorting: true,
+    enableColumnFilters: true,
+    getCoreRowModel: getCoreRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
+    getFilteredRowModel: getFilteredRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
-    globalFilterFn:         fuzzyFilter,
-    onSortingChange:        setSorting,
-    getSortedRowModel:      getSortedRowModel(),
-    getPaginationRowModel:  getPaginationRowModel(),
+    globalFilterFn: fuzzyFilter,
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onColumnPinningChange:    setColumnPinning,
+    onColumnPinningChange: setColumnPinning,
     autoResetPageIndex,
+    initialState: { pagination: { pageSize: 25 } }, // PHP: pageLength: 25
   });
 
   useDidUpdate(() => table.resetRowSelection(), [products]);
@@ -121,9 +225,23 @@ export default function PerformTest() {
     return (
       <Page title="Perform Test">
         <div className="flex h-[60vh] items-center justify-center gap-3 text-gray-500">
-          <svg className="h-5 w-5 animate-spin text-blue-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+          <svg
+            className="h-5 w-5 animate-spin text-blue-600"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+            />
           </svg>
           Loading...
         </div>
@@ -138,7 +256,7 @@ export default function PerformTest() {
           className={clsx(
             "flex h-full w-full flex-col",
             tableSettings.enableFullScreen &&
-              "fixed inset-0 z-61 bg-white pt-3 dark:bg-dark-900",
+              "fixed inset-0 z-61 bg-white pt-3 dark:bg-dark-900"
           )}
         >
           <Toolbar table={table} />
@@ -146,13 +264,15 @@ export default function PerformTest() {
           <div
             className={clsx(
               "transition-content flex grow flex-col pt-3",
-              tableSettings.enableFullScreen ? "overflow-hidden" : "px-(--margin-x)",
+              tableSettings.enableFullScreen
+                ? "overflow-hidden"
+                : "px-(--margin-x)"
             )}
           >
             <Card
               className={clsx(
                 "relative flex grow flex-col",
-                tableSettings.enableFullScreen && "overflow-hidden",
+                tableSettings.enableFullScreen && "overflow-hidden"
               )}
             >
               <div className="table-wrapper min-w-full grow overflow-x-auto">
@@ -171,9 +291,11 @@ export default function PerformTest() {
                             className={clsx(
                               "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                               header.column.getCanPin() && [
-                                header.column.getIsPinned() === "left"  && "sticky z-2 ltr:left-0 rtl:right-0",
-                                header.column.getIsPinned() === "right" && "sticky z-2 ltr:right-0 rtl:left-0",
-                              ],
+                                header.column.getIsPinned() === "left" &&
+                                  "sticky z-2 ltr:left-0 rtl:right-0",
+                                header.column.getIsPinned() === "right" &&
+                                  "sticky z-2 ltr:right-0 rtl:left-0",
+                              ]
                             )}
                           >
                             {header.column.getCanSort() ? (
@@ -182,12 +304,22 @@ export default function PerformTest() {
                                 onClick={header.column.getToggleSortingHandler()}
                               >
                                 <span className="flex-1">
-                                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                  {header.isPlaceholder
+                                    ? null
+                                    : flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                      )}
                                 </span>
-                                <TableSortIcon sorted={header.column.getIsSorted()} />
+                                <TableSortIcon
+                                  sorted={header.column.getIsSorted()}
+                                />
                               </div>
                             ) : header.isPlaceholder ? null : (
-                              flexRender(header.column.columnDef.header, header.getContext())
+                              flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )
                             )}
                           </Th>
                         ))}
@@ -197,7 +329,10 @@ export default function PerformTest() {
                   <TBody>
                     {table.getRowModel().rows.length === 0 ? (
                       <Tr>
-                        <Td colSpan={99} className="py-12 text-center text-sm text-gray-400">
+                        <Td
+                          colSpan={99}
+                          className="py-12 text-center text-sm text-gray-400"
+                        >
                           No items found.
                         </Td>
                       </Tr>
@@ -207,8 +342,9 @@ export default function PerformTest() {
                           key={row.id}
                           className={clsx(
                             "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
-                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                            row.getIsSelected() &&
+                              !isSafari &&
+                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500"
                           )}
                         >
                           {row.getVisibleCells().map((cell) => (
@@ -216,14 +352,21 @@ export default function PerformTest() {
                               key={cell.id}
                               className={clsx(
                                 "relative bg-white",
-                                cardSkin === "shadow" ? "dark:bg-dark-700" : "dark:bg-dark-900",
+                                cardSkin === "shadow"
+                                  ? "dark:bg-dark-700"
+                                  : "dark:bg-dark-900",
                                 cell.column.getCanPin() && [
-                                  cell.column.getIsPinned() === "left"  && "sticky z-2 ltr:left-0 rtl:right-0",
-                                  cell.column.getIsPinned() === "right" && "sticky z-2 ltr:right-0 rtl:left-0",
-                                ],
+                                  cell.column.getIsPinned() === "left" &&
+                                    "sticky z-2 ltr:left-0 rtl:right-0",
+                                  cell.column.getIsPinned() === "right" &&
+                                    "sticky z-2 ltr:right-0 rtl:left-0",
+                                ]
                               )}
                             >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
                             </Td>
                           ))}
                         </Tr>
@@ -234,7 +377,17 @@ export default function PerformTest() {
               </div>
               <SelectedRowsActions table={table} />
               {table.getCoreRowModel().rows.length > 0 && (
-                <div className={clsx("px-4 pb-4 sm:px-5 sm:pt-4", tableSettings.enableFullScreen && "bg-gray-50 dark:bg-dark-800", !(table.getIsSomeRowsSelected() || table.getIsAllRowsSelected()) && "pt-4")}>
+                <div
+                  className={clsx(
+                    "px-4 pb-4 sm:px-5 sm:pt-4",
+                    tableSettings.enableFullScreen &&
+                      "bg-gray-50 dark:bg-dark-800",
+                    !(
+                      table.getIsSomeRowsSelected() ||
+                      table.getIsAllRowsSelected()
+                    ) && "pt-4"
+                  )}
+                >
                   <PaginationSection table={table} />
                 </div>
               )}

@@ -2234,7 +2234,11 @@ const protectedRoutes = {
                     Component: (await import("app/pages/dashboards/action-items/assign-chemist/AssignChemistForm")).default
                   })
                 },
+                // ──────────────────────────────────Perform Testing Routes───────────────────────────────────────────
+
+
                 {
+                  
                   path: "perform-testing",
                   lazy: async () => ({
                     Component: (
@@ -2245,11 +2249,45 @@ const protectedRoutes = {
                   }),
                 },
                 {
+
                   path: "perform-testing/:id",
                   lazy: async () => ({
                     Component: (
                       await import(
                         "app/pages/dashboards/action-items/perform-testing/PerformTestDetail"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  
+                  path: "perform-testing/test-input/:teid",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/perform-testing/TestInput"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  
+                  path: "perform-testing/view-raw-data/:teid",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/perform-testing/ViewRawData"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  
+                  path: "perform-testing/test-documents/:trfid/:tid/:teid",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/action-items/perform-testing/ViewTestDocuments"
                       )
                     ).default,
                   }),
