@@ -2324,7 +2324,36 @@ const protectedRoutes = {
                     Component: (await import("app/pages/dashboards/action-items/generate-ulr/GenerateUlrDetail")).default,
                   })
                 },
-                
+                {
+                  path:"pending-upload-reports",
+                    lazy: async () => ({
+                      Component: (await import("app/pages/dashboards/action-items/pending-upload-reports/index")).default,
+                  })
+                },
+                {
+                  path:"pending-upload-reports/:id",
+                    lazy: async () => ({
+                      Component: (await import("app/pages/dashboards/action-items/pending-upload-reports/PendingUploadReportDetail")).default,
+                  })
+                },
+                {
+                  path:"final-reports-unsigned",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/final-reports-unsigned/index")).default,
+                  })
+                },
+                {
+                   path: "final-reports-unsigned/view",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/final-reports-unsigned/FinalReportDetail")).default,
+                  })
+                },
+                {
+                  path:"signed-reports",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/action-items/signed-reports/index")).default,
+                  })
+                }
               ],
             },
             {
