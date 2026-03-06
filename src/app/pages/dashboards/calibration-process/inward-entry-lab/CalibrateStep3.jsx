@@ -814,7 +814,7 @@ const CalibrateStep3 = () => {
                 observationRows.hiddenInputs?.calibrationPoints?.[rowIndex];
               const leastCount = leastCountData[calibPointId];
 
-              if (leastCount && value.trim()) {
+              if (leastCount !== undefined && leastCount !== null && leastCount > 0 && value.trim()) {
                 const numValue = parseFloat(value);
 
                 setObservationErrors((prevErrors) => {
@@ -835,8 +835,36 @@ const CalibrateStep3 = () => {
               }
             }
             currentCol += enabledObsSettings.length;
-          } else if (observationFrom === "master" && fieldname === "master") {
-            currentCol += enabledObsSettings.length;
+          }  else if (observationFrom === "master" && fieldname === "master") {
+          const masterStartCol = currentCol;
+          const masterEndCol = currentCol + enabledObsSettings.length - 1;
+
+          if (colIndex >= masterStartCol && colIndex <= masterEndCol) {
+            const calibPointId = observationRows.hiddenInputs?.calibrationPoints?.[rowIndex];
+            const leastCount = leastCountData[calibPointId];
+
+            if (leastCount !== undefined && leastCount !== null && leastCount > 0 && value.trim()) {
+              const numValue = parseFloat(value);
+
+              setObservationErrors((prevErrors) => {
+                const newErrors = { ...prevErrors };
+                delete newErrors[key];
+                return newErrors;
+              });
+
+              const divisionResult = numValue / leastCount;
+              const isInteger = Number.isInteger(Math.round(divisionResult * 1000000) / 1000000);
+
+              if (!isInteger) {
+                setObservationErrors((prevErrors) => ({
+                  ...prevErrors,
+                  [key]: `Please Enter Value divisible by ${leastCount}`,
+                }));
+              }
+            }
+              }
+              currentCol += enabledObsSettings.length;
+          
           } else if (observationFrom === "separate") {
             if (fieldname === "master" || fieldname === "uuc") {
               const obsStartCol = currentCol;
@@ -847,7 +875,7 @@ const CalibrateStep3 = () => {
                   observationRows.hiddenInputs?.calibrationPoints?.[rowIndex];
                 const leastCount = leastCountData[calibPointId];
 
-                if (leastCount && value.trim()) {
+                if (leastCount !== undefined && leastCount !== null && leastCount > 0 && value.trim()) {
                   const numValue = parseFloat(value);
 
                   setObservationErrors((prevErrors) => {
@@ -1333,11 +1361,27 @@ const CalibrateStep3 = () => {
           for (let i = 0; i < obsSettings.length; i++) {
             const colIndex = currentCol + i;
             const key = `${rowIndex}-${colIndex}`;
-            const value =
-              tableInputValues[key] ?? (row[colIndex]?.toString() || "");
+            const value = tableInputValues[key] ?? (row[colIndex]?.toString() || "");
 
             if (!value.trim()) {
               newErrors[key] = "This field is required";
+            } else {
+              const calibPointId = observationRows.hiddenInputs?.calibrationPoints?.[rowIndex];
+              const leastCount = leastCountData[calibPointId];
+
+              if (leastCount) {
+                const numValue = parseFloat(value);
+                if (isNaN(numValue)) {
+                  newErrors[key] = "Please enter a valid number";
+                } else {
+                  const divisionResult = numValue / leastCount;
+                  const isInteger = Number.isInteger(Math.round(divisionResult * 1000000) / 1000000);
+
+                  if (!isInteger) {
+                    newErrors[key] = `Please Enter Value divisible by ${leastCount}`;
+                  }
+                }
+              }
             }
           }
           currentCol += obsSettings.length;
