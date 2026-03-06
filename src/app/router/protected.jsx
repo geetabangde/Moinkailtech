@@ -2509,10 +2509,53 @@ const protectedRoutes = {
                       )
                     ).default,
                   }),
-                }
-
+                },
+                {
+                  path:"payment-hold-notification-2",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/payment-hold-notification-2/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path:"calibration-payment-approval-2",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/calibration-payment-approval-2/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path:"approve-signature",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/approve-signature/index"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "ApproveSignatureReport/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/approvals/approve-signature/ApproveSignatureReport"
+                      )
+                    ).default,
+                  }),
+                },
               ],
             },
+            // =========================sales============================
+
+            
+            // ========================people=======================
             {
               path: "people",
               children: [
