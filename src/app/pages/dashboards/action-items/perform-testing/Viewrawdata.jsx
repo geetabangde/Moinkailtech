@@ -85,7 +85,7 @@ export default function ViewRawData() {
   // PHP: testdata rows { cycle_idx: { element_id: { value, unit } } }
   const testValues    = data.test_values ?? data.measurements ?? {};
   const attachment    = data.attachment_url ?? data.attachment ?? null;
-  const trfproduct    = data.trfproduct ?? data.tid ?? "";
+  // const trfproduct    = data.trfproduct ?? data.tid ?? "";
 
   return (
     <Page title="View Raw Data">

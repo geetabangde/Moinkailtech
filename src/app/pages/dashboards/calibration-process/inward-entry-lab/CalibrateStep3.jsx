@@ -693,6 +693,14 @@ const CalibrateStep3 = () => {
               variables[varName] = value;
             });
           }
+          if (observationFrom === "master" && point.summary_data?.master) {
+            const masterData = [...point.summary_data.master].sort(
+              (a, b) => parseInt(a.repeatable) - parseInt(b.repeatable)
+            );
+            obsSettings.forEach((obsSetting, idx) => {
+              variables[obsSetting.setvariable] = parseFloat(masterData[idx]?.value) || 0;
+            });
+          } 
         }
 
         // ✅ Add master value to variables
@@ -949,6 +957,13 @@ const CalibrateStep3 = () => {
             const colIdx = uucInfo.startCol + idx;
             const cellValue = parseFloat(rowData[colIdx]) || 0;
             variables[varName] = cellValue;
+          });
+        }
+        if (observationFrom === "master" && columnMap["master"]) {
+          const masterInfo = columnMap["master"];
+          obsSettings.forEach((obsSetting, idx) => {
+            const colIdx = masterInfo.startCol + idx;
+            variables[obsSetting.setvariable] = parseFloat(rowData[colIdx]) || 0;
           });
         }
       }
