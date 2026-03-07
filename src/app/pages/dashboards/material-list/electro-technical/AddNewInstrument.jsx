@@ -19,7 +19,9 @@ const Select = ({ options, value, onChange, placeholder, name, isSearchable = tr
     setSearchTerm('');
   };
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find(
+    (opt) => String(opt.value) === String(value),
+  );
 
   return (
     <div className="relative">
@@ -317,33 +319,33 @@ const AddNewInstrument = () => {
         nickname: formData.nickName,
         idno: formData.idNo,
         serialno: formData.serialNo,
-        
+
         category: parseInt(formData.category),
         type: parseInt(formData.productType),
         department: parseInt(formData.vertical),
-        
+
         make: formData.make,
         model: formData.model,
         manufacturer: formData.manufacturerDetails,
-        
+
         batchno: formData.batchNo,
         mfddate: formData.mfdDate,
         expdate: formData.expiryDate,
         purchasedate: formData.purchaseDate,
-        
+
         frequency: formData.calibrationFrequency,
         allowedfor: formData.instrumentAllowedFor,
-        instrumentlocation: formData.instrumentLocation,
-        
+        instrumentlocation: parseInt(formData.instrumentLocation),
+
         iscalibrationrequired: formData.calibrationRequired,
         WIreference: formData.wiReference,
         software: formData.softwareFirmwareDetails,
         Acceptance: formData.acceptanceCriteria,
-        
+
         instrange: formData.instrumentRange,
         leastcount: formData.leastCount,
-        
-        qty: formData.qty ? parseInt(formData.qty) : 0
+
+        qty: formData.qty ? parseInt(formData.qty) : 0,
       };
 
       console.log('📤 Submitting instrument data:', requestData);
