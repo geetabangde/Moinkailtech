@@ -11,49 +11,50 @@ import { Card } from "components/ui";
 
 // =============================================================================
 // TestInput Page
-// PHP: testinput.php?hakuna={teid}
 // Route: /dashboards/action-items/test-input/:teid
-//
-// PHP Logic:
-//   1. Load testeventdata row by $teid
-//   2. Load parameter info (prow) → mintemp, maxtemp, minhumidity, maxhumidity,
-//      cycle, measurements, instruments, formula, remark
-//   3. If status==0 or status==24 → set default temp=27, humidity=30, remark=""
-//   4. Render instrument dropdowns (per parameter's instruments list)
-//   5. Render consumables rows (parameterconsumables table)
-//   6. Render measurement table → cycle rows × parameterelements columns
-//   7. If status==0  → "Submit Test Data" button → inserttestdata.php
-//   8. If status==24 → show results table + "Finalise Data" + "Retest Data"
-//      Finalise: if has_documents → setEndDate modal → finalsubmitdata.php
-//               else              → finalsubmitdata.php directly
-//
-// APIs:
-//   GET  /actionitem/get-test-event/{teid}          → load full test event data
-//   POST /actionitem/add-test-data                   → inserttestdata.php (submit)
-//   POST /actionitem/finalise-test-event             → finalsubmitdata.php
-//   POST /actionitem/request-reset/{teid}            → requestretest.php (Retest)
 // =============================================================================
 
 function Spinner() {
   return (
     <svg className="h-5 w-5 animate-spin text-blue-600" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z" />
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+      />
     </svg>
   );
 }
 
 // ── Results table for status==24 ──────────────────────────────────────────────
-// PHP: shows parameter name, unit, result (min/max/avg by resultype), method, specification
 function ResultsTable({ results = [] }) {
-  if (!results.length) return <p className="py-4 text-sm text-gray-400">No results found.</p>;
+  if (!results.length)
+    return <p className="py-4 text-sm text-gray-400">No results found.</p>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="bg-gray-100 dark:bg-gray-800">
-            {["S.No", "Parameter", "Unit", "Results", "Test Method", "Permissible Value"].map((h) => (
-              <th key={h} className="px-3 py-2 text-xs font-semibold uppercase text-gray-600 dark:text-gray-300">
+            {[
+              "S.No",
+              "Parameter",
+              "Unit",
+              "Results",
+              "Test Method",
+              "Permissible Value",
+            ].map((h) => (
+              <th
+                key={h}
+                className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase dark:text-gray-300"
+              >
                 {h}
               </th>
             ))}
@@ -61,13 +62,26 @@ function ResultsTable({ results = [] }) {
         </thead>
         <tbody>
           {results.map((r, i) => (
-            <tr key={i} className="border-b border-gray-100 dark:border-gray-800">
+            <tr
+              key={i}
+              className="border-b border-gray-100 dark:border-gray-800"
+            >
               <td className="px-3 py-2">{i + 1}</td>
-              <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-200">{r.parameter_name ?? "—"}</td>
-              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{r.unit ?? "—"}</td>
-              <td className="px-3 py-2 font-semibold text-gray-800 dark:text-gray-100">{r.result ?? "—"}</td>
-              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{r.method ?? "—"}</td>
-              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{r.specification ?? "—"}</td>
+              <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-200">
+                {r.parameter_name ?? r.parameter ?? "—"}
+              </td>
+              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                {r.unit ?? "—"}
+              </td>
+              <td className="px-3 py-2 font-semibold text-gray-800 dark:text-gray-100">
+                {r.result ?? "—"}
+              </td>
+              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                {r.method ?? "—"}
+              </td>
+              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                {r.specification ?? "—"}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -77,22 +91,23 @@ function ResultsTable({ results = [] }) {
 }
 
 // ── Set End Date Modal ────────────────────────────────────────────────────────
-// PHP: modal-setEndDate → submiEndDate() → finalsubmitdata.php?updating&enddate={date}
 function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
-  const [endDate,    setEndDate]    = useState("");
+  const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!endDate) { toast.error("Please select an end date."); return; }
+    if (!endDate) {
+      toast.error("Please select an end date.");
+      return;
+    }
     const [y, m, d] = endDate.split("-");
     const formatted = `${d}/${m}/${y}`;
     try {
       setSubmitting(true);
-      // PHP: view(teid, 'resultid', 'finalsubmitdata.php', `updating&enddate=${date}`)
       await axios.post("/actionitem/finalise-test-event", {
-        teid: teid,
+        id: teid,
         enddate: formatted,
-    });
+      });
       toast.success("Test finalised successfully ✅");
       onFinalised?.();
       onClose();
@@ -103,7 +118,6 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
     }
   };
 
-  // PHP: datepickerminmaxlimit(id, startdate, today) → between startdate and today
   const minDate = startDate
     ? new Date(startDate).toISOString().split("T")[0]
     : undefined;
@@ -112,7 +126,7 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-4 text-base font-semibold text-gray-800 dark:text-dark-100">
+        <h3 className="dark:text-dark-100 mb-4 text-base font-semibold text-gray-800">
           Set Test End Date
         </h3>
         <div className="mb-4">
@@ -129,15 +143,20 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
           />
         </div>
         <div className="flex justify-end gap-2">
-          <button onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400"
+          >
             Close
           </button>
-          <button onClick={handleSubmit} disabled={submitting}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
             className={clsx(
               "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700",
-              submitting && "cursor-not-allowed opacity-60"
-            )}>
+              submitting && "cursor-not-allowed opacity-60",
+            )}
+          >
             {submitting ? "Saving..." : "Save"}
           </button>
         </div>
@@ -148,57 +167,55 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function TestInput() {
-  const { teid }  = useParams();
-  const navigate  = useNavigate();
+  const { teid } = useParams();
+  const navigate = useNavigate();
 
-  const [testData,     setTestData]     = useState(null);  // full event data from API
-  const [loading,      setLoading]      = useState(true);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [retesting,    setRetesting]    = useState(false);
+  const [testData, setTestData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [retesting, setRetesting] = useState(false);
   const [endDateModal, setEndDateModal] = useState(false);
 
   // ── Form state ──────────────────────────────────────────────────────────────
-  // PHP defaults: temperature=27, humidity=30, remark=""
-  const [temperature,  setTemperature]  = useState("27");
-  const [humidity,     setHumidity]     = useState("30");
-  const [remark,       setRemark]       = useState("");
-  const [attachment,   setAttachment]   = useState(null);
+  const [temperature, setTemperature] = useState("27");
+  const [humidity, setHumidity] = useState("30");
+  const [remark, setRemark] = useState("");
+  const [attachment, setAttachment] = useState(null);
 
-  // Instruments: { [instrument_category_id]: selected_instrument_id }
+  // instruments: { [category_id]: selected_instrument_id }
   const [instruments, setInstruments] = useState({});
 
-  // Consumables: { [parameterconsumable_id]: { materiallocationid, quantity } }
+  // consumables: { [mid]: { materiallocationid, quantity } }
   const [consumables, setConsumables] = useState({});
 
-  // Measurement rows: { [cycle_index]: { [element_id]: value } }
+  // measurements: { [cycle_index]: { [element_id]: value } }
   const [measurements, setMeasurements] = useState({});
 
   // ── Fetch test event data ────────────────────────────────────────────────────
-  // API: GET /actionitem/get-test-event/{teid}
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const res = await axios.get(`/actionitem/get-test-event/${teid}`);
-      const d   = res.data?.data ?? res.data ?? null;
+
+      // ✅ Handle both res.data.data and res.data formats
+      const d = res.data?.data ?? res.data ?? null;
+
+      console.log("API Response:", d); // Debug - check your browser console
+
       setTestData(d);
 
-      // PHP: if status==0 or status==24 → set defaults
       const st = Number(d?.status ?? 0);
       if (st === 0 || st === 24) {
-        setTemperature(d?.temperature ?? "27");
-        setHumidity(d?.humidity      ?? "30");
-        setRemark(d?.remark          ?? "");
+        setTemperature(String(d?.temperature ?? "27"));
+        setHumidity(String(d?.humidity ?? "30"));
+        setRemark(d?.remark ?? "");
       }
 
-      // Pre-fill existing instrument selections
-      if (d?.selected_instruments) {
-        setInstruments(d.selected_instruments);
-      }
+      // Pre-fill instruments if returned
+      if (d?.selected_instruments) setInstruments(d.selected_instruments);
 
-      // Pre-fill existing measurements if any
-      if (d?.existing_measurements) {
-        setMeasurements(d.existing_measurements);
-      }
+      // Pre-fill measurements if returned
+      if (d?.existing_measurements) setMeasurements(d.existing_measurements);
     } catch (err) {
       console.error("Error loading test event:", err);
       toast.error("Failed to load test data.");
@@ -207,20 +224,48 @@ export default function TestInput() {
     }
   }, [teid]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const status       = Number(testData?.status ?? 0);
-  const prow         = testData?.parameter_info    ?? {};   // PHP: $prow
-  const paramElements= testData?.parameter_elements ?? [];  // PHP: parameterelements
-  const cycle        = Number(prow?.cycle ?? 1);            // PHP: $cycle
-  const instrList    = testData?.instrument_list    ?? [];  // PHP: $allins + instrument options
-  const consumList   = testData?.consumables        ?? [];  // PHP: parameterconsumables
-  const results      = testData?.results            ?? [];  // PHP: status==24 results table
-  const has_documents= Boolean(testData?.has_documents);    // PHP: mysqli_num_rows($itemDocument)
-  const lrn          = testData?.lrn                ?? "";  // PHP: $lrn
-  const trfproduct   = testData?.trfproduct         ?? testData?.tid ?? "";
+  // ── Derived data from API — handles multiple possible key names ──────────────
+  const status = Number(testData?.status ?? 0);
 
-  // ── Measurement cell change handler ─────────────────────────────────────────
+  // parameter info — PHP: $prow
+  const prow = testData?.parameter_info ?? testData?.parameter ?? {};
+
+  // parameter elements — PHP: parameterelements table
+  // ✅ Try multiple possible key names the API might use
+  const paramElements =
+    testData?.parameter_elements ??
+    testData?.elements ??
+    testData?.parameterelements ??
+    [];
+
+  const cycle = Number(prow?.cycle ?? testData?.cycle ?? 1);
+
+  // instrument list — PHP: $allins + instrument dropdown options
+  // ✅ Try multiple possible key names
+  const instrList =
+    testData?.instrument_list ??
+    testData?.instruments ??
+    testData?.instrument_categories ??
+    [];
+
+  // consumables — PHP: parameterconsumables
+  // ✅ Try multiple possible key names
+  const consumList =
+    testData?.consumables ?? testData?.parameterconsumables ?? [];
+
+  // results for status==24
+  const results = testData?.results ?? [];
+  const has_documents = Boolean(
+    testData?.has_documents ?? testData?.hasdocuments,
+  );
+  const lrn = testData?.lrn ?? "";
+  const trfproduct = testData?.trfproduct ?? testData?.tid ?? "";
+
+  // ── Measurement cell change ──────────────────────────────────────────────────
   const handleMeasurement = (cycleIdx, elementId, value) => {
     setMeasurements((prev) => ({
       ...prev,
@@ -229,52 +274,67 @@ export default function TestInput() {
   };
 
   // ── POST /actionitem/add-test-data ───────────────────────────────────────────
-  // PHP: inserttestdata.php → saves instruments, consumables, measurements
+  // ✅ FIXED: Payload format matches Postman exactly
+  // instruments[0], instruments[1] → indexed array of selected IDs
+  // materiallocationid[0], quantity[0] → indexed
+  // 446[], 1[], 2[] → element_id[] per cycle row
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
       const fd = new FormData();
+
       fd.append("teid", teid);
       fd.append("temperature", temperature);
-      fd.append("humidity",    humidity);
-      fd.append("remark",      remark);
+      fd.append("humidity", humidity);
+      fd.append("remark", remark);
       if (attachment) fd.append("attachment", attachment);
 
-      // PHP: instrument[aid] = selected_id
-      Object.entries(instruments).forEach(([aid, val]) => {
-        fd.append(`instrument[${aid}]`, val);
+      // ✅ instruments[0], instruments[1]... (indexed, not category_id keyed)
+      const instrumentValues = Object.values(instruments).filter(Boolean);
+      instrumentValues.forEach((val, idx) => {
+        fd.append(`instruments[${idx}]`, val);
       });
 
-      // PHP: materiallocationid[mid] + quantity[mid]
-      Object.entries(consumables).forEach(([mid, vals]) => {
-        fd.append(`materiallocationid[${mid}]`, vals.materiallocationid ?? "");
-        fd.append(`quantity[${mid}]`,           vals.quantity ?? "");
+      // ✅ materiallocationid[0], quantity[0]... (indexed)
+      const consumableEntries = Object.values(consumables);
+      consumableEntries.forEach((vals, idx) => {
+        fd.append(`materiallocationid[${idx}]`, vals.materiallocationid ?? "");
+        fd.append(`quantity[${idx}]`, vals.quantity ?? "");
       });
 
-      // PHP: measurement_id[] per cycle → name="pid[]"
-      // Send as: measurements = { cycle_idx: { element_id: value } }
-      fd.append("measurements", JSON.stringify(measurements));
+      // ✅ 446[], 1[], 2[]... → element_id[] appended for each cycle row
+      // PHP: name="$pid[]" where $pid = $frow['element'] from parameterelements table
+      // API returns field as "element" (not element_id)
+      paramElements.forEach((el) => {
+        // PHP: $pid = $frow['element'] → field name is "element"
+        const elId = el.element ?? el.element_id ?? el.id;
+        for (let i = 0; i < cycle; i++) {
+          fd.append(`${elId}[]`, measurements[i]?.[elId] ?? "");
+        }
+      });
+
+      console.log("Submitting FormData:");
+      for (let [k, v] of fd.entries()) console.log(k, v); // Debug
 
       await axios.post("/actionitem/add-test-data", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
       toast.success("Test data submitted successfully ✅");
       navigate(`/dashboards/action-items/perform-testing/${trfproduct}`);
     } catch (err) {
+      console.error("Submit error:", err);
       toast.error(err?.response?.data?.message ?? "Submit failed ❌");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Finalise without end date (no documents case) ────────────────────────────
-  // PHP: view(teid, 'resultid', 'finalsubmitdata.php', 'updating')
+  // ── Finalise without end date ────────────────────────────────────────────────
   const handleFinalise = async () => {
     try {
       setSubmitting(true);
-      await axios.post("/actionitem/finalise-test-event", {
-        teid: teid,
-    });
+      await axios.post("/actionitem/finalise-test-event", { id: teid });
       toast.success("Test finalised successfully ✅");
       navigate(`/dashboards/action-items/perform-testing/${trfproduct}`);
     } catch (err) {
@@ -284,8 +344,7 @@ export default function TestInput() {
     }
   };
 
-  // ── Retest — POST /actionitem/request-reset/{teid} ───────────────────────────
-  // PHP: view(teid, 'resultid', 'requestretest.php', 'updating')
+  // ── Retest ───────────────────────────────────────────────────────────────────
   const handleRetest = async () => {
     if (!window.confirm("Request a retest for this test?")) return;
     try {
@@ -323,12 +382,13 @@ export default function TestInput() {
 
   return (
     <Page title="Test Input">
-      <div className="transition-content w-full pb-10 px-(--margin-x)">
-
-        {/* ── Back button — PHP: href="performtest.php?hakuna={trfproduct}" ── */}
+      <div className="transition-content w-full px-(--margin-x) pb-10">
+        {/* Back Button */}
         <div className="mb-5">
           <button
-            onClick={() => navigate(`/dashboards/action-items/perform-testing/${trfproduct}`)}
+            onClick={() =>
+              navigate(`/dashboards/action-items/perform-testing/${trfproduct}`)
+            }
             className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
           >
             ← Back To Tests
@@ -336,21 +396,23 @@ export default function TestInput() {
         </div>
 
         <Card className="p-6">
-
           {/* ── LRN ─────────────────────────────────────────────────────────── */}
           <div className="mb-4 grid grid-cols-2 items-center gap-4 border-b border-gray-100 pb-4 dark:border-gray-800">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">LRN</label>
-            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{lrn || "—"}</span>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              LRN
+            </label>
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+              {lrn || "—"}
+            </span>
           </div>
 
           {/* ── Temperature ─────────────────────────────────────────────────── */}
-          {/* PHP: Temperature({prow.mintemp}-{prow.maxtemp}) */}
           <div className="mb-4 grid grid-cols-2 items-center gap-4">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
               Temperature
               {(prow.mintemp || prow.maxtemp) && (
                 <span className="ml-1 text-xs text-gray-400">
-                  ({prow.mintemp ?? ""}–{prow.maxtemp ?? ""})
+                  ({prow.mintemp}–{prow.maxtemp})
                 </span>
               )}
             </label>
@@ -364,13 +426,12 @@ export default function TestInput() {
           </div>
 
           {/* ── Humidity ────────────────────────────────────────────────────── */}
-          {/* PHP: Humidity({prow.minhumidity}% - {prow.maxhumidity}%) */}
           <div className="mb-4 grid grid-cols-2 items-center gap-4">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
               Humidity
               {(prow.minhumidity || prow.maxhumidity) && (
                 <span className="ml-1 text-xs text-gray-400">
-                  ({prow.minhumidity ?? ""}% – {prow.maxhumidity ?? ""}%)
+                  ({prow.minhumidity}% – {prow.maxhumidity}%)
                 </span>
               )}
             </label>
@@ -385,7 +446,9 @@ export default function TestInput() {
 
           {/* ── Remark ──────────────────────────────────────────────────────── */}
           <div className="mb-4 grid grid-cols-2 items-start gap-4">
-            <label className="pt-2 text-sm font-medium text-gray-600 dark:text-gray-400">Remark</label>
+            <label className="pt-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+              Remark
+            </label>
             <textarea
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
@@ -396,8 +459,10 @@ export default function TestInput() {
           </div>
 
           {/* ── Upload Attachment ────────────────────────────────────────────── */}
-          <div className="mb-4 grid grid-cols-2 items-center gap-4">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Upload Attachment</label>
+          <div className="mb-6 grid grid-cols-2 items-center gap-4">
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Upload Attachment
+            </label>
             <input
               type="file"
               onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
@@ -409,12 +474,20 @@ export default function TestInput() {
           {(testData.grade || testData.size) && (
             <div className="mb-6 grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/40">
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Grade</p>
-                <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">{testData.grade ?? "—"}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">
+                  Grade
+                </p>
+                <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
+                  {testData.grade ?? "—"}
+                </p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Size</p>
-                <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">{testData.size ?? "—"}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">
+                  Size
+                </p>
+                <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
+                  {testData.size ?? "—"}
+                </p>
               </div>
             </div>
           )}
@@ -434,31 +507,36 @@ export default function TestInput() {
                 Instruments
               </h4>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                {instrList.map((instr) => (
-                  <div key={instr.category_id}>
-                    <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {instr.category_name}
-                    </label>
-                    <select
-                      value={instruments[instr.category_id] ?? ""}
-                      onChange={(e) =>
-                        setInstruments((prev) => ({
-                          ...prev,
-                          [instr.category_id]: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                    >
-                      <option value="">Select {instr.category_name}</option>
-                      {/* PHP: valid instruments where mastervalidity.enddate > today */}
-                      {(instr.options ?? []).map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.name}({opt.newidno})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                {instrList.map((instr) => {
+                  // ✅ Handle both category_id and id field names
+                  const catId = instr.category_id ?? instr.id;
+                  const catName = instr.category_name ?? instr.name;
+                  const options = instr.options ?? instr.instruments ?? [];
+                  return (
+                    <div key={catId}>
+                      <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        {catName}
+                      </label>
+                      <select
+                        value={instruments[catId] ?? ""}
+                        onChange={(e) =>
+                          setInstruments((prev) => ({
+                            ...prev,
+                            [catId]: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        <option value="">Select {catName}</option>
+                        {options.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.name}({opt.newidno ?? opt.code ?? opt.id})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -471,91 +549,122 @@ export default function TestInput() {
                 Consumables
               </h4>
               <div className="space-y-3">
-                {consumList.map((con) => (
-                  <div key={con.id} className="grid grid-cols-3 items-center gap-4 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                    {/* PHP: rowinstrument.name (consumable) + unit */}
-                    <div className="text-sm text-gray-700 dark:text-gray-300">
-                      {con.name}({con.consumable_id}) (in {con.unit})
-                    </div>
-                    {/* PHP: select materiallocation batch */}
-                    <select
-                      value={consumables[con.id]?.materiallocationid ?? ""}
-                      onChange={(e) =>
-                        setConsumables((prev) => ({
-                          ...prev,
-                          [con.id]: { ...(prev[con.id] ?? {}), materiallocationid: e.target.value },
-                        }))
-                      }
-                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                {consumList.map((con) => {
+                  // ✅ Handle both id and mid field names
+                  const conId = con.id ?? con.mid;
+                  const batches = con.batches ?? con.materiallocation ?? [];
+                  return (
+                    <div
+                      key={conId}
+                      className="grid grid-cols-3 items-center gap-4 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
                     >
-                      <option value=""></option>
-                      {(con.batches ?? []).map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.newidno}({b.batchno})
-                        </option>
-                      ))}
-                    </select>
-                    {/* PHP: quantity input */}
-                    <input
-                      type="text"
-                      placeholder={`enter value in ${con.unit}`}
-                      value={consumables[con.id]?.quantity ?? ""}
-                      onChange={(e) =>
-                        setConsumables((prev) => ({
-                          ...prev,
-                          [con.id]: { ...(prev[con.id] ?? {}), quantity: e.target.value },
-                        }))
-                      }
-                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                    />
-                  </div>
-                ))}
+                      <div className="text-sm text-gray-700 dark:text-gray-300">
+                        {con.name}({con.consumable_id ?? con.consumable}) (in{" "}
+                        {con.unit})
+                      </div>
+                      <select
+                        value={consumables[conId]?.materiallocationid ?? ""}
+                        onChange={(e) =>
+                          setConsumables((prev) => ({
+                            ...prev,
+                            [conId]: {
+                              ...(prev[conId] ?? {}),
+                              materiallocationid: e.target.value,
+                            },
+                          }))
+                        }
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        <option value=""></option>
+                        {batches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.newidno}({b.batchno})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder={`enter value in ${con.unit}`}
+                        value={consumables[conId]?.quantity ?? ""}
+                        onChange={(e) =>
+                          setConsumables((prev) => ({
+                            ...prev,
+                            [conId]: {
+                              ...(prev[conId] ?? {}),
+                              quantity: e.target.value,
+                            },
+                          }))
+                        }
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* ── Measurement Table ─────────────────────────────────────────────── */}
-          {/* PHP: parameterelements → headers; cycle rows → input cells */}
+          {/* PHP: parameterelements headers + cycle rows × element columns */}
           {paramElements.length > 0 && (
             <div className="mb-6">
               <h4 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                {prow.name ?? "Measurements"}
+                {prow.name ?? testData?.parameter_name ?? "Measurements"}
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-gray-100 dark:bg-gray-800">
-                      {paramElements.map((el) => (
-                        <th key={el.element_id}
-                          className="px-3 py-2 text-xs font-semibold uppercase text-gray-600 dark:text-gray-300">
-                          {el.name}
-                        </th>
-                      ))}
+                      {paramElements.map((el) => {
+                        // ✅ PHP: $pid = $frow['element'] — API field is "element"
+                        const elId = el.element ?? el.element_id ?? el.id;
+                        const elName = el.name ?? el.element_name;
+                        return (
+                          <th
+                            key={elId}
+                            className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase dark:text-gray-300"
+                          >
+                            {elName}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
                     {/* PHP: for ($i=0; $i<$cycle; $i++) */}
                     {Array.from({ length: cycle }, (_, i) => (
-                      <tr key={i} className="border-b border-gray-100 dark:border-gray-800">
-                        {paramElements.map((el) => (
-                          <td key={el.element_id} className="px-2 py-1">
-                            {/* PHP: status==0 → input; status==24 → readonly */}
-                            {status === 0 ? (
-                              <input
-                                type="text"
-                                placeholder={`value in ${el.unit ?? ""}`}
-                                value={measurements[i]?.[el.element_id] ?? ""}
-                                onChange={(e) => handleMeasurement(i, el.element_id, e.target.value)}
-                                className="w-full rounded border border-gray-300 px-2 py-1 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                              />
-                            ) : (
-                              // status==24 → show saved value + unit (from testdata table)
-                              <span className="text-sm text-gray-700 dark:text-gray-300">
-                                {measurements[i]?.[el.element_id] ?? el.saved_value ?? "—"} {el.unit ?? ""}
-                              </span>
-                            )}
-                          </td>
-                        ))}
+                      <tr
+                        key={i}
+                        className="border-b border-gray-100 dark:border-gray-800"
+                      >
+                        {paramElements.map((el) => {
+                          // ✅ PHP: $pid = $frow['element']
+                          const elId = el.element ?? el.element_id ?? el.id;
+                          const elUnit = el.unit ?? "";
+                          return (
+                            <td key={elId} className="px-2 py-1">
+                              {status === 0 ? (
+                                // PHP: name="$pid[]" per cycle input
+                                <input
+                                  type="text"
+                                  placeholder={`value in ${elUnit}`}
+                                  value={measurements[i]?.[elId] ?? ""}
+                                  onChange={(e) =>
+                                    handleMeasurement(i, elId, e.target.value)
+                                  }
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                                />
+                              ) : (
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                  {measurements[i]?.[elId] ??
+                                    el.saved_value ??
+                                    "—"}{" "}
+                                  {elUnit}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
@@ -564,18 +673,9 @@ export default function TestInput() {
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════════════
-              ACTION BUTTONS
-              PHP:
-                status==0  → "Submit Test Data"  → inserttestdata.php
-                status==24 → Results table +
-                             "Finalise Data" (has_documents → enddate modal,
-                                              no docs → direct)
-                           + "Retest Data"   → requestretest.php
-          ══════════════════════════════════════════════════════════════════ */}
+          {/* ── Action Buttons ────────────────────────────────────────────────── */}
           <div className="mt-6 border-t border-gray-100 pt-6 dark:border-gray-800">
-
-            {/* ── status == 0: Submit ──────────────────────────────────────── */}
+            {/* status == 0: Submit */}
             {status === 0 && (
               <div className="flex justify-end">
                 <button
@@ -583,7 +683,7 @@ export default function TestInput() {
                   disabled={submitting}
                   className={clsx(
                     "rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-700",
-                    submitting && "cursor-not-allowed opacity-60"
+                    submitting && "cursor-not-allowed opacity-60",
                   )}
                 >
                   {submitting ? "Submitting..." : "Submit Test Data"}
@@ -591,18 +691,21 @@ export default function TestInput() {
               </div>
             )}
 
-            {/* ── status == 24: Results table + Finalise + Retest ─────────── */}
+            {/* status == 24: Results + Finalise + Retest */}
             {status === 24 && (
               <>
                 <ResultsTable results={results} />
                 <div className="mt-4 flex flex-wrap items-center gap-3">
-                  {/* PHP: has_documents → setEndDate modal, else direct finalise */}
                   <button
-                    onClick={has_documents ? () => setEndDateModal(true) : handleFinalise}
+                    onClick={
+                      has_documents
+                        ? () => setEndDateModal(true)
+                        : handleFinalise
+                    }
                     disabled={submitting}
                     className={clsx(
                       "rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700",
-                      submitting && "cursor-not-allowed opacity-60"
+                      submitting && "cursor-not-allowed opacity-60",
                     )}
                   >
                     {submitting ? "Finalising..." : "Finalise Data"}
@@ -612,7 +715,7 @@ export default function TestInput() {
                     disabled={retesting}
                     className={clsx(
                       "rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700",
-                      retesting && "cursor-not-allowed opacity-60"
+                      retesting && "cursor-not-allowed opacity-60",
                     )}
                   >
                     {retesting ? "Requesting..." : "Retest Data"}
@@ -624,7 +727,7 @@ export default function TestInput() {
         </Card>
       </div>
 
-      {/* ── Set End Date Modal ───────────────────────────────────────────────── */}
+      {/* Set End Date Modal */}
       {endDateModal && (
         <SetEndDateModal
           teid={teid}

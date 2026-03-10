@@ -2149,16 +2149,6 @@ const protectedRoutes = {
                         ).default,
                       }),
                     },
-                    {
-                      path: "dispatchformtesting/:id",
-                      lazy: async () => ({
-                        Component: (
-                          await import(
-                            "app/pages/dashboards/testing/dispatch-list/DispatchFormTesting"
-                          )
-                        ).default,
-                      }),
-                    },
                   ],
                 },
                 {
@@ -2170,6 +2160,16 @@ const protectedRoutes = {
                         Component: (
                           await import(
                             "app/pages/dashboards/testing/dispatch-list"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "dispatchformtesting/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/testing/dispatch-list/DispatchFormTesting"
                           )
                         ).default,
                       }),
@@ -2459,7 +2459,7 @@ const protectedRoutes = {
                       )
                     ).default,
                   }),
-                }, 
+                },
                 {
                   path: "payment-approval-calibration",
                   lazy: async () => ({
@@ -2511,7 +2511,7 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  path:"payment-hold-notification-2",
+                  path: "payment-hold-notification-2",
                   lazy: async () => ({
                     Component: (
                       await import(
@@ -2521,7 +2521,7 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  path:"calibration-payment-approval-2",
+                  path: "calibration-payment-approval-2",
                   lazy: async () => ({
                     Component: (
                       await import(
@@ -2531,7 +2531,7 @@ const protectedRoutes = {
                   }),
                 },
                 {
-                  path:"approve-signature",
+                  path: "approve-signature",
                   lazy: async () => ({
                     Component: (
                       await import(
@@ -2552,9 +2552,175 @@ const protectedRoutes = {
                 },
               ],
             },
-            // =========================sales============================
+            // ========================accounts=============================
+            {
+              path: "accounts",
+              children: [
+                {
+                  path: "payment-list",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/accounts/payment-list")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "payment-list-party-wise",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/payment-list-party-wise"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "testing-unbilled-items",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/testing-unbilled-items"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-unbilled-items",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-unbilled-items"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "proforma-invoice",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/proforma-invoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-invoice-list",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-invoice-list"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "testing-invoices",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/testing-invoices"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "past-invoices",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/past-invoices"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "canceled-invoices",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/canceled-invoices"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "invoice-cancelation-request",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/invoice-cancelation-request"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "credit-note",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/accounts/credit-note")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "invoice-report",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/invoice-report"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "complete-ledger",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/complete-ledger"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "sales-report",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/accounts/sales-report")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "gstr-1",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/accounts/gstr-1")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "consent-letter",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/accounts/consent-letter")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "expense-category",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/accounts/expense-category")).default
+                  })
+                },
+                {
+                  path: "expenses",
+                  lazy: async () => ({
+                    Component: (await import("app/pages/dashboards/accounts/expenses")).default
+                  })
+                }
+              ],
+            },
 
-            
             // ========================people=======================
             {
               path: "people",
@@ -3015,4 +3181,4 @@ const protectedRoutes = {
   ],
 };
 
-export { protectedRoutes };
+export { protectedRoutes };   

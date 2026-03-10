@@ -100,7 +100,7 @@ export function RowActions({ row, table }) {
   const status = row?.original?.status;
 
   const handleViewForm = () => {
-    navigate(`/dashboards/testing/lrn-cancel-requests/dispatchformtesting/${rowId}`);
+    navigate(`/dashboards/testing/dispatch-list/dispatchformtesting/${rowId}`);
   };
 
   const handleApprove = useCallback(async () => {
