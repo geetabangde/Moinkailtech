@@ -11,7 +11,14 @@ import { Card } from "components/ui";
 
 // =============================================================================
 // TestInput Page
-// Route: /dashboards/action-items/test-input/:teid
+// Route: /dashboards/action-items/perform-testing/test-input/:teid
+//
+// API endpoints:
+//   GET  /actionitem/get-test-event/:teid   → load form data
+//   POST /actionitem/add-test-data          → submit (status==0)
+//   GET  /actionitem/get-test-result/:teid  → load results (status==24)
+//   POST /actionitem/finalise-test-event    → finalise (status==24)
+//   POST /actionitem/request-reset/:teid    → retest (status==24)
 // =============================================================================
 
 function Spinner() {
@@ -34,10 +41,18 @@ function Spinner() {
   );
 }
 
-// ── Results table for status==24 ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// RESULTS TABLE  (status == 24)
+// API: GET /actionitem/get-test-result/:teid
+// Response: { success, data: { parameter, unit, min, max, avg, result,
+//                              status, method, specification } }
+// PHP: testeventdata + permissiblevalues → method + specification
+// ─────────────────────────────────────────────────────────────────────────────
 function ResultsTable({ results = [] }) {
-  if (!results.length)
+  const list = Array.isArray(results) ? results : results ? [results] : [];
+  if (!list.length)
     return <p className="py-4 text-sm text-gray-400">No results found.</p>;
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -61,20 +76,21 @@ function ResultsTable({ results = [] }) {
           </tr>
         </thead>
         <tbody>
-          {results.map((r, i) => (
+          {list.map((r, i) => (
             <tr
               key={i}
               className="border-b border-gray-100 dark:border-gray-800"
             >
-              <td className="px-3 py-2">{i + 1}</td>
+              <td className="px-3 py-2 text-gray-500">{i + 1}</td>
               <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-200">
-                {r.parameter_name ?? r.parameter ?? "—"}
+                {r.parameter ?? "—"}
               </td>
               <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                 {r.unit ?? "—"}
               </td>
+              {/* PHP: resultype 1=min,2=max,3=avg → round(result, decimal) */}
               <td className="px-3 py-2 font-semibold text-gray-800 dark:text-gray-100">
-                {r.result ?? "—"}
+                {r.result ?? r.avg ?? "—"}
               </td>
               <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                 {r.method ?? "—"}
@@ -90,7 +106,11 @@ function ResultsTable({ results = [] }) {
   );
 }
 
-// ── Set End Date Modal ────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SET END DATE MODAL
+// PHP: modal-setEndDate → submiEndDate() → finalsubmitdata.php?updating&enddate=
+// API: POST /actionitem/finalise-test-event { id, enddate: "dd/mm/yyyy" }
+// ─────────────────────────────────────────────────────────────────────────────
 function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
   const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -101,7 +121,7 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
       return;
     }
     const [y, m, d] = endDate.split("-");
-    const formatted = `${d}/${m}/${y}`;
+    const formatted = `${d}/${m}/${y}`; // PHP: changedateformatespecito → dd/mm/yyyy
     try {
       setSubmitting(true);
       await axios.post("/actionitem/finalise-test-event", {
@@ -118,9 +138,18 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
     }
   };
 
-  const minDate = startDate
-    ? new Date(startDate).toISOString().split("T")[0]
-    : undefined;
+  // PHP: datepickerminmaxlimit(this.id, startdate, today)
+  // startdate format from API: "11-03-2026 05:00 PM"  (dd-mm-yyyy h:i A)
+  const minDate = (() => {
+    if (!startDate) return undefined;
+    try {
+      const datePart = startDate.split(" ")[0]; // "11-03-2026"
+      const [dd, mm, yyyy] = datePart.split("-");
+      return `${yyyy}-${mm}-${dd}`; // "2026-03-11"
+    } catch {
+      return undefined;
+    }
+  })();
   const maxDate = new Date().toISOString().split("T")[0];
 
   return (
@@ -165,57 +194,59 @@ function SetEndDateModal({ teid, startDate, onClose, onFinalised }) {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
 export default function TestInput() {
   const { teid } = useParams();
   const navigate = useNavigate();
 
   const [testData, setTestData] = useState(null);
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [retesting, setRetesting] = useState(false);
   const [endDateModal, setEndDateModal] = useState(false);
 
-  // ── Form state ──────────────────────────────────────────────────────────────
+  // Form state
   const [temperature, setTemperature] = useState("27");
   const [humidity, setHumidity] = useState("30");
   const [remark, setRemark] = useState("");
   const [attachment, setAttachment] = useState(null);
+  const [instruments, setInstruments] = useState({}); // { [cat_id]: instrument_id }
+  const [consumables, setConsumables] = useState({}); // { [mid]: { materiallocationid, quantity } }
+  const [measurements, setMeasurements] = useState({}); // { [cycleIdx]: { [measurement_id]: value } }
 
-  // instruments: { [category_id]: selected_instrument_id }
-  const [instruments, setInstruments] = useState({});
-
-  // consumables: { [mid]: { materiallocationid, quantity } }
-  const [consumables, setConsumables] = useState({});
-
-  // measurements: { [cycle_index]: { [element_id]: value } }
-  const [measurements, setMeasurements] = useState({});
-
-  // ── Fetch test event data ────────────────────────────────────────────────────
+  // ── GET /actionitem/get-test-event/:teid ─────────────────────────────────
+  //
+  // Confirmed response (real API data):
+  // data.test_event        → { id, trf, trfproduct, status, temperature, humidity,
+  //                            remark, startdate, enddate, instruments: ",", ... }
+  // data.parameter         → { id, name, cycle, mintemp, maxtemp, minhumidity,
+  //                            maxhumidity, remark: "-", ... }
+  // data.grade_name        → "E 250 BR"
+  // data.size_name         → "Thickness or Diameter 20-40mm"
+  // data.lrn               → "22061175524"
+  // data.has_documents     → false
+  // data.instruments       → [{ id, name, options: Array|Object }]
+  //   ↳ id "275" → options: Array ✅
+  //   ↳ id "4"   → options: Object { "2":{...}, "3":{...} }  ← FIX needed
+  // data.consumables       → []
+  // data.parameter_elements→ [{ id, measurement_id, name, unit }]
+  //   ↳ measurement_id = PHP $pid = $frow['element']
+  //   ↳ Form field name: "${measurement_id}[]"  e.g. "7[]", "15[]"
+  // data.cycle             → 1
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const res = await axios.get(`/actionitem/get-test-event/${teid}`);
-
-      // ✅ Handle both res.data.data and res.data formats
       const d = res.data?.data ?? res.data ?? null;
-
-      console.log("API Response:", d); // Debug - check your browser console
-
       setTestData(d);
 
-      const st = Number(d?.status ?? 0);
-      if (st === 0 || st === 24) {
-        setTemperature(String(d?.temperature ?? "27"));
-        setHumidity(String(d?.humidity ?? "30"));
-        setRemark(d?.remark ?? "");
-      }
-
-      // Pre-fill instruments if returned
-      if (d?.selected_instruments) setInstruments(d.selected_instruments);
-
-      // Pre-fill measurements if returned
-      if (d?.existing_measurements) setMeasurements(d.existing_measurements);
+      const evt = d?.test_event ?? {};
+      setTemperature(String(evt.temperature ?? "27"));
+      setHumidity(String(evt.humidity ?? "30"));
+      setRemark(evt.remark ?? "");
     } catch (err) {
       console.error("Error loading test event:", err);
       toast.error("Failed to load test data.");
@@ -224,97 +255,124 @@ export default function TestInput() {
     }
   }, [teid]);
 
+  // ── GET /actionitem/get-test-result/:teid ────────────────────────────────
+  // Response: { success, data: { parameter, unit, min, max, avg, result,
+  //                              status, method, specification } }
+  const fetchResults = useCallback(async () => {
+    try {
+      const res = await axios.get(`/actionitem/get-test-result/${teid}`);
+      const d = res.data?.data ?? res.data ?? null;
+      setResults(d ? (Array.isArray(d) ? d : [d]) : []);
+    } catch (err) {
+      console.error("Error loading results:", err);
+    }
+  }, [teid]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // ── Derived data from API — handles multiple possible key names ──────────────
-  const status = Number(testData?.status ?? 0);
-
-  // parameter info — PHP: $prow
-  const prow = testData?.parameter_info ?? testData?.parameter ?? {};
-
-  // parameter elements — PHP: parameterelements table
-  // ✅ Try multiple possible key names the API might use
-  const paramElements =
-    testData?.parameter_elements ??
-    testData?.elements ??
-    testData?.parameterelements ??
-    [];
-
-  const cycle = Number(prow?.cycle ?? testData?.cycle ?? 1);
-
-  // instrument list — PHP: $allins + instrument dropdown options
-  // ✅ Try multiple possible key names
-  const instrList =
-    testData?.instrument_list ??
-    testData?.instruments ??
-    testData?.instrument_categories ??
-    [];
-
-  // consumables — PHP: parameterconsumables
-  // ✅ Try multiple possible key names
-  const consumList =
-    testData?.consumables ?? testData?.parameterconsumables ?? [];
-
-  // results for status==24
-  const results = testData?.results ?? [];
-  const has_documents = Boolean(
-    testData?.has_documents ?? testData?.hasdocuments,
-  );
+  // ── Derived values ────────────────────────────────────────────────────────
+  const evt = testData?.test_event ?? {};
+  const status = Number(evt.status ?? 0);
+  const trfproduct = evt.trfproduct ?? ""; // PHP: $trfproduct → back button
+  const has_documents = Boolean(testData?.has_documents ?? false);
   const lrn = testData?.lrn ?? "";
-  const trfproduct = testData?.trfproduct ?? testData?.tid ?? "";
+  const prow = testData?.parameter ?? {}; // PHP: $prow
+  const cycle = Number(testData?.cycle ?? prow.cycle ?? 1);
 
-  // ── Measurement cell change ──────────────────────────────────────────────────
-  const handleMeasurement = (cycleIdx, elementId, value) => {
+  // parameter_elements[].measurement_id = PHP $pid = $frow['element']
+  const paramElements = Array.isArray(testData?.parameter_elements)
+    ? testData.parameter_elements
+    : [];
+
+  // ── FIX: instruments options — Array OR keyed Object ─────────────────────
+  // "275": options = [...Array...]     → use as-is
+  // "4":   options = {"2":{}, "3":{}} → Object.values() → Array
+  const instrList = Array.isArray(testData?.instruments)
+    ? testData.instruments.map((instr) => ({
+        ...instr,
+        options: Array.isArray(instr.options)
+          ? instr.options
+          : Object.values(instr.options ?? {}), // ✅ always Array now
+      }))
+    : [];
+
+  const consumList = Array.isArray(testData?.consumables)
+    ? testData.consumables
+    : [];
+
+  // Pre-select saved instruments from evt.instruments = ",275,4," string
+  // PHP: $iinstruments = explode(",", $instruments)
+  //      if (in_array($brow['id'], $iinstruments)) echo "selected='selected'"
+  useEffect(() => {
+    if (!evt.instruments || instrList.length === 0) return;
+    const savedIds = evt.instruments
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!savedIds.length) return;
+    const preSelected = {};
+    instrList.forEach((cat) => {
+      const match = cat.options.find((opt) =>
+        savedIds.includes(String(opt.id)),
+      );
+      if (match) preSelected[cat.id] = String(match.id);
+    });
+    if (Object.keys(preSelected).length > 0) setInstruments(preSelected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testData]);
+
+  // Fetch results when status == 24
+  useEffect(() => {
+    if (status === 24) fetchResults();
+  }, [status, fetchResults]);
+
+  const handleMeasurement = (cycleIdx, pid, value) => {
     setMeasurements((prev) => ({
       ...prev,
-      [cycleIdx]: { ...(prev[cycleIdx] ?? {}), [elementId]: value },
+      [cycleIdx]: { ...(prev[cycleIdx] ?? {}), [pid]: value },
     }));
   };
 
-  // ── POST /actionitem/add-test-data ───────────────────────────────────────────
-  // ✅ FIXED: Payload format matches Postman exactly
-  // instruments[0], instruments[1] → indexed array of selected IDs
-  // materiallocationid[0], quantity[0] → indexed
-  // 446[], 1[], 2[] → element_id[] per cycle row
+  // ── POST /actionitem/add-test-data ───────────────────────────────────────
+  // FormData fields (confirmed from Postman screenshot):
+  //   teid, temperature, humidity, remark, attachment (File)
+  //   instruments[0], instruments[1]...
+  //   materiallocationid[0], materiallocationid[1]...
+  //   quantity[0], quantity[1]...
+  //   {measurement_id}[]  e.g. "446[]", "7[]", "15[]"  (per cycle)
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
       const fd = new FormData();
-
       fd.append("teid", teid);
       fd.append("temperature", temperature);
       fd.append("humidity", humidity);
       fd.append("remark", remark);
       if (attachment) fd.append("attachment", attachment);
 
-      // ✅ instruments[0], instruments[1]... (indexed, not category_id keyed)
-      const instrumentValues = Object.values(instruments).filter(Boolean);
-      instrumentValues.forEach((val, idx) => {
-        fd.append(`instruments[${idx}]`, val);
-      });
+      // instruments[0], instruments[1]...
+      Object.values(instruments)
+        .filter(Boolean)
+        .forEach((val, idx) => {
+          fd.append(`instruments[${idx}]`, val);
+        });
 
-      // ✅ materiallocationid[0], quantity[0]... (indexed)
-      const consumableEntries = Object.values(consumables);
-      consumableEntries.forEach((vals, idx) => {
+      // materiallocationid[0], quantity[0]...
+      Object.values(consumables).forEach((vals, idx) => {
         fd.append(`materiallocationid[${idx}]`, vals.materiallocationid ?? "");
         fd.append(`quantity[${idx}]`, vals.quantity ?? "");
       });
 
-      // ✅ 446[], 1[], 2[]... → element_id[] appended for each cycle row
-      // PHP: name="$pid[]" where $pid = $frow['element'] from parameterelements table
-      // API returns field as "element" (not element_id)
+      // PHP: name="$pid[]" → "$pid = $frow['element']" = measurement_id from API
+      // Postman: "446[]" = 10.5, "7[]" = value, "15[]" = value  (per cycle row)
       paramElements.forEach((el) => {
-        // PHP: $pid = $frow['element'] → field name is "element"
-        const elId = el.element ?? el.element_id ?? el.id;
+        const pid = el.measurement_id; // confirmed field from real API response
         for (let i = 0; i < cycle; i++) {
-          fd.append(`${elId}[]`, measurements[i]?.[elId] ?? "");
+          fd.append(`${pid}[]`, measurements[i]?.[pid] ?? "");
         }
       });
-
-      console.log("Submitting FormData:");
-      for (let [k, v] of fd.entries()) console.log(k, v); // Debug
 
       await axios.post("/actionitem/add-test-data", fd, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -330,7 +388,8 @@ export default function TestInput() {
     }
   };
 
-  // ── Finalise without end date ────────────────────────────────────────────────
+  // ── POST /actionitem/finalise-test-event ─────────────────────────────────
+  // PHP: finalsubmitdata.php — direct (no enddate, has_documents == false)
   const handleFinalise = async () => {
     try {
       setSubmitting(true);
@@ -344,12 +403,13 @@ export default function TestInput() {
     }
   };
 
-  // ── Retest ───────────────────────────────────────────────────────────────────
+  // ── POST /actionitem/request-reset/:teid ─────────────────────────────────
+  // PHP: requestretest.php
   const handleRetest = async () => {
     if (!window.confirm("Request a retest for this test?")) return;
     try {
       setRetesting(true);
-      await axios.post(`/actionitem/request-reset/${teid}`);
+      await axios.get(`/actionitem/request-reset/${teid}`);
       toast.success("Retest requested ✅");
       navigate(`/dashboards/action-items/perform-testing/${trfproduct}`);
     } catch (err) {
@@ -359,7 +419,7 @@ export default function TestInput() {
     }
   };
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <Page title="Test Input">
@@ -369,7 +429,6 @@ export default function TestInput() {
       </Page>
     );
   }
-
   if (!testData) {
     return (
       <Page title="Test Input">
@@ -383,7 +442,7 @@ export default function TestInput() {
   return (
     <Page title="Test Input">
       <div className="transition-content w-full px-(--margin-x) pb-10">
-        {/* Back Button */}
+        {/* PHP: <a href="performtest.php?hakuna={trfproduct}"> Back To Tests</a> */}
         <div className="mb-5">
           <button
             onClick={() =>
@@ -396,7 +455,7 @@ export default function TestInput() {
         </div>
 
         <Card className="p-6">
-          {/* ── LRN ─────────────────────────────────────────────────────────── */}
+          {/* ── LRN ─────────────────────────────────────────────────────── */}
           <div className="mb-4 grid grid-cols-2 items-center gap-4 border-b border-gray-100 pb-4 dark:border-gray-800">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
               LRN
@@ -406,7 +465,8 @@ export default function TestInput() {
             </span>
           </div>
 
-          {/* ── Temperature ─────────────────────────────────────────────────── */}
+          {/* ── Temperature ─────────────────────────────────────────────── */}
+          {/* PHP: Temperature($prow['mintemp']-$prow['maxtemp'])            */}
           <div className="mb-4 grid grid-cols-2 items-center gap-4">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
               Temperature
@@ -425,7 +485,8 @@ export default function TestInput() {
             />
           </div>
 
-          {/* ── Humidity ────────────────────────────────────────────────────── */}
+          {/* ── Humidity ────────────────────────────────────────────────── */}
+          {/* PHP: Humidity($prow['minhumidity']% - $prow['maxhumidity']%) */}
           <div className="mb-4 grid grid-cols-2 items-center gap-4">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
               Humidity
@@ -444,7 +505,7 @@ export default function TestInput() {
             />
           </div>
 
-          {/* ── Remark ──────────────────────────────────────────────────────── */}
+          {/* ── Remark ──────────────────────────────────────────────────── */}
           <div className="mb-4 grid grid-cols-2 items-start gap-4">
             <label className="pt-2 text-sm font-medium text-gray-600 dark:text-gray-400">
               Remark
@@ -458,7 +519,7 @@ export default function TestInput() {
             />
           </div>
 
-          {/* ── Upload Attachment ────────────────────────────────────────────── */}
+          {/* ── Upload Attachment ────────────────────────────────────────── */}
           <div className="mb-6 grid grid-cols-2 items-center gap-4">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
               Upload Attachment
@@ -470,15 +531,17 @@ export default function TestInput() {
             />
           </div>
 
-          {/* ── Grade / Size ─────────────────────────────────────────────────── */}
-          {(testData.grade || testData.size) && (
+          {/* ── Grade / Size ─────────────────────────────────────────────── */}
+          {/* PHP: grades.name + sizes.name                                  */}
+          {/* API: grade_name = "E 250 BR", size_name = "Thickness..."       */}
+          {(testData.grade_name || testData.size_name) && (
             <div className="mb-6 grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/40">
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">
                   Grade
                 </p>
                 <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
-                  {testData.grade ?? "—"}
+                  {testData.grade_name ?? "—"}
                 </p>
               </div>
               <div>
@@ -486,21 +549,23 @@ export default function TestInput() {
                   Size
                 </p>
                 <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
-                  {testData.size ?? "—"}
+                  {testData.size_name ?? "—"}
                 </p>
               </div>
             </div>
           )}
 
-          {/* ── Parameter Remark ─────────────────────────────────────────────── */}
-          {prow.remark && (
+          {/* ── Parameter Remark ─────────────────────────────────────────── */}
+          {/* PHP: echo $prow['remark'] — API returns "-" as placeholder     */}
+          {prow.remark && prow.remark !== "-" && (
             <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300">
               {prow.remark}
             </div>
           )}
 
-          {/* ── Instruments ──────────────────────────────────────────────────── */}
-          {/* PHP: foreach($allins as $aid) → select instrument dropdown per category */}
+          {/* ── Instruments ──────────────────────────────────────────────── */}
+          {/* PHP: foreach($allins as $aid) → one select per category        */}
+          {/* PHP validates: mastervalidity.enddate > today (backend filters) */}
           {instrList.length > 0 && (
             <div className="mb-6">
               <h4 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -508,10 +573,9 @@ export default function TestInput() {
               </h4>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                 {instrList.map((instr) => {
-                  // ✅ Handle both category_id and id field names
-                  const catId = instr.category_id ?? instr.id;
-                  const catName = instr.category_name ?? instr.name;
-                  const options = instr.options ?? instr.instruments ?? [];
+                  const catId = instr.id; // PHP: $aid
+                  const catName = instr.name; // PHP: $iname
+                  const options = instr.options; // already normalised to Array
                   return (
                     <div key={catId}>
                       <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -527,10 +591,12 @@ export default function TestInput() {
                         }
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                       >
+                        {/* PHP: <option value="">Select {$iname}</option> */}
                         <option value="">Select {catName}</option>
                         {options.map((opt) => (
+                          // PHP: $brow['name'] . "(" . $brow['newidno'] . ")"
                           <option key={opt.id} value={opt.id}>
-                            {opt.name}({opt.newidno ?? opt.code ?? opt.id})
+                            {opt.name}({opt.newidno ?? opt.idno ?? opt.id})
                           </option>
                         ))}
                       </select>
@@ -541,8 +607,8 @@ export default function TestInput() {
             </div>
           )}
 
-          {/* ── Consumables ──────────────────────────────────────────────────── */}
-          {/* PHP: foreach parameterconsumables → select batch + quantity input */}
+          {/* ── Consumables ──────────────────────────────────────────────── */}
+          {/* PHP: foreach parameterconsumables → batch select + qty input   */}
           {consumList.length > 0 && (
             <div className="mb-6">
               <h4 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -550,18 +616,23 @@ export default function TestInput() {
               </h4>
               <div className="space-y-3">
                 {consumList.map((con) => {
-                  // ✅ Handle both id and mid field names
                   const conId = con.id ?? con.mid;
-                  const batches = con.batches ?? con.materiallocation ?? [];
+                  const batches = Array.isArray(con.batches)
+                    ? con.batches
+                    : Array.isArray(con.materiallocation)
+                      ? con.materiallocation
+                      : [];
                   return (
                     <div
                       key={conId}
                       className="grid grid-cols-3 items-center gap-4 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
                     >
+                      {/* PHP: name."(".$consumable.")". " (in $uname)" */}
                       <div className="text-sm text-gray-700 dark:text-gray-300">
                         {con.name}({con.consumable_id ?? con.consumable}) (in{" "}
                         {con.unit})
                       </div>
+                      {/* PHP: name="materiallocationid['{$mid}']" */}
                       <select
                         value={consumables[conId]?.materiallocationid ?? ""}
                         onChange={(e) =>
@@ -582,6 +653,7 @@ export default function TestInput() {
                           </option>
                         ))}
                       </select>
+                      {/* PHP: name="quantity['{$mid}']" */}
                       <input
                         type="text"
                         placeholder={`enter value in ${con.unit}`}
@@ -604,62 +676,62 @@ export default function TestInput() {
             </div>
           )}
 
-          {/* ── Measurement Table ─────────────────────────────────────────────── */}
-          {/* PHP: parameterelements headers + cycle rows × element columns */}
+          {/* ── Measurement Table ─────────────────────────────────────────── */}
+          {/* PHP: parameterelements → TH headers + for($i=0; $i<$cycle; $i++) */}
+          {/* PHP: $pid = $frow['element'] = API measurement_id                 */}
+          {/* PHP: name="$pid[]"  e.g. "7[]", "15[]"                           */}
           {paramElements.length > 0 && (
             <div className="mb-6">
               <h4 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                {prow.name ?? testData?.parameter_name ?? "Measurements"}
+                {/* PHP: echo $prow['name'] */}
+                {prow.name ?? "Measurements"}
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-gray-100 dark:bg-gray-800">
-                      {paramElements.map((el) => {
-                        // ✅ PHP: $pid = $frow['element'] — API field is "element"
-                        const elId = el.element ?? el.element_id ?? el.id;
-                        const elName = el.name ?? el.element_name;
-                        return (
-                          <th
-                            key={elId}
-                            className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase dark:text-gray-300"
-                          >
-                            {elName}
-                          </th>
-                        );
-                      })}
+                      {paramElements.map((el) => (
+                        <th
+                          key={el.measurement_id}
+                          className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase dark:text-gray-300"
+                        >
+                          {/* PHP: $pname = selectfieldwhere("measurements","name","id=$pid") */}
+                          {el.name}
+                          {el.unit && (
+                            <span className="ml-1 font-normal text-gray-400 normal-case">
+                              ({el.unit})
+                            </span>
+                          )}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {/* PHP: for ($i=0; $i<$cycle; $i++) */}
+                    {/* PHP: for ($i = 0; $i < $cycle; $i++) */}
                     {Array.from({ length: cycle }, (_, i) => (
                       <tr
                         key={i}
                         className="border-b border-gray-100 dark:border-gray-800"
                       >
                         {paramElements.map((el) => {
-                          // ✅ PHP: $pid = $frow['element']
-                          const elId = el.element ?? el.element_id ?? el.id;
-                          const elUnit = el.unit ?? "";
+                          const pid = el.measurement_id; // PHP: $pid = $frow['element']
+                          const unit = el.unit ?? "";
                           return (
-                            <td key={elId} className="px-2 py-1">
+                            <td key={pid} className="px-2 py-1">
                               {status === 0 ? (
-                                // PHP: name="$pid[]" per cycle input
+                                // PHP: <input name="$pid[]" placeholder="enter value in $unit" />
                                 <input
                                   type="text"
-                                  placeholder={`value in ${elUnit}`}
-                                  value={measurements[i]?.[elId] ?? ""}
+                                  placeholder={`value in ${unit}`}
+                                  value={measurements[i]?.[pid] ?? ""}
                                   onChange={(e) =>
-                                    handleMeasurement(i, elId, e.target.value)
+                                    handleMeasurement(i, pid, e.target.value)
                                   }
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                                 />
                               ) : (
                                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                                  {measurements[i]?.[elId] ??
-                                    el.saved_value ??
-                                    "—"}{" "}
-                                  {elUnit}
+                                  {measurements[i]?.[pid] ?? "—"} {unit}
                                 </span>
                               )}
                             </td>
@@ -673,9 +745,10 @@ export default function TestInput() {
             </div>
           )}
 
-          {/* ── Action Buttons ────────────────────────────────────────────────── */}
+          {/* ── Action Buttons ─────────────────────────────────────────────── */}
           <div className="mt-6 border-t border-gray-100 pt-6 dark:border-gray-800">
-            {/* status == 0: Submit */}
+            {/* status == 0 → Submit */}
+            {/* PHP: if ($hakunastatus == 0) → sendForm inserttestdata.php */}
             {status === 0 && (
               <div className="flex justify-end">
                 <button
@@ -691,11 +764,14 @@ export default function TestInput() {
               </div>
             )}
 
-            {/* status == 24: Results + Finalise + Retest */}
+            {/* status == 24 → Results table + Finalise + Retest */}
+            {/* PHP: elseif ($hakunastatus == 24) */}
             {status === 24 && (
               <>
                 <ResultsTable results={results} />
                 <div className="mt-4 flex flex-wrap items-center gap-3">
+                  {/* PHP: if(mysqli_num_rows($itemDocument) > 0) → setEndDAte() modal
+                            else → view(teid, finalsubmitdata.php, 'updating')         */}
                   <button
                     onClick={
                       has_documents
@@ -710,6 +786,8 @@ export default function TestInput() {
                   >
                     {submitting ? "Finalising..." : "Finalise Data"}
                   </button>
+
+                  {/* PHP: view(teid, requestretest.php, 'updating') */}
                   <button
                     onClick={handleRetest}
                     disabled={retesting}
@@ -727,11 +805,11 @@ export default function TestInput() {
         </Card>
       </div>
 
-      {/* Set End Date Modal */}
+      {/* Set End Date Modal — PHP: modal-setEndDate → submiEndDate() */}
       {endDateModal && (
         <SetEndDateModal
           teid={teid}
-          startDate={testData?.startdate}
+          startDate={evt.startdate} // "11-03-2026 05:00 PM"
           onClose={() => setEndDateModal(false)}
           onFinalised={() =>
             navigate(`/dashboards/action-items/perform-testing/${trfproduct}`)

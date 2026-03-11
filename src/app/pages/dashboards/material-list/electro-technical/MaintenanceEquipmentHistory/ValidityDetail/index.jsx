@@ -12,18 +12,24 @@ import clsx from "clsx";
 import { useRef, useState, useEffect, useCallback } from "react";
 import axios from "utils/axios";
 import { useLocation } from "react-router";
-import toast, { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from "react-hot-toast";
 
 // Local Imports
 import { TableSortIcon } from "components/shared/table/TableSortIcon";
 import { ColumnFilter } from "components/shared/table/ColumnFilter";
 import { PaginationSection } from "components/shared/table/PaginationSection";
-import { Button, Card, Table, THead, TBody, Th, Tr, Input, Td } from "components/ui";
 import {
-  useLockScrollbar,
-  useLocalStorage,
-  useDidUpdate,
-} from "hooks";
+  Button,
+  Card,
+  Table,
+  THead,
+  TBody,
+  Th,
+  Tr,
+  Input,
+  Td,
+} from "components/ui";
+import { useLockScrollbar, useLocalStorage, useDidUpdate } from "hooks";
 import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
 import { SelectedRowsActions } from "./SelectedRowsActions";
@@ -40,20 +46,18 @@ export default function ValidityDetailsTable() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // FIX 1: दोनों tables के लिए अलग-अलग skipper
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
+  const [uncertaintyAutoResetPageIndex, uncertaintySkipAutoResetPageIndex] =
+    useSkipper();
 
-  // Get URL params
-  const [urlParams, setUrlParams] = useState({ fid: '', cid: '', labId: '' });
+  const [urlParams, setUrlParams] = useState({ fid: "", cid: "", labId: "" });
 
-  // Matrix Data State
   const [matrixData, setMatrixData] = useState([]);
   const [matrixLoading, setMatrixLoading] = useState(true);
-  const [matrixRecordsFiltered, setMatrixRecordsFiltered] = useState(0);
 
-  // Uncertainty Data State
   const [uncertaintyData, setUncertaintyData] = useState([]);
   const [uncertaintyLoading, setUncertaintyLoading] = useState(true);
-  const [uncertaintyRecordsTotal, setUncertaintyRecordsTotal] = useState(0);
 
   const [tableSettings, setTableSettings] = useState({
     enableSorting: true,
@@ -71,7 +75,6 @@ export default function ValidityDetailsTable() {
     pageIndex: 0,
     pageSize: 10,
   });
-
   const [uncertaintyPagination, setUncertaintyPagination] = useState({
     pageIndex: 0,
     pageSize: 10,
@@ -79,176 +82,140 @@ export default function ValidityDetailsTable() {
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
     "column-visibility-validity",
-    {}
+    {},
   );
-
   const [uncertaintyColumnVisibility, setUncertaintyColumnVisibility] =
     useLocalStorage("column-visibility-uncertainty", {});
-
   const [columnPinning, setColumnPinning] = useLocalStorage(
     "column-pinning-validity",
-    {}
+    {},
   );
 
   const cardRef = useRef();
   const uncertaintyCardRef = useRef();
 
-  // Extract URL params
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const fid = params.get("fid") || "";
-    const cid = params.get("cid") || "";
-    const labId = params.get("labId") || "";
-
-    setUrlParams({ fid, cid, labId });
+    setUrlParams({
+      fid: params.get("fid") || "",
+      cid: params.get("cid") || "",
+      labId: params.get("labId") || "",
+    });
   }, [location.search]);
 
-  // Function to handle back navigation with params
+  // Search करने पर page 1 पर reset
+  const handleMatrixSearch = (value) => {
+    setGlobalFilter(value);
+    setMatrixPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
+  const handleUncertaintySearch = (value) => {
+    setUncertaintyGlobalFilter(value);
+    setUncertaintyPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
+
   const handleBackNavigation = () => {
     if (urlParams.fid && urlParams.labId) {
-      navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${urlParams.fid}&labId=${urlParams.labId}`);
+      navigate(
+        `/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${urlParams.fid}&labId=${urlParams.labId}`,
+      );
     } else if (urlParams.fid) {
-      navigate(`/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${urlParams.fid}`);
+      navigate(
+        `/dashboards/material-list/electro-technical/maintenance-equipment-history?fid=${urlParams.fid}`,
+      );
     } else {
-      navigate('/dashboards/material-list/electro-technical/maintenance-equipment-history');
+      navigate(
+        "/dashboards/material-list/electro-technical/maintenance-equipment-history",
+      );
     }
   };
 
-  // API: Delete Master Matrix
   const deleteMasterMatrix = async (id) => {
     try {
       const response = await axios.delete(`/material/delete-mastermatrix`, {
-        params: { id }
+        params: { id },
       });
-
       if (response.data?.success || response.data?.status) {
-        // Immediately remove from UI
         setMatrixData((prev) => prev.filter((row) => row.id !== id));
-        // Show success toast
         toast.success(response.data?.message || "Record deleted successfully");
         return true;
-      } else {
-        toast.error(response.data?.message || "Failed to delete record");
-        return false;
       }
+      toast.error(response.data?.message || "Failed to delete record");
+      return false;
     } catch (err) {
-      console.error("Error deleting master matrix:", err);
       toast.error(err.response?.data?.message || "Failed to delete record");
       return false;
     }
   };
 
-  // API: Delete Master Uncertainty Matrix
   const deleteMasterUncertaintyMatrix = async (id) => {
     try {
-      const response = await axios.delete(`/material/delete-MasterUncertainty-Matrix/${id}`);
-
+      const response = await axios.delete(
+        `/material/delete-MasterUncertainty-Matrix/${id}`,
+      );
       if (response.data?.success || response.data?.status) {
-        // Immediately remove from UI
         setUncertaintyData((prev) => prev.filter((row) => row.id !== id));
-        // Show success toast
         toast.success(response.data?.message || "Record deleted successfully");
         return true;
-      } else {
-        toast.error(response.data?.message || "Failed to delete record");
-        return false;
       }
+      toast.error(response.data?.message || "Failed to delete record");
+      return false;
     } catch (err) {
-      console.error("Error deleting master uncertainty matrix:", err);
       toast.error(err.response?.data?.message || "Failed to delete record");
       return false;
     }
   };
 
-  // API: Fetch Matrix Data
+  // FIX 2: API सारा data एक बार देती है — कोई pagination params नहीं
   const fetchMatrixData = useCallback(async (fid, cid) => {
     try {
       setMatrixLoading(true);
-
       const response = await axios.get(`/material/masters-matrix-detail`, {
-        params: {
-          fid: fid,
-          cid: cid,
-          draw: 1,
-          start: matrixPagination.pageIndex * matrixPagination.pageSize,
-          length: matrixPagination.pageSize,
-          "search[value]": globalFilter,
-        },
+        params: { fid, cid },
       });
-
-      if (response.data) {
-        setMatrixData(
-          Array.isArray(response.data.data) ? response.data.data : []
-        );
-        setMatrixRecordsFiltered(response.data.recordsFiltered || 0);
-      }
+      setMatrixData(
+        Array.isArray(response.data?.data) ? response.data.data : [],
+      );
     } catch (err) {
       console.error("Error fetching matrix data:", err);
       setMatrixData([]);
     } finally {
       setMatrixLoading(false);
     }
-  }, [matrixPagination.pageIndex, matrixPagination.pageSize, globalFilter]);
+  }, []);
 
-  // API: Fetch Uncertainty Data
   const fetchUncertaintyData = useCallback(async (fid, cid) => {
     try {
       setUncertaintyLoading(true);
-
       const response = await axios.get(`/material/masters-validity-detail`, {
-        params: {
-          fid: fid,
-          cid: cid,
-          draw: 1,
-          start: uncertaintyPagination.pageIndex * uncertaintyPagination.pageSize,
-          length: uncertaintyPagination.pageSize,
-          "search[value]": uncertaintyGlobalFilter,
-        },
+        params: { fid, cid },
       });
-
-      if (response.data) {
-        setUncertaintyData(
-          Array.isArray(response.data.data) ? response.data.data : []
-        );
-        setUncertaintyRecordsTotal(response.data.total || 0);
-      }
+      setUncertaintyData(
+        Array.isArray(response.data?.data) ? response.data.data : [],
+      );
     } catch (err) {
       console.error("Error fetching uncertainty data:", err);
       setUncertaintyData([]);
     } finally {
       setUncertaintyLoading(false);
     }
-  }, [uncertaintyPagination.pageIndex, uncertaintyPagination.pageSize, uncertaintyGlobalFilter]);
+  }, []);
 
-  // Fetch Matrix Data
+  // FIX 3: सिर्फ URL change पर fetch — pagination change पर नहीं
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const fid = params.get("fid") || "";
     const cid = params.get("cid") || "";
-
     if (fid && cid) {
       fetchMatrixData(fid, cid);
-    } else {
-      setMatrixLoading(false);
-      setMatrixData([]);
-    }
-  }, [location.search, fetchMatrixData]);
-
-  // Fetch Uncertainty Data
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const fid = params.get("fid") || "";
-    const cid = params.get("cid") || "";
-
-    if (fid && cid) {
       fetchUncertaintyData(fid, cid);
     } else {
+      setMatrixLoading(false);
       setUncertaintyLoading(false);
-      setUncertaintyData([]);
     }
-  }, [location.search, fetchUncertaintyData]);
+  }, [location.search, fetchMatrixData, fetchUncertaintyData]);
 
-  // Main Matrix Table
+  // Matrix Table — manualPagination नहीं, client-side handle होगी
   const table = useReactTable({
     data: matrixData,
     columns: columns,
@@ -268,9 +235,7 @@ export default function ValidityDetailsTable() {
       },
       deleteRows: async (rows) => {
         skipAutoResetPageIndex();
-        for (const row of rows) {
-          await deleteMasterMatrix(row.original.id);
-        }
+        for (const row of rows) await deleteMasterMatrix(row.original.id);
       },
     },
     filterFns: { fuzzy: fuzzyFilter },
@@ -289,8 +254,7 @@ export default function ValidityDetailsTable() {
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
     autoResetPageIndex,
-    pageCount: Math.ceil(matrixRecordsFiltered / matrixPagination.pageSize),
-    manualPagination: true,
+    // manualPagination नहीं — TanStack खुद handle करेगा ✅
   });
 
   // Uncertainty Table
@@ -307,13 +271,12 @@ export default function ValidityDetailsTable() {
       isUncertaintyTable: true,
       deleteRow: async (row) => {
         await deleteMasterUncertaintyMatrix(row.original.id);
-        skipAutoResetPageIndex();
+        uncertaintySkipAutoResetPageIndex(); // ✅ अपना skipper
       },
       deleteRows: async (rows) => {
-        skipAutoResetPageIndex();
-        for (const row of rows) {
+        uncertaintySkipAutoResetPageIndex(); // ✅ अपना skipper
+        for (const row of rows)
           await deleteMasterUncertaintyMatrix(row.original.id);
-        }
       },
     },
     filterFns: { fuzzy: fuzzyFilter },
@@ -330,21 +293,19 @@ export default function ValidityDetailsTable() {
     getPaginationRowModel: getPaginationRowModel(),
     onPaginationChange: setUncertaintyPagination,
     onColumnVisibilityChange: setUncertaintyColumnVisibility,
-    autoResetPageIndex,
-    pageCount: Math.ceil(uncertaintyRecordsTotal / uncertaintyPagination.pageSize),
-    manualPagination: true,
+    autoResetPageIndex: uncertaintyAutoResetPageIndex, // ✅ अपना skipper
+    // manualPagination नहीं ✅
   });
 
   useDidUpdate(() => table.resetRowSelection(), [matrixData]);
   useDidUpdate(() => uncertaintyTable.resetRowSelection(), [uncertaintyData]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // Loading State
   if (matrixLoading && uncertaintyLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center text-gray-600">
         <svg
-          className="animate-spin h-6 w-6 mr-2 text-blue-600"
+          className="mr-2 h-6 w-6 animate-spin text-blue-600"
           viewBox="0 0 24 24"
         >
           <circle
@@ -354,12 +315,12 @@ export default function ValidityDetailsTable() {
             r="10"
             stroke="currentColor"
             strokeWidth="4"
-          ></circle>
+          />
           <path
             className="opacity-75"
             fill="currentColor"
             d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
-          ></path>
+          />
         </svg>
         Loading Validity Details...
       </div>
@@ -368,36 +329,27 @@ export default function ValidityDetailsTable() {
 
   return (
     <div className="transition-content grid grid-cols-1 grid-rows-[auto_auto_1fr] px-(--margin-x) py-4">
-      {/* Toast Notification */}
       <Toaster
         position="top-right"
         reverseOrder={false}
         toastOptions={{
           duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
+          style: { background: "#363636", color: "#fff" },
           success: {
             duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
+            iconTheme: { primary: "#10b981", secondary: "#fff" },
           },
           error: {
             duration: 4000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
+            iconTheme: { primary: "#ef4444", secondary: "#fff" },
           },
         }}
       />
 
+      {/* Page Header */}
       <div className="flex items-center justify-between space-x-4">
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-medium tracking-wide text-gray-800 dark:text-dark-50">
+          <h2 className="dark:text-dark-50 truncate text-xl font-medium tracking-wide text-gray-800">
             Masters Validity Details
           </h2>
         </div>
@@ -409,18 +361,16 @@ export default function ValidityDetailsTable() {
           >
             ← Back To Master Validity
           </Button>
-
           <Button
             className="h-8 space-x-1.5 rounded-md px-3 text-xs"
             color="primary"
             onClick={() => {
               const params = new URLSearchParams();
-              if (urlParams.fid) params.append('fid', urlParams.fid);
-              if (urlParams.cid) params.append('cid', urlParams.cid);
-              if (urlParams.labId) params.append('labId', urlParams.labId);
-
+              if (urlParams.fid) params.append("fid", urlParams.fid);
+              if (urlParams.cid) params.append("cid", urlParams.cid);
+              if (urlParams.labId) params.append("labId", urlParams.labId);
               navigate(
-                `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-master-matrix?${params.toString()}`
+                `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-master-matrix?${params.toString()}`,
               );
             }}
           >
@@ -429,16 +379,30 @@ export default function ValidityDetailsTable() {
         </div>
       </div>
 
-      <div className="flex flex-col pt-4 space-y-6">
-        {/* 1. Main Matrix Table */}
+      <div className="flex flex-col space-y-6 pt-4">
+        {/* ── 1. Matrix Table ─────────────────────────────────────────────── */}
         <Card
           className={clsx(
             "relative flex grow flex-col",
-            tableSettings.enableFullScreen && "overflow-hidden"
+            tableSettings.enableFullScreen && "overflow-hidden",
           )}
           ref={cardRef}
         >
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <h3 className="dark:text-dark-50 text-base font-medium text-gray-800">
+              Masters Matrix Detail
+            </h3>
+            <input
+              type="text"
+              value={globalFilter}
+              onChange={(e) => handleMatrixSearch(e.target.value)}
+              placeholder="Search matrix..."
+              className="w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            />
+          </div>
+
           <Toolbar table={table} />
+
           <div className="table-wrapper min-w-full grow overflow-x-auto">
             <Table
               hoverable
@@ -453,27 +417,27 @@ export default function ValidityDetailsTable() {
                       <Th
                         key={header.id}
                         className={clsx(
-                          "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
+                          "dark:bg-dark-800 dark:text-dark-100 bg-gray-200 font-semibold text-gray-800 uppercase first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                           header.column.getCanPin() && [
                             header.column.getIsPinned() === "left" &&
-                            "sticky z-2 ltr:left-0 rtl:right-0",
+                              "sticky z-2 ltr:left-0 rtl:right-0",
                             header.column.getIsPinned() === "right" &&
-                            "sticky z-2 ltr:right-0 rtl:left-0",
-                          ]
+                              "sticky z-2 ltr:right-0 rtl:left-0",
+                          ],
                         )}
                       >
                         {header.column.getCanSort() ? (
                           <div
-                            className="flex cursor-pointer select-none items-center space-x-3"
+                            className="flex cursor-pointer items-center space-x-3 select-none"
                             onClick={header.column.getToggleSortingHandler()}
                           >
                             <span className="flex-1">
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
+                                    header.column.columnDef.header,
+                                    header.getContext(),
+                                  )}
                             </span>
                             <TableSortIcon
                               sorted={header.column.getIsSorted()}
@@ -482,7 +446,7 @@ export default function ValidityDetailsTable() {
                         ) : header.isPlaceholder ? null : (
                           flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )
                         )}
                         {header.column.getCanFilter() ? (
@@ -494,53 +458,92 @@ export default function ValidityDetailsTable() {
                 ))}
               </THead>
               <TBody>
-                {table.getRowModel().rows.map((row) => (
-                  <Tr
-                    key={row.id}
-                    className={clsx(
-                      "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                      row.getIsSelected() &&
-                      !isSafari &&
-                      "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500"
-                    )}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <Td
-                        key={cell.id}
-                        className={clsx(
-                          "relative",
-                          cardSkin === "shadow"
-                            ? "dark:bg-dark-700"
-                            : "dark:bg-dark-900",
-                          cell.column.getCanPin() && [
-                            cell.column.getIsPinned() === "left" &&
-                            "sticky z-2 ltr:left-0 rtl:right-0",
-                            cell.column.getIsPinned() === "right" &&
-                            "sticky z-2 ltr:right-0 rtl:left-0",
-                          ]
-                        )}
+                {matrixLoading ? (
+                  <Tr>
+                    <Td
+                      colSpan={99}
+                      className="py-10 text-center text-sm text-gray-400"
+                    >
+                      <svg
+                        className="mx-auto mb-2 h-5 w-5 animate-spin text-blue-500"
+                        viewBox="0 0 24 24"
                       >
-                        {cell.column.getIsPinned() && (
-                          <div
-                            className={clsx(
-                              "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
-                              cell.column.getIsPinned() === "left"
-                                ? "ltr:border-r rtl:border-l"
-                                : "ltr:border-l rtl:border-r"
-                            )}
-                          ></div>
-                        )}
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </Td>
-                    ))}
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+                        />
+                      </svg>
+                      Loading...
+                    </Td>
                   </Tr>
-                ))}
+                ) : table.getRowModel().rows.length === 0 ? (
+                  <Tr>
+                    <Td
+                      colSpan={99}
+                      className="py-10 text-center text-sm text-gray-400"
+                    >
+                      No records found.
+                    </Td>
+                  </Tr>
+                ) : (
+                  table.getRowModel().rows.map((row) => (
+                    <Tr
+                      key={row.id}
+                      className={clsx(
+                        "dark:border-b-dark-500 relative border-y border-transparent border-b-gray-200",
+                        row.getIsSelected() &&
+                          !isSafari &&
+                          "row-selected after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500 after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent",
+                      )}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <Td
+                          key={cell.id}
+                          className={clsx(
+                            "relative",
+                            cardSkin === "shadow"
+                              ? "dark:bg-dark-700"
+                              : "dark:bg-dark-900",
+                            cell.column.getCanPin() && [
+                              cell.column.getIsPinned() === "left" &&
+                                "sticky z-2 ltr:left-0 rtl:right-0",
+                              cell.column.getIsPinned() === "right" &&
+                                "sticky z-2 ltr:right-0 rtl:left-0",
+                            ],
+                          )}
+                        >
+                          {cell.column.getIsPinned() && (
+                            <div
+                              className={clsx(
+                                "dark:border-dark-500 pointer-events-none absolute inset-0 border-gray-200",
+                                cell.column.getIsPinned() === "left"
+                                  ? "ltr:border-r rtl:border-l"
+                                  : "ltr:border-l rtl:border-r",
+                              )}
+                            />
+                          )}
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </Td>
+                      ))}
+                    </Tr>
+                  ))
+                )}
               </TBody>
             </Table>
           </div>
+
           <SelectedRowsActions table={table} />
           {matrixData.length > 0 && (
             <div className="px-4 pb-4 sm:px-5 sm:pt-4">
@@ -549,35 +552,44 @@ export default function ValidityDetailsTable() {
           )}
         </Card>
 
-        {/* 2. Uncertainty Table */}
+        {/* ── 2. Uncertainty Table ─────────────────────────────────────────── */}
         <Card
           className={clsx(
             "relative flex grow flex-col",
-            tableSettings.enableFullScreen && "overflow-hidden"
+            tableSettings.enableFullScreen && "overflow-hidden",
           )}
           ref={uncertaintyCardRef}
         >
-          <div className="flex justify-between items-center mb-4 px-4 pt-4">
-            <h3 className="text-lg font-medium text-gray-800 dark:text-dark-50">
+          <div className="mb-4 flex items-center justify-between px-4 pt-4">
+            <h3 className="dark:text-dark-50 text-lg font-medium text-gray-800">
               Masters Validity Uncertainty Detail
             </h3>
-            <Button
-              className="h-8 space-x-1.5 rounded-md px-3 text-xs"
-              color="primary"
-              onClick={() => {
-                const params = new URLSearchParams();
-                if (urlParams.fid) params.append('fid', urlParams.fid);
-                if (urlParams.cid) params.append('cid', urlParams.cid);
-                if (urlParams.labId) params.append('labId', urlParams.labId);
-
-                navigate(
-                  `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-uncertainty-matrix?${params.toString()}`
-                );
-              }}
-            >
-              Add New Uncertainty Matrix
-            </Button>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={uncertaintyGlobalFilter}
+                onChange={(e) => handleUncertaintySearch(e.target.value)}
+                placeholder="Search uncertainty..."
+                className="w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              />
+              <Button
+                className="h-8 space-x-1.5 rounded-md px-3 text-xs"
+                color="primary"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (urlParams.fid) params.append("fid", urlParams.fid);
+                  if (urlParams.cid) params.append("cid", urlParams.cid);
+                  if (urlParams.labId) params.append("labId", urlParams.labId);
+                  navigate(
+                    `/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail/add-new-uncertainty-matrix?${params.toString()}`,
+                  );
+                }}
+              >
+                Add New Uncertainty Matrix
+              </Button>
+            </div>
           </div>
+
           <div className="table-wrapper min-w-full grow overflow-x-auto">
             <Table
               hoverable
@@ -591,22 +603,20 @@ export default function ValidityDetailsTable() {
                     {headerGroup.headers.map((header) => (
                       <Th
                         key={header.id}
-                        className={clsx(
-                          "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg"
-                        )}
+                        className="dark:bg-dark-800 dark:text-dark-100 bg-gray-200 font-semibold text-gray-800 uppercase first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg"
                       >
                         {header.column.getCanSort() ? (
                           <div
-                            className="flex cursor-pointer select-none items-center space-x-3"
+                            className="flex cursor-pointer items-center space-x-3 select-none"
                             onClick={header.column.getToggleSortingHandler()}
                           >
                             <span className="flex-1">
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
+                                    header.column.columnDef.header,
+                                    header.getContext(),
+                                  )}
                             </span>
                             <TableSortIcon
                               sorted={header.column.getIsSorted()}
@@ -615,7 +625,7 @@ export default function ValidityDetailsTable() {
                         ) : header.isPlaceholder ? null : (
                           flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )
                         )}
                       </Th>
@@ -624,26 +634,63 @@ export default function ValidityDetailsTable() {
                 ))}
               </THead>
               <TBody>
-                {uncertaintyTable.getRowModel().rows.map((row) => (
-                  <Tr
-                    key={row.id}
-                    className={clsx(
-                      "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500"
-                    )}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <Td key={cell.id} className="relative">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </Td>
-                    ))}
+                {uncertaintyLoading ? (
+                  <Tr>
+                    <Td
+                      colSpan={99}
+                      className="py-10 text-center text-sm text-gray-400"
+                    >
+                      <svg
+                        className="mx-auto mb-2 h-5 w-5 animate-spin text-blue-500"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+                        />
+                      </svg>
+                      Loading...
+                    </Td>
                   </Tr>
-                ))}
+                ) : uncertaintyTable.getRowModel().rows.length === 0 ? (
+                  <Tr>
+                    <Td
+                      colSpan={99}
+                      className="py-10 text-center text-sm text-gray-400"
+                    >
+                      No records found.
+                    </Td>
+                  </Tr>
+                ) : (
+                  uncertaintyTable.getRowModel().rows.map((row) => (
+                    <Tr
+                      key={row.id}
+                      className="dark:border-b-dark-500 relative border-y border-transparent border-b-gray-200"
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <Td key={cell.id} className="relative">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </Td>
+                      ))}
+                    </Tr>
+                  ))
+                )}
               </TBody>
             </Table>
           </div>
+
           <SelectedRowsActions table={uncertaintyTable} />
           {uncertaintyData.length > 0 && (
             <div className="px-4 pb-4 sm:px-5 sm:pt-4">
@@ -652,28 +699,28 @@ export default function ValidityDetailsTable() {
           )}
         </Card>
 
-        {/* 3. Interpolation Formula Section */}
+        {/* ── 3. Interpolation Formula ─────────────────────────────────────── */}
         <Card className="relative flex grow flex-col">
-          <div className="flex justify-between items-center mb-5 px-4 pt-4">
-            <h3 className="text-lg font-medium text-gray-800 dark:text-dark-50">
+          <div className="mb-5 flex items-center justify-between px-4 pt-4">
+            <h3 className="dark:text-dark-50 text-lg font-medium text-gray-800">
               Interpolation Formula Detail
             </h3>
           </div>
-          <div className="border border-gray-300 rounded-md p-3 mx-4">
+          <div className="mx-4 rounded-md border border-gray-300 p-3">
             <div className="flex space-x-4">
               <label className="flex-1">
-                <span className="text-sm font-medium text-gray-700 dark:text-dark-200">
+                <span className="dark:text-dark-200 text-sm font-medium text-gray-700">
                   Formula
                 </span>
                 <Input
                   type="text"
-                  className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-dark-700 dark:border-dark-500 dark:text-dark-100"
+                  className="focus:border-primary-500 focus:ring-primary-500 dark:bg-dark-700 dark:border-dark-500 dark:text-dark-100 mt-2 block w-full rounded-md border-gray-300 shadow-sm"
                   placeholder="Enter interpolation formula..."
                 />
               </label>
             </div>
           </div>
-          <div className="flex justify-end mt-4 px-4 pb-4">
+          <div className="mt-4 flex justify-end px-4 pb-4">
             <Button className="h-8 px-4 text-sm" color="primary">
               Save Master Matrix
             </Button>

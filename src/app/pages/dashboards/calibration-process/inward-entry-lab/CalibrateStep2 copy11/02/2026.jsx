@@ -708,16 +708,11 @@ const Calibratestep2 = () => {
                 }
 
                 if (response.data.errors) {
-                  if (Array.isArray(response.data.errors)) {
-                    newGeneralErrors.push(...response.data.errors);
-                  } else if (typeof response.data.errors === "object") {
-                    newFieldErrors = response.data.errors;
-                    // ADD THIS: flatten field errors into general errors too
-                    Object.values(response.data.errors).forEach((errArr) => {
-                      if (Array.isArray(errArr))
-                        newGeneralErrors.push(...errArr);
-                    });
-                  }
+                    if (Array.isArray(response.data.errors)) {
+                        newGeneralErrors.push(...response.data.errors);
+                    } else if (typeof response.data.errors === 'object') {
+                        newFieldErrors = response.data.errors;
+                    }
                 }
 
                 setGeneralErrors(newGeneralErrors);
@@ -726,57 +721,36 @@ const Calibratestep2 = () => {
                 toast.error('Please fix the errors and try again');
             }
         } catch (err) {
-          console.error("Error submitting step2 data:", err);
+            console.error('Error submitting step2 data:', err);
 
-          let newGeneralErrors = [];
-          let newFieldErrors = {};
+            let newGeneralErrors = [];
+            let newFieldErrors = {};
 
-          // WITH THIS:
-          const errData =
-            err.response?.data ||
-            err.data ||
-            (typeof err === "object" && err?.message ? err : null);
-          if (errData) {
-            if (errData.message) {
-              newGeneralErrors.push(errData.message);
-            }
-            if (errData.errors) {
-              if (Array.isArray(errData.errors)) {
-                newGeneralErrors.push(...errData.errors);
-              } else if (typeof errData.errors === "object") {
-                newFieldErrors = errData.errors;
-                Object.values(errData.errors).forEach((errArr) => {
-                  if (Array.isArray(errArr)) newGeneralErrors.push(...errArr);
-                });
-              }
-            }
-            if (
-              newGeneralErrors.length === 0 &&
-              Object.keys(newFieldErrors).length === 0
-            ) {
-              newGeneralErrors.push("Server error occurred. Please try again.");
-            }
-          } else if (err.request) {
-            newGeneralErrors.push(
-              "Network Error: Please check your connection",
-            );
-          } else {
-            // Try to extract from err directly
-            if (
-              err?.response?.data?.errors &&
-              Array.isArray(err.response.data.errors)
-            ) {
-              newGeneralErrors.push(...err.response.data.errors);
-            } else if (err?.response?.data?.message) {
-              newGeneralErrors.push(err.response.data.message);
+            if (err.response?.data) {
+                if (err.response.data.message) {
+                    newGeneralErrors.push(err.response.data.message);
+                }
+
+                if (err.response.data.errors) {
+                    if (Array.isArray(err.response.data.errors)) {
+                        newGeneralErrors.push(...err.response.data.errors);
+                    } else if (typeof err.response.data.errors === 'object') {
+                        newFieldErrors = err.response.data.errors;
+                    }
+                }
+
+                if (newGeneralErrors.length === 0 && Object.keys(newFieldErrors).length === 0) {
+                    newGeneralErrors.push(`Server Error: ${err.response.status} - ${err.response.statusText}`);
+                }
+            } else if (err.request) {
+                newGeneralErrors.push('Network Error: Please check your connection');
             } else {
-              newGeneralErrors.push("Error saving data. Please try again.");
+                newGeneralErrors.push('Error saving data. Please try again.');
             }
-          }
 
-          setGeneralErrors(newGeneralErrors);
-          setFieldErrors(newFieldErrors);
-          toast.error("Error occurred while submitting");
+            setGeneralErrors(newGeneralErrors);
+            setFieldErrors(newFieldErrors);
+            toast.error('Error occurred while submitting');
         } finally {
             setIsSubmitting(false);
         }
@@ -1310,14 +1284,8 @@ const Calibratestep2 = () => {
                                     </div>
                                     <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
                                         {generalErrors.map((error, index) => (
-                                                <li key={index}>
-                                                    {error === 'Validation failed' ? null : (
-                                                        <span>
-                                                            <strong>⚠</strong> {error.replace('is not valid with provided masterss', 'has no valid master selected')}
-                                                        </span>
-                                                    )}
-                                                </li>
-                                            ))}
+                                            <li key={index}>{error}</li>
+                                        ))}
                                     </ul>
                                 </div>
                             )}

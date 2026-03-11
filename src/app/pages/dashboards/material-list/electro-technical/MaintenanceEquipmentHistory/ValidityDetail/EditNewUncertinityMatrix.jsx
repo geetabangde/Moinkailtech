@@ -141,10 +141,10 @@ const EditNewUncertaintyMatrix = () => {
       return;
     }
 
-    if (!formData.mode) {
-      toast.error('Please select Mode');
-      return;
-    }
+    // if (!formData.mode) {
+    //   toast.error('Please select Mode');
+    //   return;
+    // }
 
     if (!formData.unit) {
       toast.error('Please select Unit');

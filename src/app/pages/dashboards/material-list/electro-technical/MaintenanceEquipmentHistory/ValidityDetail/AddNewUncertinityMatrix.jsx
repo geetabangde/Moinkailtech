@@ -8,7 +8,7 @@ const MasterMatrixForm = () => {
   
   const [formData, setFormData] = useState({
     unityType: 'Pressure',
-    mode: 'Not Specified',
+    mode: '',
     unit: 'Hectopascal(hPa)',
     instrumentRangeMin: '',
     instrumentRangeMax: '',
@@ -43,7 +43,7 @@ const MasterMatrixForm = () => {
           onClick={() => 
             navigate('/dashboards/material-list/electro-technical/maintenance-equipment-history/validity-detail')
           }>
-            ← Back to Master Detail Entry List
+            ← Back to Master Detail Entry List 
           </Button>
         </div>
 
@@ -53,7 +53,7 @@ const MasterMatrixForm = () => {
             {/* Unity Type */}
             <div className="grid grid-cols-12 gap-4 items-center">
               <label className="col-span-3 text-right text-gray-700 font-medium">
-                Unity Type/ parameter
+                Unity Type/ parameter 
               </label>
               <div className="col-span-9">
                 <select 
@@ -202,7 +202,7 @@ const MasterMatrixForm = () => {
           {/* Save Button */}
           <div className="mt-8 flex justify-end">
             <Button className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded font-medium">
-              Save Master Matrix
+              Save Master Matrix 
             </Button>
           </div>
         </Card>

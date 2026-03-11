@@ -501,7 +501,7 @@ function ActionCell({ row, onRefresh }) {
   // ── PHP exact status flag logic ───────────────────────────────────────────
   const renderFlag = () => {
     // PHP: $starttime = $row['startdate'] — empty string means not started
-    const isStarted = start_time && start_time !== "";
+    const isStarted = (start_time && start_time !== "") || status === 24;
     const isWitnessLocked = witnesslock !== 0;
 
     const elements = [];

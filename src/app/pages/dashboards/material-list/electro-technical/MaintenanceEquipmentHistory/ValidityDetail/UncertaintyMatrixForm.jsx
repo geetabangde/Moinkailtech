@@ -29,7 +29,7 @@ const UncertaintyMatrixForm = () => {
 
   const [formData, setFormData] = useState({
     unityType: '',
-    mode: '',
+    mode: ' ',
     unit: '',
     point: '',
     cmc: '',
@@ -115,10 +115,7 @@ const UncertaintyMatrixForm = () => {
       return;
     }
 
-    if (!formData.mode) {
-      toast.error('Please select Mode');
-      return;
-    }
+  
 
     if (!formData.unit) {
       toast.error('Please select Unit');
@@ -147,16 +144,16 @@ const UncertaintyMatrixForm = () => {
       // Prepare payload exactly as per your API requirement
       const payload = {
         unittype: formData.unityType,
-        mode: formData.mode,
+        mode: formData.mode || "",
         unit: parseInt(formData.unit),
         point: parseFloat(formData.point) || 0,
         cmc: parseFloat(formData.cmc) || 0,
-        uncertaintyTerm: formData.uncertaintyTerm || '',
+        uncertaintyTerm: formData.uncertaintyTerm || "",
         cmcunit: parseInt(formData.cmcUnit) || 0,
         drift: parseFloat(formData.drift) || 0,
         density: parseFloat(formData.density) || 0,
         masterid: parseInt(fid),
-        certificateid: parseInt(cid)
+        certificateid: parseInt(cid),
       };
 
       console.log('Submitting uncertainty payload:', payload);

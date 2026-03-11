@@ -182,24 +182,25 @@ const AddCrf = () => {
   };
 
   const addMatrixDetail = (entryIndex) => {
-    const entry = matrixEntries[entryIndex];
-    const rangeParts = entry.range.split(' to ');
-    const min = rangeParts[0];
-    const max = rangeParts[1];
+    const entry = matrixEntries[entryIndex]; // undefined hoga jab niche se call ho
+
+    // Agar entry nahi mili to empty defaults use karo
+    const min = entry ? entry.range.split(" to ")[0] : "";
+    const max = entry ? entry.range.split(" to ")[1] : "";
 
     setMatrixDetails([
       ...matrixDetails,
       {
-        matrixType: '',
-        unitType: entry?.unitType || '',
-        unit: entry?.unit || '',
-        unitText: entry?.unitText || '',
+        matrixType: "",
+        unitType: entry?.unitType || "",
+        unit: entry?.unit || "",
+        unitText: entry?.unitText || "",
         instrumentRangeMin: min,
         instrumentRangeMax: max,
-        operatingRangeMin: '',
-        operatingRangeMax: '',
-        leastCount: '',
-        mode: entry?.mode || '',
+        operatingRangeMin: "",
+        operatingRangeMax: "",
+        leastCount: "",
+        mode: entry?.mode || "",
         matrixId: entry?.matrixId || null,
         pricematrixid: entry?.pricematrixId || null,
         calibPoints: [],
@@ -842,7 +843,7 @@ const AddCrf = () => {
                           <label className="text-sm text-gray-700">Least Count</label>
                           <div className="col-span-2">
                             <input
-                              type="number"
+                              type="text"
                               name={`leastcount[${index}]`}
                               value={detail.leastCount}
                               onChange={(e) => handleMatrixDetailChange(index, 'leastCount', e.target.value)}

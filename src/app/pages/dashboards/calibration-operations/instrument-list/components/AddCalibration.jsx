@@ -107,10 +107,12 @@ export default function AddCalibration({
     { value: "separate", label: "separate" },
   ];
 
+  // CHANGE KARO - customSelectStyles mein menu property
   const customSelectStyles = {
     control: (base, state) => ({
       ...base,
       minHeight: "42px",
+      minWidth: "200px", // ← add karo
       borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
       boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.5)" : "none",
       "&:hover": {
@@ -120,6 +122,8 @@ export default function AddCalibration({
     menu: (base) => ({
       ...base,
       zIndex: 50,
+      width: "350px", // ← ye add karo
+      minWidth: "350px", // ← ye add karo
     }),
   };
 
@@ -136,20 +140,16 @@ export default function AddCalibration({
     fetchFieldnameOptions();
   }, [instrumentId]);
 
-
   useEffect(() => {
     const currentSetpoint = rows3[0]?.setpoint?.value;
-    
+
     if (!currentSetpoint) return;
 
     if (currentSetpoint === "master") {
-      
       handleMasterMode();
     } else if (currentSetpoint === "uuc") {
-    
       handleUucMode();
     } else if (currentSetpoint === "separate") {
-      
       handleSeparateMode();
     }
   }, [rows3[0]?.setpoint?.value, masterRepeatableValue, uucRepeatableValue]);
@@ -191,7 +191,6 @@ export default function AddCalibration({
   };
 
   const handleSeparateMode = () => {
-    
     if (rows2.length === 0) {
       setRows2([createEmptyRow2(1, "separate")]);
     }
@@ -311,24 +310,30 @@ export default function AddCalibration({
         };
 
         setRows1(table1Data.length > 0 ? table1Data : [createEmptyRow1(1)]);
-        setRows2(table2Data.length > 0 ? table2Data : [createEmptyRow2(1, data.setpoint || "uuc")]);
+        setRows2(
+          table2Data.length > 0
+            ? table2Data
+            : [createEmptyRow2(1, data.setpoint || "uuc")],
+        );
         setRows3([table3Data]);
-        
+
         // Set repeatable values
         setMasterRepeatableValue(data.master?.toString() || "");
         setUucRepeatableValue(data.uuc?.toString() || "");
-        
-        
+
         if (data.setpoint) {
           if (data.setpoint === "master" && data.master) {
             const masterCount = parseInt(data.master);
             if (!isNaN(masterCount) && masterCount > 0) {
-              const masterRows = Array.from({ length: masterCount }, (_, index) => ({
-                ...createEmptyRow2(index + 1, "master"),
-                fieldname: `Master Observation ${index + 1}`,
-                setvariable: `master_obs${index + 1}`,
-              }));
-              
+              const masterRows = Array.from(
+                { length: masterCount },
+                (_, index) => ({
+                  ...createEmptyRow2(index + 1, "master"),
+                  fieldname: `Master Observation ${index + 1}`,
+                  setvariable: `master_obs${index + 1}`,
+                }),
+              );
+
               if (table2Data.length === 0) {
                 setRows2(masterRows);
               }
@@ -341,13 +346,12 @@ export default function AddCalibration({
                 fieldname: `UUC Observation ${index + 1}`,
                 setvariable: `uuc_obs${index + 1}`,
               }));
-              
+
               if (table2Data.length === 0) {
                 setRows2(uucRows);
               }
             }
           }
-          
         }
       } else {
         setRows1([createEmptyRow1(1)]);
@@ -376,8 +380,8 @@ export default function AddCalibration({
 
   const createEmptyRow2 = (id, type = "uuc") => {
     let fieldname, setvariable;
-    
-    switch(type) {
+
+    switch (type) {
       case "master":
         fieldname = `Master Observation ${id}`;
         setvariable = `master_obs${id}`;
@@ -394,7 +398,7 @@ export default function AddCalibration({
         fieldname = `Observation ${id}`;
         setvariable = `obs${id}`;
     }
-    
+
     return {
       id,
       checked: true,
@@ -459,25 +463,23 @@ export default function AddCalibration({
   const addRow2 = () => {
     const newId =
       rows2.length > 0 ? Math.max(...rows2.map((r) => r.id)) + 1 : 1;
-    
-  
+
     const currentSetpoint = rows3[0]?.setpoint?.value || "uuc";
     setRows2([...rows2, createEmptyRow2(newId, currentSetpoint)]);
   };
 
   const handleInputChange3 = (id, field, value) => {
     const currentSetpoint = rows3[0]?.setpoint?.value;
-    
+
     if (field === "masterRepeatable") {
       setMasterRepeatableValue(value);
-      
-      
+
       if (currentSetpoint === "master") {
         const repeatCount = parseInt(value);
         if (!isNaN(repeatCount) && repeatCount > 0 && repeatCount <= 20) {
           const newRows2 = [];
           for (let i = 1; i <= repeatCount; i++) {
-            const existingRow = rows2.find(row => row.id === i);
+            const existingRow = rows2.find((row) => row.id === i);
             if (existingRow) {
               newRows2.push(existingRow);
             } else {
@@ -491,14 +493,13 @@ export default function AddCalibration({
       }
     } else if (field === "uucRepeatable") {
       setUucRepeatableValue(value);
-      
-      
+
       if (currentSetpoint === "uuc") {
         const repeatCount = parseInt(value);
         if (!isNaN(repeatCount) && repeatCount > 0 && repeatCount <= 20) {
           const newRows2 = [];
           for (let i = 1; i <= repeatCount; i++) {
-            const existingRow = rows2.find(row => row.id === i);
+            const existingRow = rows2.find((row) => row.id === i);
             if (existingRow) {
               newRows2.push(existingRow);
             } else {
@@ -511,7 +512,7 @@ export default function AddCalibration({
         }
       }
     }
-    
+
     setRows3(
       rows3.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
     );
@@ -525,9 +526,9 @@ export default function AddCalibration({
     );
   };
 
-    const getRequiredRowsCount = () => {
+  const getRequiredRowsCount = () => {
     const currentSetpoint = rows3[0]?.setpoint?.value;
-    
+
     if (currentSetpoint === "master") {
       const count = parseInt(masterRepeatableValue);
       return isNaN(count) || count <= 0 ? 1 : count;
@@ -535,7 +536,6 @@ export default function AddCalibration({
       const count = parseInt(uucRepeatableValue);
       return isNaN(count) || count <= 0 ? 1 : count;
     } else if (currentSetpoint === "separate") {
-      
       return 0;
     }
     return 1;
@@ -544,7 +544,7 @@ export default function AddCalibration({
   const handleSave = async () => {
     toast.success("Calibration settings saved!");
     onNext();
-    
+
     if (!formatId) {
       alert("Format ID is missing!");
       return;
@@ -715,7 +715,8 @@ export default function AddCalibration({
                 </div>
 
                 {/* Master Repeatable Field - Always show if setpoint is master or separate */}
-                {(currentSetpoint === "master" || currentSetpoint === "separate") && (
+                {(currentSetpoint === "master" ||
+                  currentSetpoint === "separate") && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Master Repeatable
@@ -737,15 +738,16 @@ export default function AddCalibration({
                       title="Enter number of master observation rows"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      {currentSetpoint === "master" 
-                        ? "Number of observation rows for Master" 
+                      {currentSetpoint === "master"
+                        ? "Number of observation rows for Master"
                         : "Master observation rows (for separate mode)"}
                     </p>
                   </div>
                 )}
 
                 {/* UUC Repeatable Field - Always show if setpoint is uuc or separate */}
-                {(currentSetpoint === "uuc" || currentSetpoint === "separate") && (
+                {(currentSetpoint === "uuc" ||
+                  currentSetpoint === "separate") && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       UUC Repeatable
@@ -767,8 +769,8 @@ export default function AddCalibration({
                       title="Enter number of UUC observation rows"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      {currentSetpoint === "uuc" 
-                        ? "Number of observation rows for UUC" 
+                      {currentSetpoint === "uuc"
+                        ? "Number of observation rows for UUC"
                         : "UUC observation rows (for separate mode)"}
                     </p>
                   </div>
@@ -970,18 +972,39 @@ export default function AddCalibration({
                 Observation Setting
               </h2>
               <div className="text-sm text-gray-500">
-                <div>Setpoint: <span className="font-semibold">{currentSetpoint || "Not selected"}</span></div>
-                <div>Rows: <span className="font-semibold">{rows2.length}</span></div>
+                <div>
+                  Setpoint:{" "}
+                  <span className="font-semibold">
+                    {currentSetpoint || "Not selected"}
+                  </span>
+                </div>
+                <div>
+                  Rows: <span className="font-semibold">{rows2.length}</span>
+                </div>
                 {currentSetpoint === "master" && masterRepeatableValue && (
-                  <div>Master Repeatable: <span className="font-semibold">{masterRepeatableValue}</span></div>
+                  <div>
+                    Master Repeatable:{" "}
+                    <span className="font-semibold">
+                      {masterRepeatableValue}
+                    </span>
+                  </div>
                 )}
                 {currentSetpoint === "uuc" && uucRepeatableValue && (
-                  <div>UUC Repeatable: <span className="font-semibold">{uucRepeatableValue}</span></div>
+                  <div>
+                    UUC Repeatable:{" "}
+                    <span className="font-semibold">{uucRepeatableValue}</span>
+                  </div>
                 )}
                 {currentSetpoint === "separate" && (
                   <div>
-                    <span className="font-semibold">Master: {masterRepeatableValue || "0"}</span> | 
-                    <span className="font-semibold"> UUC: {uucRepeatableValue || "0"}</span>
+                    <span className="font-semibold">
+                      Master: {masterRepeatableValue || "0"}
+                    </span>{" "}
+                    |
+                    <span className="font-semibold">
+                      {" "}
+                      UUC: {uucRepeatableValue || "0"}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1021,10 +1044,12 @@ export default function AddCalibration({
                   </thead>
                   <tbody>
                     {rows2.map((row) => {
-                      const isRequiredRow = currentSetpoint === "master" || currentSetpoint === "uuc" 
-                        ? row.id <= requiredRowsCount 
-                        : false;
-                      
+                      const isRequiredRow =
+                        currentSetpoint === "master" ||
+                        currentSetpoint === "uuc"
+                          ? row.id <= requiredRowsCount
+                          : false;
+
                       return (
                         <tr key={row.id} className="border-b hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm">{row.id}</td>
@@ -1102,7 +1127,11 @@ export default function AddCalibration({
                               style={{ cursor: "pointer" }}
                               disabled={isRequiredRow && rows2.length === 1}
                               className="rounded-md bg-red-600 px-3 py-1 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                              title={isRequiredRow ? "Required row cannot be deleted" : "Delete row"}
+                              title={
+                                isRequiredRow
+                                  ? "Required row cannot be deleted"
+                                  : "Delete row"
+                              }
                             >
                               <TrashIcon className="size-4.5 stroke-1" />
                             </button>
@@ -1114,16 +1143,16 @@ export default function AddCalibration({
                 </table>
               </div>
 
-            
-              {(currentSetpoint === "separate" || rows2.length < requiredRowsCount) && (
+              {(currentSetpoint === "separate" ||
+                rows2.length < requiredRowsCount) && (
                 <div className="flex justify-end border-t p-4">
                   <button
                     style={{ cursor: "pointer" }}
                     onClick={addRow2}
                     className="rounded-md bg-green-600 px-6 py-2 font-medium text-white transition hover:bg-green-700"
                   >
-                    {currentSetpoint === "separate" 
-                      ? "Add Row" 
+                    {currentSetpoint === "separate"
+                      ? "Add Row"
                       : `Add Row (Auto: ${requiredRowsCount})`}
                   </button>
                 </div>
