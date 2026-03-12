@@ -2556,14 +2556,94 @@ const protectedRoutes = {
             {
               path: "accounts",
               children: [
+                // ── Payment List + nested routes ──────────────────────
                 {
                   path: "payment-list",
-                  lazy: async () => ({
-                    Component: (
-                      await import("app/pages/dashboards/accounts/payment-list")
-                    ).default,
-                  }),
+                  children: [
+                    {
+                      path: "",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "create",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/Add"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "link-invoice/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/LinkInvoice"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "print-receipt/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/PrintPaymentReceipt"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "edit-without-customer/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/EditPayment"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "link-bd/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/LinkBD"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "pending-invoices/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/PendingInvoices"
+                          )
+                        ).default,
+                      }),
+                    },
+                    {
+                      path: "link-customer/:id",
+                      lazy: async () => ({
+                        Component: (
+                          await import(
+                            "app/pages/dashboards/accounts/payment-list/LinkCustomer"
+                          )
+                        ).default,
+                      }),
+                    },
+                  ],
                 },
+
+                // ── Other accounts routes ─────────────────────────────
                 {
                   path: "payment-list-party-wise",
                   lazy: async () => ({
@@ -2702,25 +2782,32 @@ const protectedRoutes = {
                   path: "consent-letter",
                   lazy: async () => ({
                     Component: (
-                      await import("app/pages/dashboards/accounts/consent-letter")
+                      await import(
+                        "app/pages/dashboards/accounts/consent-letter"
+                      )
                     ).default,
                   }),
                 },
                 {
                   path: "expense-category",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/accounts/expense-category")).default
-                  })
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/expense-category"
+                      )
+                    ).default,
+                  }),
                 },
                 {
                   path: "expenses",
                   lazy: async () => ({
-                    Component: (await import("app/pages/dashboards/accounts/expenses")).default
-                  })
-                }
+                    Component: (
+                      await import("app/pages/dashboards/accounts/expenses")
+                    ).default,
+                  }),
+                },
               ],
             },
-
             // ========================people=======================
             {
               path: "people",
