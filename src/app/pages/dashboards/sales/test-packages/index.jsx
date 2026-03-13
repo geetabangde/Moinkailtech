@@ -10,7 +10,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import clsx from "clsx";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import axios from "utils/axios";
 import { toast } from "sonner";
 
@@ -29,9 +30,11 @@ import { columns } from "./columns";
 // ----------------------------------------------------------------------
 
 const isSafari = getUserAgentBrowser() === "Safari";
+const PERMISSIONS = [263, 264, 265, 266]; // Replace with real auth
 
-export default function PartyWisePayment() {
+export default function TestPackagesList() {
   const { cardSkin } = useThemeContext();
+  const navigate = useNavigate();
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,43 +45,41 @@ export default function PartyWisePayment() {
     enableSorting: true,
     enableColumnFilters: false,
   });
-
   const [globalFilter, setGlobalFilter] = useState("");
-  const [sorting, setSorting] = useState([]);
-
+  const [sorting, setSorting] = useState([{ id: "id", desc: true }]);
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
-    "col-vis-party-wise-payment",
+    "col-vis-test-packages",
     {},
   );
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "col-pin-party-wise-payment",
+    "col-pin-test-packages",
     {},
   );
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
-  // ── Fetch ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const res = await axios.get("/accounts/get-payment-partywise");
-        if (
-          (res.data.status === true || res.data.status === "true") &&
-          Array.isArray(res.data.data)
-        ) {
-          setData(res.data.data);
-        } else {
-          setData([]);
-        }
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load party wise payment list");
-      } finally {
-        setLoading(false);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get("/sales/get-test-packagelist");
+      if (
+        (res.data.status === true || res.data.status === "true") &&
+        Array.isArray(res.data.data)
+      ) {
+        setData(res.data.data);
+      } else {
+        setData([]);
       }
-    };
-    fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load test packages");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const table = useReactTable({
     data,
@@ -94,11 +95,16 @@ export default function PartyWisePayment() {
       updateData: (rowIndex, columnId, value) => {
         skipAutoResetPageIndex();
         setData((old) =>
-          old.map((row, index) =>
-            index === rowIndex ? { ...old[rowIndex], [columnId]: value } : row,
+          old.map((row, i) =>
+            i === rowIndex ? { ...old[rowIndex], [columnId]: value } : row,
           ),
         );
       },
+      deleteRow: (row) => {
+        skipAutoResetPageIndex();
+        setData((old) => old.filter((r) => r.id !== row.original.id));
+      },
+      refetch: fetchData,
       setTableSettings,
     },
     filterFns: { fuzzy: fuzzyFilter },
@@ -121,18 +127,9 @@ export default function PartyWisePayment() {
   useDidUpdate(() => table.resetRowSelection(), [data]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // ── Summary totals ────────────────────────────────────────────────────────
-  const totalDebit = data.reduce((s, r) => s + (parseFloat(r.debit) || 0), 0);
-  const totalCredit = data.reduce((s, r) => s + (parseFloat(r.credit) || 0), 0);
-  const totalRemaining = data.reduce(
-    (s, r) => s + (parseFloat(r.balance) || 0),
-    0,
-  );
-  const fmt = (n) => n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
-
   if (loading) {
     return (
-      <Page title="Party Wise Payment">
+      <Page title="Price List">
         <div className="flex h-[60vh] items-center justify-center text-gray-600">
           <svg
             className="mr-2 h-6 w-6 animate-spin text-blue-600"
@@ -152,14 +149,14 @@ export default function PartyWisePayment() {
               d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
             />
           </svg>
-          Loading...
+          Loading Price List...
         </div>
       </Page>
     );
   }
 
   return (
-    <Page title="Party Wise Payment">
+    <Page title="Price List">
       <div className="transition-content w-full pb-5">
         <div
           className={clsx(
@@ -171,42 +168,31 @@ export default function PartyWisePayment() {
           {/* ── Toolbar ── */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-(--margin-x) pt-4 pb-3">
             <h2 className="dark:text-dark-50 text-xl font-semibold text-gray-800">
-              Party Wise Payment List
+              Price List
+              <span className="dark:bg-dark-700 dark:text-dark-300 ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-sm font-normal text-gray-500">
+                {data.length}
+              </span>
             </h2>
-            <input
-              type="text"
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              placeholder="Search customer..."
-              className="focus:border-primary-500 focus:ring-primary-500 dark:border-dark-500 dark:bg-dark-800 dark:text-dark-100 h-9 w-64 rounded-md border border-gray-300 px-3 text-sm text-gray-700 focus:ring-1 focus:outline-none"
-            />
-          </div>
-
-          {/* ── Summary Badges ── */}
-          {data.length > 0 && (
-            <div className="flex flex-wrap gap-3 px-(--margin-x) pb-3">
-              <SummaryBadge
-                label="Total Billing"
-                value={`₹${fmt(totalDebit)}`}
-                color="gray"
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                placeholder="Search package, rate..."
+                className="focus:border-primary-500 focus:ring-primary-500 dark:border-dark-500 dark:bg-dark-800 dark:text-dark-100 h-9 w-60 rounded-md border border-gray-300 px-3 text-sm text-gray-700 focus:ring-1 focus:outline-none"
               />
-              <SummaryBadge
-                label="Total Received"
-                value={`₹${fmt(totalCredit)}`}
-                color="green"
-              />
-              <SummaryBadge
-                label="Total Remaining"
-                value={`₹${fmt(totalRemaining)}`}
-                color="red"
-              />
-              <SummaryBadge
-                label="Customers"
-                value={data.length}
-                color="blue"
-              />
+              {PERMISSIONS.includes(263) && (
+                <button
+                  onClick={() =>
+                    navigate("/dashboards/sales/test-packages/add")
+                  }
+                  className="h-9 rounded-md bg-blue-500 px-4 text-sm font-medium text-white hover:bg-blue-600"
+                >
+                  + Add New Test Price
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           <div
             className={clsx(
@@ -301,7 +287,7 @@ export default function PartyWisePayment() {
                           colSpan={columns.length}
                           className="dark:text-dark-400 py-10 text-center text-sm text-gray-500"
                         >
-                          No records found.
+                          No test prices found.
                         </Td>
                       </Tr>
                     )}
@@ -319,21 +305,5 @@ export default function PartyWisePayment() {
         </div>
       </div>
     </Page>
-  );
-}
-
-function SummaryBadge({ label, value, color }) {
-  const colorMap = {
-    blue: "bg-blue-50  text-blue-700  dark:bg-blue-900/20  dark:text-blue-400",
-    green:
-      "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400",
-    red: "bg-red-50   text-red-700   dark:bg-red-900/20   dark:text-red-400",
-    gray: "bg-gray-100 text-gray-700  dark:bg-dark-700     dark:text-dark-200",
-  };
-  return (
-    <div className={clsx("rounded-lg px-4 py-2 text-sm", colorMap[color])}>
-      <span className="font-medium">{label}: </span>
-      <span className="font-bold">{value}</span>
-    </div>
   );
 }

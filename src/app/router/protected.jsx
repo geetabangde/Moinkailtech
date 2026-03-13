@@ -2552,6 +2552,52 @@ const protectedRoutes = {
                 },
               ],
             },
+            // =============================sales==========================
+            {
+              path: "sales",
+              children: [
+                // ── test-packages ──────────────────────
+                {
+                  path: "test-packages",
+                  lazy: async () => ({
+                    Component: (
+                      await import("app/pages/dashboards/sales/test-packages")
+                    ).default,
+                  }),
+                },
+                {
+                  path: "test-packages/add",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/sales/test-packages/AddTestPackage"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "test-packages/edit/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/sales/test-packages/EditTestPackage"
+                      )
+                    ).default,
+                  }),
+                },
+                // ── Clone route — same EditTestPackage, cloneId param se isClone=true ──
+                {
+                  path: "test-packages/clone/:cloneId",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/sales/test-packages/EditTestPackage"
+                      )
+                    ).default,
+                  }),
+                },
+              ],
+            },
             // ========================accounts=============================
             {
               path: "accounts",
@@ -2650,6 +2696,26 @@ const protectedRoutes = {
                     Component: (
                       await import(
                         "app/pages/dashboards/accounts/payment-list-party-wise"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "customer-payment/:customerid",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/payment-list-party-wise/CustomerPayments"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "customer-ledger/:customerid",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/payment-list-party-wise/CustomerLedger"
                       )
                     ).default,
                   }),
@@ -3268,4 +3334,4 @@ const protectedRoutes = {
   ],
 };
 
-export { protectedRoutes };   
+export { protectedRoutes };
