@@ -1,6 +1,8 @@
-// Import Dependencies
-import {MagnifyingGlassIcon} from "@heroicons/react/24/outline";
-// import { TbUpload } from "react-icons/tb";
+// Toolbar.jsx — Proforma Invoice List
+// PHP: + Add Proforma Invoices button (permission 62)
+// Pattern: same as payment-list Toolbar
+
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import {
   Menu,
@@ -10,49 +12,42 @@ import {
   Transition,
 } from "@headlessui/react";
 import { EllipsisHorizontalIcon } from "@heroicons/react/20/solid";
-
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router";
 
 import { Button, Input } from "components/ui";
 import { TableConfig } from "./TableConfig";
 import { useBreakpointsContext } from "app/contexts/breakpoint/context";
-// import { orderStatusOptions } from "./data";
 
 // ----------------------------------------------------------------------
 
 export function Toolbar({ table }) {
   const { isXs } = useBreakpointsContext();
-  const isFullScreenEnabled = table.getState().tableSettings.enableFullScreen;
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const isFullScreenEnabled = table.getState().tableSettings?.enableFullScreen;
+
+  const permissions = table.options.meta?.permissions ?? [];
+  // PHP: in_array(62, $permissions) → show Add button
+  const canAdd = permissions.includes(62);
 
   return (
     <div className="table-toolbar">
+      {/* ── Row 1: Heading + Add button / mobile menu ── */}
       <div
         className={clsx(
           "transition-content flex items-center justify-between gap-4",
           isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x) pt-4",
         )}
       >
-          {/*  */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          {/* Heading */}
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-wide text-gray-800 dark:text-dark-50">
-            Modes List
-            </h2>
-          </div>
-
-          {/* Button */}
-          <div>
-          <Button
-              onClick={() => navigate("/dashboards/master-data/modes/create")}
-              className="h-9 rounded-md px-4 text-sm font-medium"
-              color="primary"
-            >+ Add New Modes </Button>
-          
-          </div>
+        <div className="min-w-0">
+          <h2 className="dark:text-dark-50 text-xl font-semibold tracking-wide text-gray-800">
+            Proforma Invoice List
+          </h2>
+          <p className="dark:text-dark-400 mt-0.5 text-sm text-gray-500">
+            Manage all proforma invoices
+          </p>
         </div>
-        
+
         {isXs ? (
           <Menu as="div" className="relative inline-block text-left">
             <MenuButton
@@ -70,137 +65,60 @@ export function Toolbar({ table }) {
               leave="transition ease-in"
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-2"
-              className="absolute z-100 mt-1.5 min-w-[10rem] whitespace-nowrap rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-700 dark:shadow-none ltr:right-0 rtl:left-0"
+              className="dark:border-dark-500 dark:bg-dark-700 absolute z-100 mt-1.5 min-w-[10rem] rounded-lg border border-gray-300 bg-white py-1 whitespace-nowrap shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden ltr:right-0 rtl:left-0 dark:shadow-none"
             >
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>+ Add New Unittype/ Parameter</span>
-                  </button>
-                )}
-              </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Share</span>
-                  </button>
-                )}
-              </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Print</span>
-                  </button>
-                )}
-              </MenuItem>
-              <hr className="mx-3 my-1.5 h-px border-gray-150 dark:border-dark-500" />
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Import Orders</span>
-                  </button>
-                )}
-              </MenuItem>
-              <hr className="mx-3 my-1.5 h-px border-gray-150 dark:border-dark-500" />
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Export as PDF</span>
-                  </button>
-                )}
-              </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Export as CSV</span>
-                  </button>
-                )}
-              </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    className={clsx(
-                      "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <span>Save Table as View</span>
-                  </button>
-                )}
-              </MenuItem>
+              {canAdd && (
+                <MenuItem>
+                  {({ focus }) => (
+                    <button
+                      onClick={() =>
+                        navigate("/dashboards/accounts/proforma-invoice/add")
+                      }
+                      className={clsx(
+                        "flex h-9 w-full items-center px-3 tracking-wide outline-hidden transition-colors",
+                        focus &&
+                          "dark:bg-dark-600 dark:text-dark-100 bg-gray-100 text-gray-800",
+                      )}
+                    >
+                      + Add Proforma Invoice
+                    </button>
+                  )}
+                </MenuItem>
+              )}
             </Transition>
           </Menu>
         ) : (
-          <div className="flex space-x-2 ">
-          
-
-          
-            
+          <div className="flex shrink-0 items-center gap-2">
+            {/* PHP: in_array(62,$permissions) → + Add Proforma Invoices */}
+            {canAdd && (
+              <button
+                onClick={() =>
+                  navigate("/dashboards/accounts/proforma-invoice/add")
+                }
+                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                + Add Proforma Invoice
+              </button>
+            )}
           </div>
         )}
       </div>
 
+      {/* ── Row 2: Search + TableConfig ── */}
       {isXs ? (
-        <>
-          <div
-            className={clsx(
-              "flex space-x-2 pt-4  [&_.input-root]:flex-1",
-              isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
-            )}
-          >
-            <SearchInput table={table} />
-            <TableConfig table={table} />
-          </div>
-          <div
-            className={clsx(
-              "hide-scrollbar flex shrink-0 space-x-2 overflow-x-auto pb-1 pt-4 ",
-              isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
-            )}
-          >
-          
-          </div>
-        </>
+        <div
+          className={clsx(
+            "flex space-x-2 pt-4 [&_.input-root]:flex-1",
+            isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
+          )}
+        >
+          <SearchInput table={table} />
+          <TableConfig table={table} />
+        </div>
       ) : (
         <div
           className={clsx(
-            "custom-scrollbar transition-content flex justify-between space-x-4 overflow-x-auto pb-1 pt-4 ",
+            "custom-scrollbar transition-content flex justify-between space-x-4 overflow-x-auto pt-4 pb-1",
             isFullScreenEnabled ? "px-4 sm:px-5" : "px-(--margin-x)",
           )}
           style={{
@@ -209,12 +127,10 @@ export function Toolbar({ table }) {
               : "var(--margin-x)",
           }}
         >
-          <div className="flex shrink-0 space-x-2 ">
+          <div className="flex shrink-0 items-center space-x-2">
             <SearchInput table={table} />
-            
+            <TableConfig table={table} />
           </div>
-
-          
         </div>
       )}
     </div>
@@ -228,11 +144,14 @@ function SearchInput({ table }) {
       onChange={(e) => table.setGlobalFilter(e.target.value)}
       prefix={<MagnifyingGlassIcon className="size-4" />}
       classNames={{
-        input: "h-8 text-xs ring-primary-500/50 focus:ring-3",
+        input: "ring-primary-500/50 h-8 text-xs focus:ring-3",
         root: "shrink-0",
       }}
-      placeholder="Search ID, Customer..."
+      placeholder="Search invoice no, customer..."
     />
   );
 }
 
+Toolbar.propTypes = {
+  table: PropTypes.object.isRequired,
+};

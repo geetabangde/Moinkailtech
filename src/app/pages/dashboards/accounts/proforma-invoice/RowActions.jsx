@@ -1,160 +1,200 @@
-// Import Dependencies
-import {
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuItems,
-  Transition,
-} from "@headlessui/react";
-import {
+// RowActions.jsx — Proforma Invoice List
+// PHP actions:
+//   status==0 + permission(300) → Approve button
+//   status!=91 → Edit Proforma Invoice
+//   always → View Invoice
 
-  EllipsisHorizontalIcon,
-
-  PencilIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
 import clsx from "clsx";
-import { Fragment, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import PropTypes from "prop-types";
-
-// Local Imports
-import { ConfirmModal } from "components/shared/ConfirmModal";
-import { Button } from "components/ui";
+import { useNavigate } from "react-router";
 import axios from "utils/axios";
 import { toast } from "sonner";
-import { useNavigate } from "react-router";
-
-
 
 // ----------------------------------------------------------------------
 
-const confirmMessages = {
-  pending: {
-    description:
-      "Are you sure you want to delete this modes? Once deleted, it cannot be restored.",
-  },
-  success: {
-    title: "modes Deleted",
-  },
-};
+// ── Custom Approve Modal ──────────────────────────────────────────────────
+function ApproveModal({ show, onClose, onOk, loading }) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="dark:bg-dark-800 w-full max-w-sm rounded-lg bg-white shadow-xl">
+        {/* Icon */}
+        <div className="flex flex-col items-center px-6 pt-6 pb-4">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-7 w-7 text-green-600 dark:text-green-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <h3 className="dark:text-dark-50 text-base font-semibold text-gray-800">
+            Approve Invoice?
+          </h3>
+          <p className="dark:text-dark-400 mt-1.5 text-center text-sm text-gray-500">
+            Are you sure you want to approve this Proforma Invoice?
+          </p>
+        </div>
+        {/* Buttons */}
+        <div className="dark:border-dark-500 flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="dark:border-dark-500 dark:text-dark-300 rounded-md border border-gray-300 px-5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onOk}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+                  />
+                </svg>
+                Approving…
+              </>
+            ) : (
+              "Approve"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function RowActions({ row, table }) {
-  const navigate = useNavigate(); // 👈 Hook
-   const handleEdit = () => {
-    const id = row.original.id; // 👈 your API data should return "id"
-    navigate(`/dashboards/master-data/modes/edit/${id}`);
-  };
+  const navigate = useNavigate();
+  const rowData = row.original;
+  const permissions = table.options.meta?.permissions ?? [];
 
+  // PHP: in_array(300, $permissions) → Approve
+  const canApprove = permissions.includes(300);
+  // PHP: in_array(62, $permissions) → Edit (add/edit)
+  const canEdit = permissions.includes(62);
 
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
-  const [deleteSuccess, setDeleteSuccess] = useState(false);
-  const [deleteError, setDeleteError] = useState(false);
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [approveLoading, setApproveLoading] = useState(false);
 
+  const openApprove = () => setApproveModalOpen(true);
+  const closeApprove = () => setApproveModalOpen(false);
 
-
-  const closeModal = () => {
-    setDeleteModalOpen(false);
-  };
-
-  const openModal = () => {
-    setDeleteModalOpen(true);
-    setDeleteError(false);
-    setDeleteSuccess(false);
-  };
-
-  const handleDeleteRows = useCallback(async () => {
-  const id = row.original.id; // Assuming your row contains `id`
-  setConfirmDeleteLoading(true);
-
-  try {
-    await axios.delete(`/master/mode-delete/${id}`);
-    table.options.meta?.deleteRow(row); // remove row from UI
-    setDeleteSuccess(true);
-     toast.success("Unit type deleted successfully ✅", {
-      duration: 1000,
-      icon: "🗑️",
-    });
-  } catch (error) {
-    console.error("Delete failed:", error);
-    setDeleteError(true);
-     toast.error("Failed to delete unit type ❌", {
-      duration: 2000,
-    });
-  } finally {
-    setConfirmDeleteLoading(false);
-  }
-}, [row, table]);
-
-  const state = deleteError ? "error" : deleteSuccess ? "success" : "pending";
+  const handleApprove = useCallback(async () => {
+    setApproveLoading(true);
+    try {
+      const res = await axios.post(`/accounts/approve-invoice/${rowData.id}`);
+      if (
+        res.data.success === true ||
+        res.data.status === true ||
+        res.data.status === "true" ||
+        res.data === "Invoice Approved"
+      ) {
+        toast.success("Proforma Invoice approved ✅");
+        table.options.meta?.updateRow(row.index, {
+          status: 1,
+          invoiceno: res.data.invoiceno ?? rowData.invoiceno,
+        });
+        closeApprove();
+      } else {
+        toast.error(res.data.message ?? "Approval failed");
+      }
+    } catch {
+      toast.error("Failed to approve invoice");
+    } finally {
+      setApproveLoading(false);
+    }
+  }, [rowData.id, rowData.invoiceno, row.index, table]);
 
   return (
     <>
-      <div className="flex justify-center space-x-1.5 ">
-      
+      <div className="flex flex-wrap gap-1.5">
+        {/* PHP: status==0 + canApprove → Approve */}
+        {rowData.status === 0 && canApprove && (
+          <ActionBtn color="success" onClick={openApprove}>
+            Approve
+          </ActionBtn>
+        )}
 
-        <Menu as="div" className="relative inline-block text-left">
-          <MenuButton as={Button} isIcon className="size-8 rounded-full">
-            <EllipsisHorizontalIcon className="size-4.5" />
-          </MenuButton>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out"
-            enterFrom="opacity-0 translate-y-2"
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-2"
+        {/* PHP: status!=91 → Edit Proforma Invoice */}
+        {rowData.status !== 91 && canEdit && (
+          <ActionBtn
+            color="warning"
+            onClick={() =>
+              navigate(
+                `/dashboards/accounts/proforma-invoice/edit/${rowData.id}`,
+              )
+            }
           >
-            <MenuItems
-              anchor={{ to: "bottom end", gap: 12 }}
-              className="absolute z-100 w-[10rem] rounded-lg border border-gray-300 bg-white py-1 shadow-lg shadow-gray-200/50 outline-hidden focus-visible:outline-hidden dark:border-dark-500 dark:bg-dark-750 dark:shadow-none ltr:right-0 rtl:left-0"
-            >
-              
-              <MenuItem>
-                {({ focus }) => (
-                  <button onClick={handleEdit}
-                    className={clsx(
-                      "flex h-9 w-full items-center space-x-3 px-3 tracking-wide outline-hidden transition-colors ",
-                      focus &&
-                        "bg-gray-100 text-gray-800 dark:bg-dark-600 dark:text-dark-100",
-                    )}
-                  >
-                    <PencilIcon className="size-4.5 stroke-1" />
-                    <span>Edit</span>
-                  </button>
-                )}
-              </MenuItem>
-              <MenuItem>
-                {({ focus }) => (
-                  <button
-                    onClick={openModal}
-                    className={clsx(
-                      "this:error flex h-9 w-full items-center space-x-3 px-3 tracking-wide text-this outline-hidden transition-colors dark:text-this-light ",
-                      focus && "bg-this/10 dark:bg-this-light/10",
-                    )}
-                  >
-                    <TrashIcon className="size-4.5 stroke-1" />
-                    <span>Delete</span>
-                  </button>
-                )}
-              </MenuItem>
-            </MenuItems>
-          </Transition>
-        </Menu>
+            Edit
+          </ActionBtn>
+        )}
+
+        {/* PHP: always → View Invoice */}
+        <ActionBtn
+          color="primary"
+          onClick={() =>
+            navigate(`/dashboards/accounts/proforma-invoice/view/${rowData.id}`)
+          }
+        >
+          View Invoice
+        </ActionBtn>
       </div>
 
-      <ConfirmModal
-        show={deleteModalOpen}
-        onClose={closeModal}
-        messages={confirmMessages}
-        onOk={handleDeleteRows}
-        confirmLoading={confirmDeleteLoading}
-        state={state}
+      <ApproveModal
+        show={approveModalOpen}
+        onClose={closeApprove}
+        onOk={handleApprove}
+        loading={approveLoading}
       />
-
-    
     </>
+  );
+}
+
+function ActionBtn({ color = "primary", onClick, children }) {
+  const colorMap = {
+    success: "bg-green-500 hover:bg-green-600 text-white",
+    primary: "bg-blue-500 hover:bg-blue-600 text-white",
+    warning: "bg-amber-500 hover:bg-amber-600 text-white",
+    danger: "bg-red-500 hover:bg-red-600 text-white",
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        "inline-flex items-center rounded px-2.5 py-1 text-xs font-medium transition-colors",
+        colorMap[color],
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

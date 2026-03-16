@@ -2751,11 +2751,71 @@ const protectedRoutes = {
                   }),
                 },
                 {
+                  path: "proforma-invoice/add",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/proforma-invoice/AddEditProformaInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "proforma-invoice/edit/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/proforma-invoice/AddEditProformaInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "proforma-invoice/view/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/proforma-invoice/ViewProformaInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
                   path: "calibration-invoice-list",
                   lazy: async () => ({
                     Component: (
                       await import(
                         "app/pages/dashboards/accounts/calibration-invoice-list"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-invoice-list/view/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-invoice-list/ViewCalibrationInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-invoice-list/edit/:id",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-invoice-list/Addcalibrationinvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-invoice-list/add",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-invoice-list/Addcalibrationinvoice"
                       )
                     ).default,
                   }),

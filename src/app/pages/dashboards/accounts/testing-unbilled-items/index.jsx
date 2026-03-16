@@ -1,4 +1,11 @@
-// Import Dependencies
+// index.jsx — Unbilled Testing Items
+// Route: /dashboards/accounts/calibration-unbilled-items
+// Pattern: exact same as PaymentList (tanstack table, Toolbar, PaginationSection)
+// PHP logic port:
+//   invBrnArray  → billed BRNs from invoices
+//   trfBrnArray  → unbilled from trfProducts (invoice null/empty)
+//   cross-match  → remove billed from trf list → final unbilled list
+
 import {
   flexRender,
   getCoreRowModel,
@@ -12,6 +19,7 @@ import {
 import clsx from "clsx";
 import { useState, useEffect } from "react";
 import axios from "utils/axios";
+import { toast } from "sonner";
 
 // Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
@@ -20,75 +28,154 @@ import { Page } from "components/shared/Page";
 import { useLockScrollbar, useDidUpdate, useLocalStorage } from "hooks";
 import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
-import { Toolbar } from "./Toolbar";
-import { columns } from "./columns";
 import { PaginationSection } from "components/shared/table/PaginationSection";
-import { SelectedRowsActions } from "./SelectedRowsActions";
 import { useThemeContext } from "app/contexts/theme/context";
 import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
+import { Toolbar } from "./Toolbar";
+import { columns } from "./columns";
 
 // ----------------------------------------------------------------------
 
 const isSafari = getUserAgentBrowser() === "Safari";
 
-export default function OrdersDatatableV1() {
+// ── PHP BRN cross-match (frontend fallback) ───────────────────────────────
+// PHP: foreach $invBrnArray → array_search($brnno, $trfBrnColumn) → unset
+// React: Set-based O(1) filter
+function applyPhpBrnFilter(trfList, invBrnList) {
+  if (!invBrnList || invBrnList.length === 0) return trfList;
+  const invSet = new Set(invBrnList.map((b) => String(b).trim()));
+  return trfList.filter((row) => !invSet.has(String(row.brn).trim()));
+}
+
+// ── Spinner ───────────────────────────────────────────────────────────────
+function PageSpinner() {
+  return (
+    <Page title="Unbilled Testing Items">
+      <div className="flex h-[60vh] items-center justify-center text-gray-600">
+        <svg
+          className="mr-2 h-6 w-6 animate-spin text-blue-600"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+          />
+        </svg>
+        Loading...
+      </div>
+    </Page>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────
+export default function UnbilledTestingItems() {
   const { cardSkin } = useThemeContext();
 
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [bdList, setBdList] = useState([]);
+  const [loading, setLoading] = useState(false); // false = no auto-load on mount
+  const [dropdownLoading, setDropdownLoading] = useState(true);
+  const [searched, setSearched] = useState(false);
 
-  // ✅ Fetch from API
+  // ── Filter state ──────────────────────────────────────────────────────
+  const [filters, setFilters] = useState({
+    startdate: "",
+    enddate: "",
+    customerid: "",
+    bd: "",
+  });
+
+  // ── Load dropdowns on mount ───────────────────────────────────────────
   useEffect(() => {
-    fetchModes();
+    const load = async () => {
+      try {
+        const [custRes, bdRes] = await Promise.all([
+          axios.get("/people/get-all-customers"),
+          axios.get("/people/get-customer-bd"),
+        ]);
+        setCustomers(custRes.data.data ?? custRes.data ?? []);
+        setBdList(bdRes.data.data ?? bdRes.data ?? []);
+      } catch {
+        toast.error("Filter options load nahi ho sake");
+      } finally {
+        setDropdownLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  const fetchModes = async () => {
-  try {
-    setLoading(true); // start loader
-    const response = await axios.get("/master/mode-list");
-    
-    // console.log("API response:", response.data); // debug
-
-    if (response.data.status && Array.isArray(response.data.data)) {
-      setOrders(response.data.data); // ✅ correct assignment
-    } else {
-      console.warn("Unexpected response structure:", response.data);
-      setOrders([]); // fallback
+  // ── Fetch unbilled items — called on Search click ─────────────────────
+  // PHP: if (!empty($search)) → run queries else "Search Parameter Required"
+  const fetchItems = async (f = filters) => {
+    if (!f.startdate || !f.enddate) {
+      toast.error("Start Date aur End Date dono required hain");
+      return;
     }
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        startdate: f.startdate,
+        enddate: f.enddate,
+      });
+      if (f.customerid) params.set("customerid", f.customerid);
+      if (f.bd) params.set("bd", f.bd);
 
-  } catch (err) {
-    console.error("Error fetching mode list:", err);
-  } finally {
-    setLoading(false); // stop loader
-  }
-};
+      const res = await axios.get(
+        `/accounts/testing-unbilled-item?${params.toString()}`,
+      );
+      const rawList = res.data.data ?? res.data ?? [];
 
+      // PHP frontend BRN cross-match fallback
+      // (if backend already filtered, invBrns will be [] → no-op)
+      const invBrns = res.data.invBrns ?? [];
+      const finalList = applyPhpBrnFilter(rawList, invBrns);
 
+      setItems(finalList);
+      setSearched(true);
+      if (finalList.length === 0) toast.info("Koi unbilled item nahi mila");
+    } catch (err) {
+      console.error(err);
+      toast.error("Data fetch karne mein error aaya");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleSearch = () => fetchItems(filters);
+
+  // ── Table settings ────────────────────────────────────────────────────
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
     enableRowDense: false,
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
-
   const [sorting, setSorting] = useState([]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
-    "column-visibility-orders-1",
+    "column-visibility-unbilled-testing",
     {},
   );
-
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "column-pinning-orders-1",
+    "column-pinning-unbilled-testing",
     {},
   );
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
   const table = useReactTable({
-    data: orders,
-    columns: columns,
+    data: items,
+    columns,
     state: {
       globalFilter,
       sorting,
@@ -96,37 +183,18 @@ export default function OrdersDatatableV1() {
       columnPinning,
       tableSettings,
     },
-        meta: {
-  updateData: (rowIndex, columnId, value) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.map((row, index) => {
-        if (index === rowIndex) {
-          return {
-            ...old[rowIndex],
-            [columnId]: value,
-          };
-        }
-        return row;
-      })
-    );
-  },
-  deleteRow: (row) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.filter((oldRow) => oldRow.id !== row.original.id)
-    );
-  },
-  deleteRows: (rows) => {
-    skipAutoResetPageIndex();
-    const rowIds = rows.map((row) => row.original.id);
-    setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
-  },
-  setTableSettings
-},
-    filterFns: {
-      fuzzy: fuzzyFilter,
+    meta: {
+      setTableSettings,
+      updateData: (rowIndex, columnId, value) => {
+        skipAutoResetPageIndex();
+        setItems((old) =>
+          old.map((row, index) =>
+            index === rowIndex ? { ...old[rowIndex], [columnId]: value } : row,
+          ),
+        );
+      },
     },
+    filterFns: { fuzzy: fuzzyFilter },
     enableSorting: tableSettings.enableSorting,
     enableColumnFilters: tableSettings.enableColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -137,44 +205,45 @@ export default function OrdersDatatableV1() {
     globalFilterFn: fuzzyFilter,
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-
     getPaginationRowModel: getPaginationRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
-
     autoResetPageIndex,
   });
 
-  useDidUpdate(() => table.resetRowSelection(), [orders]);
-
+  useDidUpdate(() => table.resetRowSelection(), [items]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // ✅ Loading UI
-  if (loading) {
-    return (
-      <Page title="Modes List">
-        <div className="flex h-[60vh] items-center justify-center text-gray-600">
-          <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
-          </svg>
-          Loading Modes...
-        </div>
-      </Page>
-    );
-  }
+  // ── Loading spinner (while searching) ────────────────────────────────
+  if (loading || dropdownLoading) return <PageSpinner />;
+
+  // ── Summary counts ────────────────────────────────────────────────────
+  const pendingCount = items.filter(
+    (r) =>
+      !r.invoice || r.invoice === "" || r.invoice === "0" || r.invoice === 0,
+  ).length;
+  const billedCount = items.length - pendingCount;
 
   return (
-    <Page title="Modes List">
+    <Page title="Unbilled Testing Items">
       <div className="transition-content w-full pb-5">
         <div
           className={clsx(
             "flex h-full w-full flex-col",
             tableSettings.enableFullScreen &&
-              "fixed inset-0 z-61 bg-white pt-3 dark:bg-dark-900",
+              "dark:bg-dark-900 fixed inset-0 z-61 bg-white pt-3",
           )}
         >
-          <Toolbar table={table} />
+          {/* Toolbar with filters */}
+          <Toolbar
+            table={table}
+            filters={filters}
+            setFilters={setFilters}
+            customers={customers}
+            bdList={bdList}
+            onSearch={handleSearch}
+          />
+
           <div
             className={clsx(
               "transition-content flex grow flex-col pt-3",
@@ -183,77 +252,114 @@ export default function OrdersDatatableV1() {
                 : "px-(--margin-x)",
             )}
           >
+            {/* Summary pills — shown after first search */}
+            {searched && items.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="dark:bg-dark-700 dark:text-dark-200 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
+                  Total: <span className="font-bold">{items.length}</span>
+                </span>
+                <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                  Pending: <span className="font-bold">{pendingCount}</span>
+                </span>
+                <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  Billed: <span className="font-bold">{billedCount}</span>
+                </span>
+              </div>
+            )}
+
             <Card
               className={clsx(
                 "relative flex grow flex-col",
                 tableSettings.enableFullScreen && "overflow-hidden",
               )}
             >
-              <div className="table-wrapper min-w-full grow overflow-x-auto">
-                <Table
-                  hoverable
-                  dense={tableSettings.enableRowDense}
-                  sticky={tableSettings.enableFullScreen}
-                  className="w-full text-left rtl:text-right"
-                >
-                  <THead>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <Tr key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => (
-                          <Th
-                            key={header.id}
+              {/* Empty / initial state */}
+              {!searched ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-16">
+                  <span className="text-4xl">🔍</span>
+                  <p className="dark:text-dark-300 font-medium text-gray-600">
+                    Filters select karein aur Search karein
+                  </p>
+                  <p className="dark:text-dark-500 text-sm text-gray-400">
+                    Start Date aur End Date required hain
+                  </p>
+                </div>
+              ) : searched && items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-16">
+                  <span className="text-4xl">📋</span>
+                  <p className="dark:text-dark-300 font-medium text-gray-600">
+                    Koi unbilled item nahi mila
+                  </p>
+                  <p className="dark:text-dark-500 text-sm text-gray-400">
+                    Filters adjust karke dobara try karein
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="table-wrapper min-w-full grow overflow-x-auto">
+                    <Table
+                      hoverable
+                      dense={tableSettings.enableRowDense}
+                      sticky={tableSettings.enableFullScreen}
+                      className="w-full text-left rtl:text-right"
+                    >
+                      <THead>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                          <Tr key={headerGroup.id}>
+                            {headerGroup.headers.map((header) => (
+                              <Th
+                                key={header.id}
+                                className={clsx(
+                                  "dark:bg-dark-800 dark:text-dark-100 bg-gray-200 font-semibold text-gray-800 uppercase first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
+                                  header.column.getCanPin() && [
+                                    header.column.getIsPinned() === "left" &&
+                                      "sticky z-2 ltr:left-0 rtl:right-0",
+                                    header.column.getIsPinned() === "right" &&
+                                      "sticky z-2 ltr:right-0 rtl:left-0",
+                                  ],
+                                )}
+                              >
+                                {header.column.getCanSort() ? (
+                                  <div
+                                    className="flex cursor-pointer items-center space-x-3 select-none"
+                                    onClick={header.column.getToggleSortingHandler()}
+                                  >
+                                    <span className="flex-1">
+                                      {header.isPlaceholder
+                                        ? null
+                                        : flexRender(
+                                            header.column.columnDef.header,
+                                            header.getContext(),
+                                          )}
+                                    </span>
+                                    <TableSortIcon
+                                      sorted={header.column.getIsSorted()}
+                                    />
+                                  </div>
+                                ) : header.isPlaceholder ? null : (
+                                  flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext(),
+                                  )
+                                )}
+                              </Th>
+                            ))}
+                          </Tr>
+                        ))}
+                      </THead>
+
+                      <TBody>
+                        {table.getRowModel().rows.map((row) => (
+                          <Tr
+                            key={row.id}
                             className={clsx(
-                              "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
-                              header.column.getCanPin() && [
-                                header.column.getIsPinned() === "left" &&
-                                  "sticky z-2 ltr:left-0 rtl:right-0",
-                                header.column.getIsPinned() === "right" &&
-                                  "sticky z-2 ltr:right-0 rtl:left-0",
-                              ],
+                              "dark:border-b-dark-500 relative border-y border-transparent border-b-gray-200",
+                              row.getIsSelected() &&
+                                !isSafari &&
+                                "row-selected after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500 after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent",
                             )}
                           >
-                            {header.column.getCanSort() ? (
-                              <div
-                                className="flex cursor-pointer select-none items-center space-x-3 "
-                                onClick={header.column.getToggleSortingHandler()}
-                              >
-                                <span className="flex-1">
-                                  {header.isPlaceholder
-                                    ? null
-                                    : flexRender(
-                                        header.column.columnDef.header,
-                                        header.getContext(),
-                                      )}
-                                </span>
-                                <TableSortIcon
-                                  sorted={header.column.getIsSorted()}
-                                />
-                              </div>
-                            ) : header.isPlaceholder ? null : (
-                              flexRender(
-                                header.column.columnDef.header,
-                                header.getContext(),
-                              )
-                            )}
-                          </Th>
-                        ))}
-                      </Tr>
-                    ))}
-                  </THead>
-                  <TBody>
-                    {table.getRowModel().rows.map((row) => {
-                      return (
-                        <Tr
-                          key={row.id}
-                          className={clsx(
-                            "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
-                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
-                          )}
-                        >
-                          {/* first row is a normal row */}
-                          {row.getVisibleCells().map((cell) => {
-                            return (
+                            {row.getVisibleCells().map((cell) => (
                               <Td
                                 key={cell.id}
                                 className={clsx(
@@ -272,41 +378,42 @@ export default function OrdersDatatableV1() {
                                 {cell.column.getIsPinned() && (
                                   <div
                                     className={clsx(
-                                      "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
+                                      "dark:border-dark-500 pointer-events-none absolute inset-0 border-gray-200",
                                       cell.column.getIsPinned() === "left"
                                         ? "ltr:border-r rtl:border-l"
                                         : "ltr:border-l rtl:border-r",
                                     )}
-                                  ></div>
+                                  />
                                 )}
                                 {flexRender(
                                   cell.column.columnDef.cell,
                                   cell.getContext(),
                                 )}
                               </Td>
-                            );
-                          })}
-                        </Tr>
-                      );
-                    })}
-                  </TBody>
-                </Table>
-              </div>
-              <SelectedRowsActions table={table} />
-              {table.getCoreRowModel().rows.length && (
-                <div
-                  className={clsx(
-                    "px-4 pb-4 sm:px-5 sm:pt-4",
-                    tableSettings.enableFullScreen &&
-                      "bg-gray-50 dark:bg-dark-800",
-                    !(
-                      table.getIsSomeRowsSelected() ||
-                      table.getIsAllRowsSelected()
-                    ) && "pt-4",
+                            ))}
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </Table>
+                  </div>
+
+                  {/* Pagination — same as PaymentList */}
+                  {table.getCoreRowModel().rows.length > 0 && (
+                    <div
+                      className={clsx(
+                        "px-4 pb-4 sm:px-5 sm:pt-4",
+                        tableSettings.enableFullScreen &&
+                          "dark:bg-dark-800 bg-gray-50",
+                        !(
+                          table.getIsSomeRowsSelected() ||
+                          table.getIsAllRowsSelected()
+                        ) && "pt-4",
+                      )}
+                    >
+                      <PaginationSection table={table} />
+                    </div>
                   )}
-                >
-                  <PaginationSection table={table} />
-                </div>
+                </>
               )}
             </Card>
           </div>

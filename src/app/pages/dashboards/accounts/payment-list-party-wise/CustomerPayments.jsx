@@ -104,7 +104,9 @@ function RowActions({ row, table }) {
     <div className="flex flex-wrap gap-1.5">
       <button
         onClick={() =>
-          navigate(`/dashboards/accounts/print-receipt/${row.original.id}`)
+          navigate(
+            `/dashboards/accounts/payment-list/print-receipt/${row.original.id}`,
+          )
         }
         className="rounded bg-green-500 px-3 py-1 text-xs font-medium text-white hover:bg-green-600"
       >
@@ -296,14 +298,14 @@ export default function CustomerPayments() {
               placeholder="Search..."
               className="focus:border-primary-500 focus:ring-primary-500 dark:border-dark-500 dark:bg-dark-800 dark:text-dark-100 h-9 w-56 rounded-md border border-gray-300 px-3 text-sm text-gray-700 focus:ring-1 focus:outline-none"
             />
-            <button
+            {/* <button
               onClick={() =>
                 navigate(`/dashboards/accounts/customer-ledger/${customerid}`)
               }
               className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
             >
               View Ledger
-            </button>
+            </button> */}
             <button
               onClick={() =>
                 navigate("/dashboards/accounts/payment-list-party-wise")

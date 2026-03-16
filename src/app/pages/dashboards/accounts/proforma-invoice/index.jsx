@@ -1,4 +1,8 @@
-// Import Dependencies
+// index.jsx — Proforma Invoice List
+// Route: /dashboards/accounts/proforma-invoice
+// PHP: performainvoicelist.php + performainvoicelistdata.php
+// API: GET /accounts/proforma-invoicelist
+
 import {
   flexRender,
   getCoreRowModel,
@@ -12,83 +16,81 @@ import {
 import clsx from "clsx";
 import { useState, useEffect } from "react";
 import axios from "utils/axios";
+import { toast } from "sonner";
 
-// Local Imports
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
 import { TableSortIcon } from "components/shared/table/TableSortIcon";
 import { Page } from "components/shared/Page";
 import { useLockScrollbar, useDidUpdate, useLocalStorage } from "hooks";
 import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
-import { Toolbar } from "./Toolbar";
-import { columns } from "./columns";
 import { PaginationSection } from "components/shared/table/PaginationSection";
-import { SelectedRowsActions } from "./SelectedRowsActions";
 import { useThemeContext } from "app/contexts/theme/context";
 import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
+import { Toolbar } from "./Toolbar";
+import { columns } from "./columns";
 
 // ----------------------------------------------------------------------
 
 const isSafari = getUserAgentBrowser() === "Safari";
 
-export default function OrdersDatatableV1() {
+// PHP permission IDs — adjust to your auth system
+const PERMISSIONS = [41, 62, 300];
+
+export default function ProformaInvoiceList() {
   const { cardSkin } = useThemeContext();
 
-  const [orders, setOrders] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch from API
+  // ── Fetch on mount — PHP: performainvoicelistdata.php ────────────────
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get("/accounts/proforma-invoicelist");
+      if (
+        (res.data.status === true || res.data.status === "true") &&
+        Array.isArray(res.data.data)
+      ) {
+        setInvoices(res.data.data);
+      } else {
+        setInvoices([]);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load proforma invoices");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchModes();
+    fetchInvoices();
   }, []);
 
-  const fetchModes = async () => {
-  try {
-    setLoading(true); // start loader
-    const response = await axios.get("/master/mode-list");
-    
-    // console.log("API response:", response.data); // debug
-
-    if (response.data.status && Array.isArray(response.data.data)) {
-      setOrders(response.data.data); // ✅ correct assignment
-    } else {
-      console.warn("Unexpected response structure:", response.data);
-      setOrders([]); // fallback
-    }
-
-  } catch (err) {
-    console.error("Error fetching mode list:", err);
-  } finally {
-    setLoading(false); // stop loader
-  }
-};
-
-
-
+  // ── Table settings ────────────────────────────────────────────────────
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
     enableRowDense: false,
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
-
   const [sorting, setSorting] = useState([]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage(
-    "column-visibility-orders-1",
+    "column-visibility-proforma-invoice",
     {},
   );
-
   const [columnPinning, setColumnPinning] = useLocalStorage(
-    "column-pinning-orders-1",
+    "column-pinning-proforma-invoice",
     {},
   );
 
   const [autoResetPageIndex, skipAutoResetPageIndex] = useSkipper();
 
   const table = useReactTable({
-    data: orders,
-    columns: columns,
+    data: invoices,
+    columns,
     state: {
       globalFilter,
       sorting,
@@ -96,37 +98,22 @@ export default function OrdersDatatableV1() {
       columnPinning,
       tableSettings,
     },
-        meta: {
-  updateData: (rowIndex, columnId, value) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.map((row, index) => {
-        if (index === rowIndex) {
-          return {
-            ...old[rowIndex],
-            [columnId]: value,
-          };
-        }
-        return row;
-      })
-    );
-  },
-  deleteRow: (row) => {
-    skipAutoResetPageIndex();
-    setOrders((old) =>
-      old.filter((oldRow) => oldRow.id !== row.original.id)
-    );
-  },
-  deleteRows: (rows) => {
-    skipAutoResetPageIndex();
-    const rowIds = rows.map((row) => row.original.id);
-    setOrders((old) => old.filter((row) => !rowIds.includes(row.id)));
-  },
-  setTableSettings
-},
-    filterFns: {
-      fuzzy: fuzzyFilter,
+    meta: {
+      permissions: PERMISSIONS,
+      setTableSettings,
+      // Update a single row field (used after approve)
+      updateRow: (rowIndex, updates) => {
+        skipAutoResetPageIndex();
+        setInvoices((old) =>
+          old.map((row, i) => (i === rowIndex ? { ...row, ...updates } : row)),
+        );
+      },
+      deleteRow: (row) => {
+        skipAutoResetPageIndex();
+        setInvoices((old) => old.filter((r) => r.id !== row.original.id));
+      },
     },
+    filterFns: { fuzzy: fuzzyFilter },
     enableSorting: tableSettings.enableSorting,
     enableColumnFilters: tableSettings.enableColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -137,44 +124,58 @@ export default function OrdersDatatableV1() {
     globalFilterFn: fuzzyFilter,
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-
     getPaginationRowModel: getPaginationRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
-
     autoResetPageIndex,
+    initialState: { pagination: { pageSize: 25 } }, // PHP: "pageLength": 25
   });
 
-  useDidUpdate(() => table.resetRowSelection(), [orders]);
-
+  useDidUpdate(() => table.resetRowSelection(), [invoices]);
   useLockScrollbar(tableSettings.enableFullScreen);
 
-  // ✅ Loading UI
+  // ── Loading ───────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <Page title="Modes List">
+      <Page title="Proforma Invoice List">
         <div className="flex h-[60vh] items-center justify-center text-gray-600">
-          <svg className="animate-spin h-6 w-6 mr-2 text-blue-600" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"></path>
+          <svg
+            className="mr-2 h-6 w-6 animate-spin text-blue-600"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 000 8v4a8 8 0 01-8-8z"
+            />
           </svg>
-          Loading Modes...
+          Loading Proforma Invoices...
         </div>
       </Page>
     );
   }
 
   return (
-    <Page title="Modes List">
+    <Page title="Proforma Invoice List">
       <div className="transition-content w-full pb-5">
         <div
           className={clsx(
             "flex h-full w-full flex-col",
             tableSettings.enableFullScreen &&
-              "fixed inset-0 z-61 bg-white pt-3 dark:bg-dark-900",
+              "dark:bg-dark-900 fixed inset-0 z-61 bg-white pt-3",
           )}
         >
+          {/* Toolbar */}
           <Toolbar table={table} />
+
           <div
             className={clsx(
               "transition-content flex grow flex-col pt-3",
@@ -203,7 +204,7 @@ export default function OrdersDatatableV1() {
                           <Th
                             key={header.id}
                             className={clsx(
-                              "bg-gray-200 font-semibold uppercase text-gray-800 dark:bg-dark-800 dark:text-dark-100 first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
+                              "dark:bg-dark-800 dark:text-dark-100 bg-gray-200 font-semibold text-gray-800 uppercase first:ltr:rounded-tl-lg last:ltr:rounded-tr-lg first:rtl:rounded-tr-lg last:rtl:rounded-tl-lg",
                               header.column.getCanPin() && [
                                 header.column.getIsPinned() === "left" &&
                                   "sticky z-2 ltr:left-0 rtl:right-0",
@@ -214,7 +215,7 @@ export default function OrdersDatatableV1() {
                           >
                             {header.column.getCanSort() ? (
                               <div
-                                className="flex cursor-pointer select-none items-center space-x-3 "
+                                className="flex cursor-pointer items-center space-x-3 select-none"
                                 onClick={header.column.getToggleSortingHandler()}
                               >
                                 <span className="flex-1">
@@ -240,65 +241,74 @@ export default function OrdersDatatableV1() {
                       </Tr>
                     ))}
                   </THead>
+
                   <TBody>
-                    {table.getRowModel().rows.map((row) => {
-                      return (
+                    {table.getRowModel().rows.length === 0 ? (
+                      <Tr>
+                        <Td
+                          colSpan={columns.length}
+                          className="dark:text-dark-400 py-16 text-center text-sm text-gray-500"
+                        >
+                          No proforma invoices found
+                        </Td>
+                      </Tr>
+                    ) : (
+                      table.getRowModel().rows.map((row) => (
                         <Tr
                           key={row.id}
                           className={clsx(
-                            "relative border-y border-transparent border-b-gray-200 dark:border-b-dark-500",
-                            row.getIsSelected() && !isSafari &&
-                              "row-selected after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500",
+                            "dark:border-b-dark-500 relative border-y border-transparent border-b-gray-200",
+                            row.getIsSelected() &&
+                              !isSafari &&
+                              "row-selected after:bg-primary-500/10 ltr:after:border-l-primary-500 rtl:after:border-r-primary-500 after:pointer-events-none after:absolute after:inset-0 after:z-2 after:h-full after:w-full after:border-3 after:border-transparent",
                           )}
                         >
-                          {/* first row is a normal row */}
-                          {row.getVisibleCells().map((cell) => {
-                            return (
-                              <Td
-                                key={cell.id}
-                                className={clsx(
-                                  "relative bg-white",
-                                  cardSkin === "shadow"
-                                    ? "dark:bg-dark-700"
-                                    : "dark:bg-dark-900",
-                                  cell.column.getCanPin() && [
-                                    cell.column.getIsPinned() === "left" &&
-                                      "sticky z-2 ltr:left-0 rtl:right-0",
-                                    cell.column.getIsPinned() === "right" &&
-                                      "sticky z-2 ltr:right-0 rtl:left-0",
-                                  ],
-                                )}
-                              >
-                                {cell.column.getIsPinned() && (
-                                  <div
-                                    className={clsx(
-                                      "pointer-events-none absolute inset-0 border-gray-200 dark:border-dark-500",
-                                      cell.column.getIsPinned() === "left"
-                                        ? "ltr:border-r rtl:border-l"
-                                        : "ltr:border-l rtl:border-r",
-                                    )}
-                                  ></div>
-                                )}
-                                {flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext(),
-                                )}
-                              </Td>
-                            );
-                          })}
+                          {row.getVisibleCells().map((cell) => (
+                            <Td
+                              key={cell.id}
+                              className={clsx(
+                                "relative bg-white",
+                                cardSkin === "shadow"
+                                  ? "dark:bg-dark-700"
+                                  : "dark:bg-dark-900",
+                                cell.column.getCanPin() && [
+                                  cell.column.getIsPinned() === "left" &&
+                                    "sticky z-2 ltr:left-0 rtl:right-0",
+                                  cell.column.getIsPinned() === "right" &&
+                                    "sticky z-2 ltr:right-0 rtl:left-0",
+                                ],
+                              )}
+                            >
+                              {cell.column.getIsPinned() && (
+                                <div
+                                  className={clsx(
+                                    "dark:border-dark-500 pointer-events-none absolute inset-0 border-gray-200",
+                                    cell.column.getIsPinned() === "left"
+                                      ? "ltr:border-r rtl:border-l"
+                                      : "ltr:border-l rtl:border-r",
+                                  )}
+                                />
+                              )}
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </Td>
+                          ))}
                         </Tr>
-                      );
-                    })}
+                      ))
+                    )}
                   </TBody>
                 </Table>
               </div>
-              <SelectedRowsActions table={table} />
-              {table.getCoreRowModel().rows.length && (
+
+              {/* Pagination */}
+              {table.getCoreRowModel().rows.length > 0 && (
                 <div
                   className={clsx(
                     "px-4 pb-4 sm:px-5 sm:pt-4",
                     tableSettings.enableFullScreen &&
-                      "bg-gray-50 dark:bg-dark-800",
+                      "dark:bg-dark-800 bg-gray-50",
                     !(
                       table.getIsSomeRowsSelected() ||
                       table.getIsAllRowsSelected()
