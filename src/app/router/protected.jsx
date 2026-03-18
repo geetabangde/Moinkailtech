@@ -2805,7 +2805,7 @@ const protectedRoutes = {
                   lazy: async () => ({
                     Component: (
                       await import(
-                        "app/pages/dashboards/accounts/calibration-invoice-list/Addcalibrationinvoice"
+                        "app/pages/dashboards/accounts/calibration-invoice-list/EditCalibrationInvoice"
                       )
                     ).default,
                   }),
@@ -2815,7 +2815,27 @@ const protectedRoutes = {
                   lazy: async () => ({
                     Component: (
                       await import(
-                        "app/pages/dashboards/accounts/calibration-invoice-list/Addcalibrationinvoice"
+                        "app/pages/dashboards/accounts/calibration-invoice-list/AddCalibrationInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-invoice-list/add-advance",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-invoice-list/AddAdvanceCalibrationInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "calibration-invoice-list/add-foc",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/calibration-invoice-list/AddFOCCalibrationInvoice"
                       )
                     ).default,
                   }),

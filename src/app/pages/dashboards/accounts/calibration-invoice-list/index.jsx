@@ -20,6 +20,7 @@ import { useState, useEffect } from "react";
 import axios from "utils/axios";
 import { toast } from "sonner";
 
+import { ColumnFilter } from "components/shared/table/ColumnFilter";
 import { Table, Card, THead, TBody, Th, Tr, Td } from "components/ui";
 import { TableSortIcon } from "components/shared/table/TableSortIcon";
 import { Page } from "components/shared/Page";
@@ -28,13 +29,10 @@ import { fuzzyFilter } from "utils/react-table/fuzzyFilter";
 import { useSkipper } from "utils/react-table/useSkipper";
 import { PaginationSection } from "components/shared/table/PaginationSection";
 import { useThemeContext } from "app/contexts/theme/context";
-// import { getUserAgentBrowser } from "utils/dom/getUserAgentBrowser";
 import { Toolbar } from "./Toolbar";
 import { columns } from "./columns";
 
 // ----------------------------------------------------------------------
-
-
 
 // PHP permission IDs — adjust to your auth system
 const PERMISSIONS = [146, 61, 269, 270, 271, 273, 292, 314, 383];
@@ -66,6 +64,8 @@ export default function CalibrationInvoiceList() {
   const [tableSettings, setTableSettings] = useState({
     enableFullScreen: false,
     enableRowDense: false,
+    enableSorting: true, // ✅ sorting on
+    enableColumnFilters: true, // ✅ per-column search on
   });
 
   const [globalFilter, setGlobalFilter] = useState("");
@@ -203,6 +203,7 @@ export default function CalibrationInvoiceList() {
                               ],
                             )}
                           >
+                            {/* ── Column Header + Sort ── */}
                             {header.column.getCanSort() ? (
                               <div
                                 className="flex cursor-pointer items-center space-x-3 select-none"
@@ -226,6 +227,35 @@ export default function CalibrationInvoiceList() {
                                 header.getContext(),
                               )
                             )}
+
+                            {/* ── Per-column Filter ──────────────────────────
+                                PHP port:
+                                  status column  → <select> Pending/Approved/Einvoice
+                                  other columns  → <input type="text"> Search...
+                            ─────────────────────────────────────────────── */}
+                            {header.column.getCanFilter() ? (
+                              header.column.columnDef.meta?.filterType ===
+                              "select" ? (
+                                // PHP: columns[8] → select dropdown exact match
+                                <select
+                                  className="dark:border-dark-500 dark:bg-dark-900 dark:text-dark-100 mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                  value={header.column.getFilterValue() ?? ""}
+                                  onChange={(e) =>
+                                    header.column.setFilterValue(
+                                      e.target.value || undefined,
+                                    )
+                                  }
+                                >
+                                  <option value="">All</option>
+                                  <option value="0">Pending</option>
+                                  <option value="1">Approved</option>
+                                  <option value="2">Einvoice</option>
+                                </select>
+                              ) : (
+                                // PHP: text input like '%value%' for all other columns
+                                <ColumnFilter column={header.column} />
+                              )
+                            ) : null}
                           </Th>
                         ))}
                       </Tr>
