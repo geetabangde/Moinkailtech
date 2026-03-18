@@ -2851,6 +2851,36 @@ const protectedRoutes = {
                   }),
                 },
                 {
+                  path: "testing-invoices/create",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/testing-invoices/AddTestingInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "testing-invoices/create-advance",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/testing-invoices/AddTestingAdvanceInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
+                  path: "testing-invoices/create-foc",
+                  lazy: async () => ({
+                    Component: (
+                      await import(
+                        "app/pages/dashboards/accounts/testing-invoices/AddTestingFOCInvoice"
+                      )
+                    ).default,
+                  }),
+                },
+                {
                   path: "past-invoices",
                   lazy: async () => ({
                     Component: (
